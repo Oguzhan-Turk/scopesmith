@@ -36,14 +36,33 @@
 - Spring AI still evolving (1.x) — version locked to avoid breaking changes
 - Acceptable for 15-day competition timeline
 
-## ADR-003: Story Point Estimation
-**Date:** 2026-03-28
-**Status:** Accepted
+## ADR-003: Story Point Estimation — Learning System
+**Date:** 2026-03-29
+**Status:** Accepted (updated)
 
-**Decision:** AI-powered contextual SP suggestion instead of deterministic question-based calculation
+**Decision:** AI-powered contextual SP suggestion that learns from team decisions over time
 
 **Rationale:**
-- Existing SP calculator uses 6 fixed questions (service count, DB changes, integration, logic, testing, requirement maturity)
-- Fixed questions can't capture project-specific complexity
+- Existing SP calculator uses 6 fixed questions — can't capture project-specific complexity
 - AI considers project context, similar past tasks, and provides rationale
-- SP is a suggestion, not a final decision — team decides
+- SP is a suggestion, not the final decision — team decides
+
+**Learning mechanism (3 layers):**
+
+1. **Team calibration** — spFinal (team decision) stored per task. When enough data
+   accumulates (20+ tasks), AI references team's historical SP patterns.
+   "I suggest 5 SP, but your team typically rates similar tasks at 8."
+   Minimum threshold: don't reference history with < 20 tasks.
+
+2. **Overestimate/underestimate pattern** — AI suggestion vs team decision vs actual
+   completion. Triple comparison. "This team consistently underestimates DB tasks."
+   Requires Jira sprint completion data — post-MVP.
+
+3. **Similar task reference** — Show actual past tasks as evidence.
+   "Similar to 'Create DiscountCode entity' (5 SP, completed in 3 days)."
+   Past task title + description sent to Claude for similarity matching.
+   This is MVP-feasible and high impact.
+
+**Implementation priority:**
+- MVP: Layer 1 (calibration) + Layer 3 (similar task reference)
+- Post-MVP: Layer 2 (pattern detection, needs Jira data)
