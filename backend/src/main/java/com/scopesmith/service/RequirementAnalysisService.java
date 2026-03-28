@@ -1,10 +1,7 @@
 package com.scopesmith.service;
 
 import com.scopesmith.dto.AnalysisResult;
-import com.scopesmith.entity.Analysis;
-import com.scopesmith.entity.Question;
-import com.scopesmith.entity.Requirement;
-import com.scopesmith.entity.RequirementStatus;
+import com.scopesmith.entity.*;
 import com.scopesmith.repository.AnalysisRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -92,6 +89,92 @@ public class RequirementAnalysisService {
         analysisRepository.save(savedAnalysis);
 
         return savedAnalysis;
+    }
+
+    /**
+     * Re-analyze a requirement using the previous analysis + answers as additional context.
+     * Creates a NEW analysis record — the old one is preserved for history.
+     */
+    @Transactional
+    public Analysis reAnalyze(Analysis previousAnalysis) {
+        Requirement requirement = previousAnalysis.getRequirement();
+        requirement.setStatus(RequirementStatus.ANALYZING);
+
+        String userMessage = buildReAnalysisMessage(requirement, previousAnalysis);
+
+        log.info("Starting re-analysis for requirement #{} (previous analysis #{})",
+                requirement.getId(), previousAnalysis.getId());
+        AnalysisResult result = aiService.chatWithStructuredOutput(SYSTEM_PROMPT, userMessage, AnalysisResult.class);
+        log.info("Re-analysis complete for requirement #{}", requirement.getId());
+
+        Analysis newAnalysis = Analysis.builder()
+                .requirement(requirement)
+                .structuredSummary(result.getStructuredSummary())
+                .assumptions(String.join("\n", result.getAssumptions()))
+                .riskLevel(result.getRiskLevel())
+                .riskReason(result.getRiskReason())
+                .affectedModules(String.join(", ", result.getAffectedModules()))
+                .requirementVersion(requirement.getVersion())
+                .build();
+
+        Analysis savedAnalysis = analysisRepository.save(newAnalysis);
+
+        for (String questionText : result.getQuestions()) {
+            Question question = Question.builder()
+                    .analysis(savedAnalysis)
+                    .questionText(questionText)
+                    .build();
+            savedAnalysis.getQuestions().add(question);
+        }
+
+        requirement.setStatus(
+                result.getQuestions().isEmpty() ? RequirementStatus.ANALYZED : RequirementStatus.CLARIFYING
+        );
+
+        analysisRepository.save(savedAnalysis);
+        return savedAnalysis;
+    }
+
+    private String buildReAnalysisMessage(Requirement requirement, Analysis previousAnalysis) {
+        StringBuilder message = new StringBuilder();
+
+        // Project context
+        String techContext = requirement.getProject().getTechContext();
+        if (techContext != null && !techContext.isBlank()) {
+            message.append("## Project Context\n");
+            message.append(techContext);
+            message.append("\n\n");
+        }
+
+        message.append("## Raw Requirement\n");
+        message.append(requirement.getRawText());
+        message.append("\n\n");
+
+        // Previous analysis summary
+        message.append("## Previous Analysis\n");
+        message.append(previousAnalysis.getStructuredSummary());
+        message.append("\n\n");
+
+        // Q&A pairs
+        message.append("## Clarification Q&A\n");
+        message.append("The following questions were asked and answered. ");
+        message.append("Use these answers to produce a MORE PRECISE and COMPLETE analysis.\n\n");
+
+        for (Question q : previousAnalysis.getQuestions()) {
+            if (q.getStatus() == QuestionStatus.ANSWERED) {
+                message.append("**Q:** ").append(q.getQuestionText()).append("\n");
+                message.append("**A:** ").append(q.getAnswer()).append("\n\n");
+            } else if (q.getStatus() == QuestionStatus.DISMISSED) {
+                message.append("**Q:** ").append(q.getQuestionText()).append("\n");
+                message.append("**A:** _(Dismissed — not relevant)_\n\n");
+            }
+        }
+
+        message.append("Based on these answers, refine your analysis. ");
+        message.append("Ask NEW questions only if critical information is still missing. ");
+        message.append("Do not repeat already-answered questions.");
+
+        return message.toString();
     }
 
     private String buildUserMessage(Requirement requirement) {
