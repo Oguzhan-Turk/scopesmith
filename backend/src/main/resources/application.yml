@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: ScopeSmith
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/scopesmith
+    username: scopesmith
+    password: scopesmith_dev
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+server:
+  port: 8080
+
+logging:
+  level:
+    com.scopesmith: DEBUG
+    org.hibernate.SQL: WARN
