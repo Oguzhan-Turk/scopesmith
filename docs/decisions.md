@@ -18,17 +18,23 @@
 - Python FastAPI: better AI ecosystem but new backend language for developer
 - Java 25 + Spring Boot 4.0: too new, risk of unexpected issues in 15-day timeline
 
-## ADR-002: AI Integration Approach
-**Date:** 2026-03-28
-**Status:** Accepted
+## ADR-002: AI Integration — Spring AI over Anthropic SDK
+**Date:** 2026-03-29
+**Status:** Accepted (updated from raw SDK)
 
-**Decision:** Claude API with structured prompts, no custom code parser — let Claude analyze raw code files
+**Decision:** Spring AI (spring-ai-starter-model-anthropic 1.1.4) with AiService interface abstraction
 
 **Rationale:**
-- Writing custom parsers for entity/service/controller detection is fragile and project-structure dependent
-- Claude excels at understanding code structure from raw files
-- Send file tree + key files → Claude extracts project context
-- Context stored as structured summary in DB, reused across analyses
+- Structured output: `.entity(Class)` auto-maps JSON to Java objects — critical for our use case
+- Reduced boilerplate: no manual JSON parsing, retry, error handling
+- Provider-agnostic: swap Claude for GPT by changing config, not code
+- DIP applied: AiService interface → SpringAiService implementation
+- Code parsing: no custom parser — let Claude analyze raw code files
+
+**Trade-off:**
+- Less low-level control than raw SDK
+- Spring AI still evolving (1.x) — version locked to avoid breaking changes
+- Acceptable for 15-day competition timeline
 
 ## ADR-003: Story Point Estimation
 **Date:** 2026-03-28

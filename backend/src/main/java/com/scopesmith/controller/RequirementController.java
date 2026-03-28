@@ -1,7 +1,9 @@
 package com.scopesmith.controller;
 
+import com.scopesmith.dto.AnalysisResponse;
 import com.scopesmith.dto.RequirementRequest;
 import com.scopesmith.dto.RequirementResponse;
+import com.scopesmith.service.RequirementAnalysisService;
 import com.scopesmith.service.RequirementService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +19,7 @@ import java.util.List;
 public class RequirementController {
 
     private final RequirementService requirementService;
+    private final RequirementAnalysisService analysisService;
 
     @PostMapping("/projects/{projectId}/requirements")
     @ResponseStatus(HttpStatus.CREATED)
@@ -41,5 +44,10 @@ public class RequirementController {
             @PathVariable Long id,
             @Valid @RequestBody RequirementRequest request) {
         return requirementService.update(id, request);
+    }
+
+    @PostMapping("/requirements/{id}/analyze")
+    public AnalysisResponse analyze(@PathVariable Long id) {
+        return AnalysisResponse.from(analysisService.analyze(id));
     }
 }
