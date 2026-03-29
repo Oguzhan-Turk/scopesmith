@@ -2,6 +2,7 @@ package com.scopesmith.service;
 
 import com.scopesmith.config.PromptLoader;
 import com.scopesmith.entity.Analysis;
+import com.scopesmith.entity.QuestionStatus;
 import com.scopesmith.entity.Task;
 import com.scopesmith.repository.AnalysisRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -19,46 +20,72 @@ public class StakeholderSummaryService {
     private final AnalysisRepository analysisRepository;
     private final PromptLoader promptLoader;
 
-    // Prompt loaded from resources/prompts/stakeholder-summary.txt via PromptLoader
-
-    @Transactional
+    /**
+     * Generate stakeholder summary. AI call is outside the transaction to avoid
+     * holding a DB connection for 15-30s during the API call.
+     */
     public String generateSummary(Long analysisId) {
-        Analysis analysis = analysisRepository.findById(analysisId)
-                .orElseThrow(() -> new EntityNotFoundException("Analysis not found with id: " + analysisId));
+        // Phase 1: Read data (short tx)
+        String userMessage = readSummaryData(analysisId);
 
-        String userMessage = buildSummaryMessage(analysis);
-
+        // Phase 2: AI call (no tx — no DB connection held)
         log.info("Generating stakeholder summary for analysis #{}", analysisId);
         String summary = aiService.chat(promptLoader.load("stakeholder-summary"), userMessage);
         log.info("Stakeholder summary generated for analysis #{}", analysisId);
 
-        // Save to analysis
-        analysis.setPoSummary(summary);
-        analysisRepository.save(analysis);
+        // Phase 3: Save result (short tx)
+        saveSummary(analysisId, summary);
 
         return summary;
     }
 
-    @Transactional
+    /**
+     * Refine existing stakeholder summary with user instruction.
+     * AI call is outside the transaction.
+     */
     public String refineSummary(Long analysisId, String instruction) {
-        Analysis analysis = analysisRepository.findById(analysisId)
-                .orElseThrow(() -> new EntityNotFoundException("Analysis not found with id: " + analysisId));
+        // Phase 1: Read data (short tx)
+        String currentSummary = readCurrentSummary(analysisId);
 
-        if (analysis.getPoSummary() == null || analysis.getPoSummary().isBlank()) {
-            throw new IllegalStateException("No existing stakeholder summary to refine for analysis: " + analysisId);
-        }
-
-        String userMessage = "## Current Summary\n" + analysis.getPoSummary()
+        String userMessage = "## Current Summary\n" + currentSummary
                 + "\n\n## Refinement Instruction\n" + instruction;
 
+        // Phase 2: AI call (no tx)
         log.info("Refining stakeholder summary for analysis #{}", analysisId);
         String refined = aiService.chat(promptLoader.load("stakeholder-summary-refine"), userMessage);
         log.info("Stakeholder summary refined for analysis #{}", analysisId);
 
-        analysis.setPoSummary(refined);
-        analysisRepository.save(analysis);
+        // Phase 3: Save result (short tx)
+        saveSummary(analysisId, refined);
 
         return refined;
+    }
+
+    @Transactional(readOnly = true)
+    protected String readSummaryData(Long analysisId) {
+        Analysis analysis = findAnalysis(analysisId);
+        return buildSummaryMessage(analysis);
+    }
+
+    @Transactional(readOnly = true)
+    protected String readCurrentSummary(Long analysisId) {
+        Analysis analysis = findAnalysis(analysisId);
+        if (analysis.getPoSummary() == null || analysis.getPoSummary().isBlank()) {
+            throw new IllegalStateException("No existing stakeholder summary to refine for analysis: " + analysisId);
+        }
+        return analysis.getPoSummary();
+    }
+
+    @Transactional
+    protected void saveSummary(Long analysisId, String summary) {
+        Analysis analysis = findAnalysis(analysisId);
+        analysis.setPoSummary(summary);
+        analysisRepository.save(analysis);
+    }
+
+    private Analysis findAnalysis(Long analysisId) {
+        return analysisRepository.findById(analysisId)
+                .orElseThrow(() -> new EntityNotFoundException("Analysis not found with id: " + analysisId));
     }
 
     private String buildSummaryMessage(Analysis analysis) {
@@ -87,14 +114,14 @@ public class StakeholderSummaryService {
             message.append(String.format("\nTotal: %d tasks, %d SP estimated\n\n", analysis.getTasks().size(), totalSp));
         }
 
-        // Open questions
+        // Open questions — fixed: use enum comparison instead of string
         long openQuestions = analysis.getQuestions().stream()
-                .filter(q -> q.getStatus().name().equals("OPEN"))
+                .filter(q -> q.getStatus() == QuestionStatus.OPEN)
                 .count();
         if (openQuestions > 0) {
             message.append("## Open Questions (").append(openQuestions).append(" remaining)\n");
             analysis.getQuestions().stream()
-                    .filter(q -> q.getStatus().name().equals("OPEN"))
+                    .filter(q -> q.getStatus() == QuestionStatus.OPEN)
                     .forEach(q -> message.append("- ").append(q.getQuestionText()).append("\n"));
         }
 

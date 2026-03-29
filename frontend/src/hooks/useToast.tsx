@@ -29,12 +29,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ toasts, showToast }}>
       {children}
-      {/* Toast container */}
-      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm">
+      {/* Toast container — aria-live for screen reader announcements */}
+      <div
+        aria-live="polite"
+        aria-atomic="true"
+        role="status"
+        className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm"
+      >
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`px-4 py-3 rounded-lg shadow-lg text-sm border animate-in slide-in-from-bottom-2 ${
+            className={`px-4 py-3 rounded-lg shadow-lg text-sm border animate-in slide-in-from-bottom-2 cursor-pointer ${
               toast.type === "error"
                 ? "bg-destructive text-destructive-foreground"
                 : toast.type === "success"

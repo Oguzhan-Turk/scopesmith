@@ -1,18 +1,32 @@
-const API_BASE = "http://localhost:8080/api/v1";
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8080/api/v1";
+const DEFAULT_TIMEOUT_MS = 60_000;
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
-    ...options,
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
 
-  if (!res.ok) {
-    const error = await res.json().catch(() => ({ message: "Request failed" }));
-    throw new Error(error.message || `HTTP ${res.status}`);
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      headers: { "Content-Type": "application/json" },
+      ...options,
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ message: `HTTP ${res.status}` }));
+      throw new Error(error.message || `HTTP ${res.status}`);
+    }
+
+    if (res.status === 204) return undefined as T;
+    return res.json();
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") {
+      throw new Error("İstek zaman aşımına uğradı. Sunucu yanıt vermedi.");
+    }
+    throw e;
+  } finally {
+    clearTimeout(timeout);
   }
-
-  if (res.status === 204) return undefined as T;
-  return res.json();
 }
 
 // Projects

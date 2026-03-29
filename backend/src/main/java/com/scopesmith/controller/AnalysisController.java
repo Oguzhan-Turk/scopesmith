@@ -29,7 +29,7 @@ public class AnalysisController {
 
     @GetMapping("/{id}")
     public AnalysisResponse getAnalysis(@PathVariable Long id) {
-        Analysis analysis = analysisRepository.findById(id)
+        Analysis analysis = analysisRepository.findByIdWithRequirement(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Analysis not found"));
         return AnalysisResponse.from(analysis);
     }
@@ -49,7 +49,7 @@ public class AnalysisController {
     public List<TaskResponse> refineTasks(
             @PathVariable Long id,
             @RequestBody Map<String, String> request) {
-        String instruction = request.get("instruction");
+        String instruction = extractInstruction(request);
         return taskBreakdownService.refineTasks(id, instruction);
     }
 
@@ -63,8 +63,19 @@ public class AnalysisController {
     public Map<String, String> refineStakeholderSummary(
             @PathVariable Long id,
             @RequestBody Map<String, String> request) {
-        String instruction = request.get("instruction");
+        String instruction = extractInstruction(request);
         String refined = stakeholderSummaryService.refineSummary(id, instruction);
         return Map.of("summary", refined);
+    }
+
+    private String extractInstruction(Map<String, String> request) {
+        String instruction = request.get("instruction");
+        if (instruction == null || instruction.isBlank()) {
+            throw new IllegalArgumentException("instruction cannot be empty");
+        }
+        if (instruction.length() > 1000) {
+            throw new IllegalArgumentException("instruction too long (max 1000 characters)");
+        }
+        return instruction.trim();
     }
 }

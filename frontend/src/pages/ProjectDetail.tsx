@@ -29,6 +29,15 @@ import { Spinner } from "@/components/ui/spinner";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/useToast";
 
+type BadgeVariant = "default" | "secondary" | "destructive";
+
+function riskColor(level: string): BadgeVariant {
+  const l = level?.toUpperCase();
+  if (l?.includes("HIGH")) return "destructive";
+  if (l?.includes("MEDIUM")) return "secondary";
+  return "default";
+}
+
 const LOADING_LABELS: Record<string, string> = {
   scan: "Proje taranıyor... Bu birkaç dakika sürebilir.",
   tasks: "Task'lar AI tarafından üretiliyor...",
@@ -102,9 +111,9 @@ export default function ProjectDetail() {
       const result = await getAnalysesByRequirement(requirementId);
       setAnalyses(result);
       if (result.length > 0) {
-        const latest = result[0];
+        const latest = result[0]; // sorted by createdAt DESC on backend
         setSelectedAnalysis(latest);
-        loadTasks(latest.id);
+        await loadTasks(latest.id);
       } else {
         setSelectedAnalysis(null);
         setTasks([]);
@@ -299,22 +308,17 @@ export default function ProjectDetail() {
   if (!project) return <div className="text-center text-destructive py-12">Proje bulunamadı</div>;
 
   // Check if current action is a long-running AI call
-  const aiLoading = actionLoading && LOADING_LABELS[actionLoading];
+  const aiLoadingLabel = actionLoading ? LOADING_LABELS[actionLoading] : null;
   const isAnalyzing = actionLoading?.startsWith("analyze-");
-
-  const riskColor = (level: string) => {
-    const l = level?.toUpperCase();
-    if (l?.includes("HIGH")) return "destructive";
-    if (l?.includes("MEDIUM")) return "secondary";
-    return "default";
-  };
+  const showProgress = !!(aiLoadingLabel || isAnalyzing);
 
   return (
     <div className="space-y-8 relative">
-      {/* AI Loading Overlay (madde 4) */}
-      {(aiLoading || isAnalyzing) && (
-        <div className="fixed inset-0 z-40 bg-background/80 flex items-center justify-center">
-          <Spinner label={aiLoading || "AI analiz ediyor..."} />
+      {/* AI Progress Bar — non-blocking, user can still browse */}
+      {showProgress && (
+        <div className="sticky top-0 z-30 -mx-6 -mt-8 mb-4 px-6 py-3 bg-primary/10 border-b flex items-center gap-3">
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <p className="text-sm font-medium">{aiLoadingLabel || "AI analiz ediyor..."}</p>
         </div>
       )}
 
@@ -475,7 +479,7 @@ export default function ProjectDetail() {
                     <div className="flex gap-2">
                       {/* Madde 7: Risk tooltip */}
                       <Tooltip content={selectedAnalysis.riskReason || "Risk bilgisi yok"}>
-                        <Badge variant={riskColor(selectedAnalysis.riskLevel) as "default" | "secondary" | "destructive"} className="cursor-help">
+                        <Badge variant={riskColor(selectedAnalysis.riskLevel)} className="cursor-help">
                           Risk: {selectedAnalysis.riskLevel}
                         </Badge>
                       </Tooltip>

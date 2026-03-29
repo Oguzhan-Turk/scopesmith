@@ -28,66 +28,61 @@ public class TaskBreakdownService {
 
     private static final long MIN_TASKS_FOR_CALIBRATION = 20;
 
-    @Transactional
+    /**
+     * Generate tasks from analysis. AI call is outside the transaction.
+     */
     public List<TaskResponse> generateTasks(Long analysisId) {
-        Analysis analysis = analysisRepository.findById(analysisId)
-                .orElseThrow(() -> new EntityNotFoundException("Analysis not found with id: " + analysisId));
+        // Phase 1: Read + validate (short tx)
+        String userMessage = readTaskBreakdownData(analysisId);
 
-        if (!analysis.getTasks().isEmpty()) {
-            throw new IllegalStateException("Tasks already exist for analysis #" + analysisId
-                    + ". Use the refine endpoint to modify existing tasks.");
-        }
-
-        String userMessage = buildTaskBreakdownMessage(analysis);
-
+        // Phase 2: AI call (no tx — no DB connection held)
         log.info("Generating task breakdown for analysis #{}", analysisId);
         TaskBreakdownResult result = aiService.chatWithStructuredOutput(
                 promptLoader.load("task-breakdown"), userMessage, TaskBreakdownResult.class);
         log.info("Task breakdown complete for analysis #{}. {} tasks generated.",
                 analysisId, result.getTasks().size());
 
-        // Save tasks — handle dependencies by title matching
-        Map<String, Task> savedTasks = new HashMap<>();
-
-        for (TaskBreakdownResult.TaskItem item : result.getTasks()) {
-            Task task = Task.builder()
-                    .analysis(analysis)
-                    .title(item.getTitle())
-                    .description(item.getDescription())
-                    .acceptanceCriteria(item.getAcceptanceCriteria())
-                    .spSuggestion(item.getSpSuggestion())
-                    .spRationale(item.getSpRationale())
-                    .priority(parsePriority(item.getPriority()))
-                    .build();
-
-            // Link dependency if specified
-            if (item.getDependsOn() != null && savedTasks.containsKey(item.getDependsOn())) {
-                task.setDependency(savedTasks.get(item.getDependsOn()));
-            }
-
-            Task saved = taskRepository.save(task);
-            savedTasks.put(saved.getTitle(), saved);
-            analysis.getTasks().add(saved);
-        }
-
-        // Update requirement status
-        analysis.getRequirement().setStatus(RequirementStatus.READY);
-
-        return analysis.getTasks().stream()
-                .map(TaskResponse::from)
-                .toList();
+        // Phase 3: Save tasks (short tx)
+        return saveGeneratedTasks(analysisId, result);
     }
 
-    @Transactional
+    /**
+     * Refine existing tasks with user instruction. AI call is outside the transaction.
+     */
     public List<TaskResponse> refineTasks(Long analysisId, String instruction) {
-        Analysis analysis = analysisRepository.findById(analysisId)
-                .orElseThrow(() -> new EntityNotFoundException("Analysis not found with id: " + analysisId));
+        // Phase 1: Read current tasks (short tx)
+        String userMessage = readRefineData(analysisId, instruction);
+
+        // Phase 2: AI call (no tx)
+        log.info("Refining tasks for analysis #{}", analysisId);
+        TaskBreakdownResult result = aiService.chatWithStructuredOutput(
+                promptLoader.load("task-breakdown-refine"), userMessage, TaskBreakdownResult.class);
+        log.info("Task refinement complete for analysis #{}. {} tasks generated.", analysisId, result.getTasks().size());
+
+        // Phase 3: Replace tasks (short tx)
+        return replaceTasksWithRefined(analysisId, result);
+    }
+
+    @Transactional(readOnly = true)
+    protected String readTaskBreakdownData(Long analysisId) {
+        Analysis analysis = findAnalysis(analysisId);
+
+        if (!analysis.getTasks().isEmpty()) {
+            throw new IllegalStateException("Tasks already exist for analysis #" + analysisId
+                    + ". Use the refine endpoint to modify existing tasks.");
+        }
+
+        return buildTaskBreakdownMessage(analysis);
+    }
+
+    @Transactional(readOnly = true)
+    protected String readRefineData(Long analysisId, String instruction) {
+        Analysis analysis = findAnalysis(analysisId);
 
         if (analysis.getTasks().isEmpty()) {
             throw new IllegalStateException("No existing tasks to refine for analysis #" + analysisId);
         }
 
-        // Build message with current tasks + instruction
         StringBuilder userMessage = new StringBuilder();
         userMessage.append("## Current Tasks\n");
         for (Task task : analysis.getTasks()) {
@@ -101,17 +96,50 @@ public class TaskBreakdownService {
         userMessage.append("\n\n## Refinement Instruction\n");
         userMessage.append(instruction);
 
-        log.info("Refining tasks for analysis #{}", analysisId);
-        TaskBreakdownResult result = aiService.chatWithStructuredOutput(
-                promptLoader.load("task-breakdown-refine"), userMessage.toString(), TaskBreakdownResult.class);
-        log.info("Task refinement complete for analysis #{}. {} tasks generated.", analysisId, result.getTasks().size());
+        return userMessage.toString();
+    }
 
-        // Delete old tasks
+    @Transactional
+    protected List<TaskResponse> saveGeneratedTasks(Long analysisId, TaskBreakdownResult result) {
+        Analysis analysis = findAnalysis(analysisId);
+
+        // Double-check: guard against concurrent generation
+        if (!analysis.getTasks().isEmpty()) {
+            throw new IllegalStateException("Tasks were already generated concurrently for analysis #" + analysisId);
+        }
+
+        Map<String, Task> savedTasks = saveTasks(analysis, result);
+        analysis.getRequirement().setStatus(RequirementStatus.READY);
+
+        return analysis.getTasks().stream()
+                .map(TaskResponse::from)
+                .toList();
+    }
+
+    @Transactional
+    protected List<TaskResponse> replaceTasksWithRefined(Long analysisId, TaskBreakdownResult result) {
+        Analysis analysis = findAnalysis(analysisId);
+
+        // Delete old tasks — dependency references are cleared first to avoid FK violations
+        for (Task task : analysis.getTasks()) {
+            task.setDependency(null);
+        }
+        taskRepository.flush();
         taskRepository.deleteAll(analysis.getTasks());
         analysis.getTasks().clear();
+        taskRepository.flush();
 
         // Save new tasks
+        saveTasks(analysis, result);
+
+        return analysis.getTasks().stream()
+                .map(TaskResponse::from)
+                .toList();
+    }
+
+    private Map<String, Task> saveTasks(Analysis analysis, TaskBreakdownResult result) {
         Map<String, Task> savedTasks = new HashMap<>();
+
         for (TaskBreakdownResult.TaskItem item : result.getTasks()) {
             Task task = Task.builder()
                     .analysis(analysis)
@@ -132,9 +160,7 @@ public class TaskBreakdownService {
             analysis.getTasks().add(saved);
         }
 
-        return analysis.getTasks().stream()
-                .map(TaskResponse::from)
-                .toList();
+        return savedTasks;
     }
 
     private String buildTaskBreakdownMessage(Analysis analysis) {
@@ -227,7 +253,6 @@ public class TaskBreakdownService {
 
             // Layer 3: Similar task reference (always available, even with few tasks)
             message.append("**Past Tasks for Reference** (use these to calibrate your estimates):\n");
-            // Send last 30 tasks max to avoid token overflow
             historicalTasks.stream().limit(30).forEach(t ->
                     message.append(String.format("- \"%s\" — AI suggested: %s SP, Team decided: %d SP\n",
                             t.getTitle(),
@@ -251,5 +276,10 @@ public class TaskBreakdownService {
         } catch (Exception e) {
             return TaskPriority.MEDIUM;
         }
+    }
+
+    private Analysis findAnalysis(Long analysisId) {
+        return analysisRepository.findById(analysisId)
+                .orElseThrow(() -> new EntityNotFoundException("Analysis not found with id: " + analysisId));
     }
 }
