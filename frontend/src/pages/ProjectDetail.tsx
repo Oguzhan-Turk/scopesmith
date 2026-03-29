@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import {
   getProject,
   getRequirements,
@@ -25,10 +25,23 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
+import { Spinner } from "@/components/ui/spinner";
+import { Tooltip } from "@/components/ui/tooltip";
+import { useToast } from "@/hooks/useToast";
+
+const LOADING_LABELS: Record<string, string> = {
+  scan: "Proje taranıyor... Bu birkaç dakika sürebilir.",
+  tasks: "Task'lar AI tarafından üretiliyor...",
+  summary: "Stakeholder özeti hazırlanıyor...",
+  "refine-summary": "Özet iyileştiriliyor...",
+  "refine-tasks": "Task'lar iyileştiriliyor...",
+};
 
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const projectId = Number(id);
+  const { showToast } = useToast();
 
   const [project, setProject] = useState<Project | null>(null);
   const [requirements, setRequirements] = useState<Requirement[]>([]);
@@ -46,9 +59,27 @@ export default function ProjectDetail() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
+  // Tab state from URL (madde 6 + 8)
+  const activeTab = searchParams.get("tab") || "requirements";
+  function setActiveTab(tab: string) {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("tab", tab);
+      return next;
+    }, { replace: true });
+  }
+
   useEffect(() => {
     loadProject();
   }, [projectId]);
+
+  // Restore requirement selection from URL (madde 8)
+  useEffect(() => {
+    const reqId = searchParams.get("req");
+    if (reqId && requirements.length > 0 && !selectedRequirementId) {
+      handleSelectRequirement(Number(reqId));
+    }
+  }, [requirements]);
 
   async function loadProject() {
     try {
@@ -59,6 +90,7 @@ export default function ProjectDetail() {
       setProject(proj);
       setRequirements(reqs);
     } catch (e) {
+      showToast("Proje yüklenemedi. Lütfen sayfayı yenileyin.");
       console.error("Failed to load project:", e);
     } finally {
       setLoading(false);
@@ -70,7 +102,7 @@ export default function ProjectDetail() {
       const result = await getAnalysesByRequirement(requirementId);
       setAnalyses(result);
       if (result.length > 0) {
-        const latest = result[0]; // sorted by createdAt DESC
+        const latest = result[0];
         setSelectedAnalysis(latest);
         loadTasks(latest.id);
       } else {
@@ -78,6 +110,7 @@ export default function ProjectDetail() {
         setTasks([]);
       }
     } catch (e) {
+      showToast("Analizler yüklenemedi.");
       console.error("Failed to load analyses:", e);
     }
   }
@@ -87,12 +120,18 @@ export default function ProjectDetail() {
       const result = await getTasksByAnalysis(analysisId);
       setTasks(result);
     } catch (e) {
+      showToast("Task'lar yüklenemedi.");
       console.error("Failed to load tasks:", e);
     }
   }
 
   function handleSelectRequirement(reqId: number) {
     setSelectedRequirementId(reqId);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("req", String(reqId));
+      return next;
+    }, { replace: true });
     loadAnalyses(reqId);
   }
 
@@ -103,7 +142,9 @@ export default function ProjectDetail() {
       const updated = await scanProject(projectId, scanPath);
       setProject(updated);
       setScanPath("");
+      showToast("Proje başarıyla tarandı.", "success");
     } catch (e) {
+      showToast("Tarama başarısız oldu. Klasör yolunu kontrol edin.");
       console.error("Scan failed:", e);
     } finally {
       setActionLoading(null);
@@ -118,7 +159,9 @@ export default function ProjectDetail() {
       setNewRequirement("");
       const reqs = await getRequirements(projectId);
       setRequirements(reqs);
+      showToast("Talep eklendi.", "success");
     } catch (e) {
+      showToast("Talep eklenemedi.");
       console.error("Failed to create requirement:", e);
     } finally {
       setActionLoading(null);
@@ -132,10 +175,17 @@ export default function ProjectDetail() {
       setSelectedRequirementId(reqId);
       setSelectedAnalysis(analysis);
       setTasks([]);
-      // Reload analyses list so it includes the new one
       const updatedAnalyses = await getAnalysesByRequirement(reqId);
       setAnalyses(updatedAnalyses);
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("req", String(reqId));
+        next.set("tab", "analysis");
+        return next;
+      }, { replace: true });
+      showToast("Analiz tamamlandı.", "success");
     } catch (e) {
+      showToast("Analiz başarısız oldu. AI servisi yanıt vermemiş olabilir.");
       console.error("Analysis failed:", e);
     } finally {
       setActionLoading(null);
@@ -152,6 +202,7 @@ export default function ProjectDetail() {
       setAnalyses((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
       setAnswers((prev) => ({ ...prev, [questionId]: "" }));
     } catch (e) {
+      showToast("Cevap gönderilemedi.");
       console.error("Failed to answer:", e);
     } finally {
       setActionLoading(null);
@@ -165,6 +216,7 @@ export default function ProjectDetail() {
       setSelectedAnalysis(updated);
       setAnalyses((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
     } catch (e) {
+      showToast("İşlem başarısız oldu.");
       console.error("Failed to dismiss:", e);
     } finally {
       setActionLoading(null);
@@ -177,7 +229,9 @@ export default function ProjectDetail() {
     try {
       const generated = await generateTasks(selectedAnalysis.id);
       setTasks(generated);
+      showToast(`${generated.length} task üretildi.`, "success");
     } catch (e) {
+      showToast("Task üretimi başarısız oldu.");
       console.error("Task generation failed:", e);
     } finally {
       setActionLoading(null);
@@ -189,15 +243,15 @@ export default function ProjectDetail() {
     setActionLoading("summary");
     try {
       const result = await generateStakeholderSummary(selectedAnalysis.id);
-      // Update the selected analysis with the new summary
       setSelectedAnalysis({ ...selectedAnalysis, stakeholderSummary: result.summary });
-      // Also update in analyses list
       setAnalyses((prev) =>
         prev.map((a) =>
           a.id === selectedAnalysis.id ? { ...a, stakeholderSummary: result.summary } : a
         )
       );
+      showToast("Stakeholder özeti hazır.", "success");
     } catch (e) {
+      showToast("Özet oluşturulamadı.");
       console.error("Summary failed:", e);
     } finally {
       setActionLoading(null);
@@ -211,7 +265,9 @@ export default function ProjectDetail() {
       const refined = await refineTasks(selectedAnalysis.id, taskInstruction);
       setTasks(refined);
       setTaskInstruction("");
+      showToast("Task'lar iyileştirildi.", "success");
     } catch (e) {
+      showToast("Task iyileştirme başarısız oldu.");
       console.error("Task refinement failed:", e);
     } finally {
       setActionLoading(null);
@@ -230,15 +286,21 @@ export default function ProjectDetail() {
         )
       );
       setSummaryInstruction("");
+      showToast("Özet iyileştirildi.", "success");
     } catch (e) {
+      showToast("Özet iyileştirme başarısız oldu.");
       console.error("Summary refinement failed:", e);
     } finally {
       setActionLoading(null);
     }
   }
 
-  if (loading) return <div className="text-center text-muted-foreground py-12">Yükleniyor...</div>;
+  if (loading) return <Spinner label="Proje yükleniyor..." />;
   if (!project) return <div className="text-center text-destructive py-12">Proje bulunamadı</div>;
+
+  // Check if current action is a long-running AI call
+  const aiLoading = actionLoading && LOADING_LABELS[actionLoading];
+  const isAnalyzing = actionLoading?.startsWith("analyze-");
 
   const riskColor = (level: string) => {
     const l = level?.toUpperCase();
@@ -248,7 +310,14 @@ export default function ProjectDetail() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 relative">
+      {/* AI Loading Overlay (madde 4) */}
+      {(aiLoading || isAnalyzing) && (
+        <div className="fixed inset-0 z-40 bg-background/80 flex items-center justify-center">
+          <Spinner label={aiLoading || "AI analiz ediyor..."} />
+        </div>
+      )}
+
       {/* Project Header */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight">{project.name}</h1>
@@ -266,12 +335,18 @@ export default function ProjectDetail() {
         </div>
       </div>
 
-      <Tabs defaultValue="requirements">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="requirements">Talepler</TabsTrigger>
           <TabsTrigger value="context">Proje Context</TabsTrigger>
-          <TabsTrigger value="analysis">Analiz</TabsTrigger>
-          <TabsTrigger value="tasks">Task'lar</TabsTrigger>
+          <TabsTrigger value="analysis">
+            Analiz
+            {selectedAnalysis && <span className="ml-1.5 text-xs opacity-60">#{selectedAnalysis.id}</span>}
+          </TabsTrigger>
+          <TabsTrigger value="tasks">
+            Task'lar
+            {tasks.length > 0 && <span className="ml-1.5 text-xs opacity-60">({tasks.length})</span>}
+          </TabsTrigger>
         </TabsList>
 
         {/* REQUIREMENTS TAB */}
@@ -296,8 +371,21 @@ export default function ProjectDetail() {
             </CardContent>
           </Card>
 
+          {requirements.length === 0 && (
+            <Card className="text-center py-12">
+              <CardContent>
+                <p className="text-muted-foreground">
+                  Henüz talep eklenmedi. Yukarıdan ilk talebinizi ekleyin.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
           {requirements.map((req) => (
-            <Card key={req.id}>
+            <Card
+              key={req.id}
+              className={selectedRequirementId === req.id ? "ring-2 ring-primary" : ""}
+            >
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base">Talep #{req.id}</CardTitle>
@@ -312,7 +400,7 @@ export default function ProjectDetail() {
                 <div className="flex gap-2">
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant={selectedRequirementId === req.id ? "default" : "outline"}
                     onClick={() => handleSelectRequirement(req.id)}
                   >
                     {selectedRequirementId === req.id ? "Seçili" : "Görüntüle"}
@@ -320,7 +408,7 @@ export default function ProjectDetail() {
                   <Button
                     size="sm"
                     onClick={() => handleAnalyze(req.id)}
-                    disabled={actionLoading === `analyze-${req.id}`}
+                    disabled={!!actionLoading}
                   >
                     {actionLoading === `analyze-${req.id}` ? "Analiz ediliyor..." : "Analiz Et"}
                   </Button>
@@ -346,9 +434,9 @@ export default function ProjectDetail() {
               />
               <Button
                 onClick={handleScan}
-                disabled={actionLoading === "scan" || !scanPath.trim()}
+                disabled={!!actionLoading || !scanPath.trim()}
               >
-                {actionLoading === "scan" ? "Taranıyor... (bu biraz sürebilir)" : "Tara"}
+                {actionLoading === "scan" ? "Taranıyor..." : "Tara"}
               </Button>
             </CardContent>
           </Card>
@@ -371,7 +459,9 @@ export default function ProjectDetail() {
             <Card className="text-center py-12">
               <CardContent>
                 <p className="text-muted-foreground">
-                  Bir talebi analiz etmek için "Talepler" sekmesinden "Analiz Et" butonuna tıklayın.
+                  {selectedRequirementId
+                    ? "Bu talep henüz analiz edilmedi. Talepler sekmesinden \"Analiz Et\" butonuna tıklayın."
+                    : "Bir talebi görüntülemek veya analiz etmek için \"Talepler\" sekmesinden başlayın."}
                 </p>
               </CardContent>
             </Card>
@@ -383,9 +473,12 @@ export default function ProjectDetail() {
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg">Analiz Sonucu</CardTitle>
                     <div className="flex gap-2">
-                      <Badge variant={riskColor(selectedAnalysis.riskLevel) as "default" | "secondary" | "destructive"}>
-                        Risk: {selectedAnalysis.riskLevel}
-                      </Badge>
+                      {/* Madde 7: Risk tooltip */}
+                      <Tooltip content={selectedAnalysis.riskReason || "Risk bilgisi yok"}>
+                        <Badge variant={riskColor(selectedAnalysis.riskLevel) as "default" | "secondary" | "destructive"} className="cursor-help">
+                          Risk: {selectedAnalysis.riskLevel}
+                        </Badge>
+                      </Tooltip>
                       {selectedAnalysis.durationMs && (
                         <Badge variant="outline">
                           {(selectedAnalysis.durationMs / 1000).toFixed(1)}s
@@ -397,17 +490,12 @@ export default function ProjectDetail() {
                 <CardContent className="space-y-4">
                   <div>
                     <h4 className="font-medium mb-1">Özet</h4>
-                    <p className="text-sm text-muted-foreground">{selectedAnalysis.structuredSummary}</p>
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{selectedAnalysis.structuredSummary}</p>
                   </div>
                   <Separator />
                   <div>
                     <h4 className="font-medium mb-1">Varsayımlar</h4>
                     <p className="text-sm text-muted-foreground whitespace-pre-wrap">{selectedAnalysis.assumptions}</p>
-                  </div>
-                  <Separator />
-                  <div>
-                    <h4 className="font-medium mb-1">Risk Nedeni</h4>
-                    <p className="text-sm text-muted-foreground">{selectedAnalysis.riskReason}</p>
                   </div>
                   <Separator />
                   <div>
@@ -475,7 +563,7 @@ export default function ProjectDetail() {
               {/* Actions */}
               <div className="flex gap-3">
                 {tasks.length === 0 ? (
-                  <Button onClick={handleGenerateTasks} disabled={actionLoading === "tasks"}>
+                  <Button onClick={handleGenerateTasks} disabled={!!actionLoading}>
                     {actionLoading === "tasks" ? "Üretiliyor..." : "Task'lara Böl"}
                   </Button>
                 ) : (
@@ -485,7 +573,7 @@ export default function ProjectDetail() {
                   <Button
                     variant="outline"
                     onClick={handleStakeholderSummary}
-                    disabled={actionLoading === "summary"}
+                    disabled={!!actionLoading}
                   >
                     {actionLoading === "summary" ? "Hazırlanıyor..." : "Stakeholder Özeti Üret"}
                   </Button>
@@ -502,7 +590,7 @@ export default function ProjectDetail() {
                         size="sm"
                         variant="outline"
                         onClick={handleStakeholderSummary}
-                        disabled={actionLoading === "summary"}
+                        disabled={!!actionLoading}
                       >
                         {actionLoading === "summary" ? "Üretiliyor..." : "Yeniden Üret"}
                       </Button>
@@ -522,7 +610,7 @@ export default function ProjectDetail() {
                       <Button
                         size="sm"
                         onClick={handleRefineSummary}
-                        disabled={actionLoading === "refine-summary" || !summaryInstruction.trim()}
+                        disabled={!!actionLoading || !summaryInstruction.trim()}
                       >
                         {actionLoading === "refine-summary" ? "İyileştiriliyor..." : "İyileştir"}
                       </Button>
@@ -540,7 +628,9 @@ export default function ProjectDetail() {
             <Card className="text-center py-12">
               <CardContent>
                 <p className="text-muted-foreground">
-                  Task'lar henüz üretilmedi. Analiz sekmesinden "Task'lara Böl" butonunu kullanın.
+                  {selectedAnalysis
+                    ? "Task'lar henüz üretilmedi. Analiz sekmesinden \"Task'lara Böl\" butonunu kullanın."
+                    : "Önce bir talep seçip analiz edin, ardından task üretin."}
                 </p>
               </CardContent>
             </Card>
@@ -607,7 +697,7 @@ export default function ProjectDetail() {
                     <Button
                       size="sm"
                       onClick={handleRefineTasks}
-                      disabled={actionLoading === "refine-tasks" || !taskInstruction.trim()}
+                      disabled={!!actionLoading || !taskInstruction.trim()}
                     >
                       {actionLoading === "refine-tasks" ? "İyileştiriliyor..." : "İyileştir"}
                     </Button>
