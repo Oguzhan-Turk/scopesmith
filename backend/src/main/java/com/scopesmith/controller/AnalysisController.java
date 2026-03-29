@@ -6,10 +6,14 @@ import com.scopesmith.entity.Analysis;
 import com.scopesmith.entity.Task;
 import com.scopesmith.repository.AnalysisRepository;
 import com.scopesmith.repository.TaskRepository;
+import com.scopesmith.service.JiraExportService;
 import com.scopesmith.service.StakeholderSummaryService;
 import com.scopesmith.service.TaskBreakdownService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -24,6 +28,7 @@ public class AnalysisController {
 
     private final TaskBreakdownService taskBreakdownService;
     private final StakeholderSummaryService stakeholderSummaryService;
+    private final JiraExportService jiraExportService;
     private final AnalysisRepository analysisRepository;
     private final TaskRepository taskRepository;
 
@@ -66,6 +71,24 @@ public class AnalysisController {
         String instruction = extractInstruction(request);
         String refined = stakeholderSummaryService.refineSummary(id, instruction);
         return Map.of("summary", refined);
+    }
+
+    @GetMapping("/{id}/export/jira-csv")
+    public ResponseEntity<byte[]> exportJiraCsv(
+            @PathVariable Long id,
+            @RequestParam String projectKey,
+            @RequestParam(defaultValue = "Story") String issueType) {
+        if (projectKey == null || projectKey.isBlank()) {
+            throw new IllegalArgumentException("projectKey cannot be empty");
+        }
+
+        byte[] csv = jiraExportService.exportTasksAsCsv(id, projectKey.trim(), issueType.trim());
+        String filename = String.format("scopesmith-%s-%d.csv", projectKey.trim(), id);
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(new MediaType("text", "csv", java.nio.charset.StandardCharsets.UTF_8))
+                .body(csv);
     }
 
     private String extractInstruction(Map<String, String> request) {

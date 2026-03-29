@@ -96,6 +96,28 @@ export const refineStakeholderSummary = (analysisId: number, instruction: string
     body: JSON.stringify({ instruction }),
   });
 
+// Jira Export
+export async function exportJiraCsv(analysisId: number, projectKey: string, issueType: string = "Story") {
+  const params = new URLSearchParams({ projectKey, issueType });
+  const res = await fetch(`${API_BASE}/analyses/${analysisId}/export/jira-csv?${params}`);
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ message: `HTTP ${res.status}` }));
+    throw new Error(error.message || `HTTP ${res.status}`);
+  }
+
+  const blob = await res.blob();
+  const disposition = res.headers.get("Content-Disposition");
+  const filename = disposition?.match(/filename="(.+)"/)?.[1] || `scopesmith-${projectKey}-${analysisId}.csv`;
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // Documents
 export const getDocuments = (projectId: number) =>
   request<Document[]>(`/projects/${projectId}/documents`);

@@ -11,6 +11,7 @@ import {
   generateStakeholderSummary,
   refineStakeholderSummary,
   refineTasks,
+  exportJiraCsv,
   getAnalysesByRequirement,
   getTasksByAnalysis,
   scanProject,
@@ -27,6 +28,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
 import { Tooltip } from "@/components/ui/tooltip";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/useToast";
 
 type BadgeVariant = "default" | "secondary" | "destructive";
@@ -64,6 +66,9 @@ export default function ProjectDetail() {
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [summaryInstruction, setSummaryInstruction] = useState("");
   const [taskInstruction, setTaskInstruction] = useState("");
+  const [exportProjectKey, setExportProjectKey] = useState("");
+  const [exportIssueType, setExportIssueType] = useState("Story");
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -299,6 +304,21 @@ export default function ProjectDetail() {
     } catch (e) {
       showToast("Özet iyileştirme başarısız oldu.");
       console.error("Summary refinement failed:", e);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleExportJira() {
+    if (!selectedAnalysis || !exportProjectKey.trim()) return;
+    setActionLoading("export");
+    try {
+      await exportJiraCsv(selectedAnalysis.id, exportProjectKey.trim(), exportIssueType.trim() || "Story");
+      showToast("CSV dosyası indirildi.", "success");
+      setExportDialogOpen(false);
+    } catch (e) {
+      showToast("Export başarısız oldu.");
+      console.error("Export failed:", e);
     } finally {
       setActionLoading(null);
     }
@@ -645,6 +665,52 @@ export default function ProjectDetail() {
                   {tasks.length} Task — Toplam{" "}
                   {tasks.reduce((sum, t) => sum + (t.spFinal || t.spSuggestion || 0), 0)} SP
                 </h2>
+                <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" variant="outline">Jira'ya Aktar</Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Jira CSV Export</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 pt-2">
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Jira Proje Key'i</label>
+                        <input
+                          type="text"
+                          placeholder="Örn: SCOPE, PROJ, MYAPP"
+                          value={exportProjectKey}
+                          onChange={(e) => setExportProjectKey(e.target.value.toUpperCase())}
+                          className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Issue Type</label>
+                        <input
+                          type="text"
+                          value={exportIssueType}
+                          onChange={(e) => setExportIssueType(e.target.value)}
+                          className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        İndirilen CSV dosyasını Jira'da "System → External System Import → CSV" ile import edebilirsiniz.
+                      </p>
+                      <div className="flex justify-end gap-2">
+                        <DialogClose asChild>
+                          <Button variant="outline" size="sm">İptal</Button>
+                        </DialogClose>
+                        <Button
+                          size="sm"
+                          onClick={handleExportJira}
+                          disabled={!exportProjectKey.trim() || actionLoading === "export"}
+                        >
+                          {actionLoading === "export" ? "İndiriliyor..." : "CSV İndir"}
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </div>
               {tasks.map((task) => (
                 <Card key={task.id}>
