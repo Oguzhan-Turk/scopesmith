@@ -127,3 +127,40 @@
 - All data must be anonymized (no customer names, no sensitive info)
 - Structure and format matter, not actual content
 - Can be from any directorate's projects
+
+## ADR-007: Context Staleness Detection
+**Date:** 2026-03-29
+**Status:** Accepted
+
+**Decision:** Three-layer system to detect when project context is outdated.
+
+**Problem:** Project code evolves. If ScopeSmith analyzes new requirements against
+stale context, results will be inaccurate and users will lose trust.
+
+**Layers:**
+
+1. **Time-based (MVP)** — Track `lastScannedAt` on Project entity.
+   Show "Last scanned X days ago" in UI. Simple, always available,
+   works for both git and local folder projects.
+
+2. **Git diff detection (MVP+)** — Store `lastScannedCommitHash`.
+   When project has remote git, compare against current HEAD.
+   Report: "47 commits since last scan, 3 new files in /entity/".
+   No full rescan needed — just git log comparison.
+   Only available for git-connected projects.
+
+3. **AI inconsistency detection (future)** — During analysis, Claude
+   notices references to modules/entities not in context.
+   "You mention OrderService but it's not in the project context.
+   Context may be outdated." Triggered at analysis time, zero overhead
+   when context is fresh.
+
+**Data model changes (Project entity):**
+- `lastScannedAt: LocalDateTime` — when was the project last scanned
+- `lastScannedCommitHash: String` — git commit hash at last scan (nullable)
+- `contextVersion: Integer` — incremented on each rescan
+
+**Implementation priority:**
+- MVP: Layer 1 (time-based) — implemented with Feature E
+- MVP+: Layer 2 (git diff) — when remote git is connected
+- Future: Layer 3 (AI detection) — prompt engineering addition
