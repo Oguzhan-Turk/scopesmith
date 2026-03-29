@@ -22,6 +22,7 @@ public class ProjectResponse {
     private LocalDateTime lastScannedAt;
     private int requirementCount;
     private int documentCount;
+    private String integrationConfig;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -39,6 +40,7 @@ public class ProjectResponse {
                 .lastScannedAt(project.getLastScannedAt())
                 .requirementCount(project.getRequirements().size())
                 .documentCount(project.getDocuments().size())
+                .integrationConfig(project.getIntegrationConfig())
                 .createdAt(project.getCreatedAt())
                 .updatedAt(project.getUpdatedAt())
                 .build();

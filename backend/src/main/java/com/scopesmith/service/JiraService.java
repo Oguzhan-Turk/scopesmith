@@ -1,11 +1,13 @@
 package com.scopesmith.service;
 
 import com.scopesmith.config.JiraConfig;
+import com.scopesmith.dto.IntegrationConfigDTO;
 import com.scopesmith.entity.Analysis;
 import com.scopesmith.entity.RequirementType;
 import com.scopesmith.entity.Task;
 import com.scopesmith.repository.AnalysisRepository;
 import com.scopesmith.repository.TaskRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -52,11 +54,17 @@ public class JiraService {
             throw new IllegalStateException("No tasks to sync for analysis #" + analysisId);
         }
 
-        String project = (projectKey != null && !projectKey.isBlank()) ? projectKey : jiraConfig.getProjectKey();
+        // Resolve config: request param → project integration config → server config (.env)
+        IntegrationConfigDTO projectConfig = parseIntegrationConfig(analysis.getRequirement().getProject().getIntegrationConfig());
+        String configKey = projectConfig != null && projectConfig.getJira() != null
+                ? projectConfig.getJira().getProjectKey() : null;
 
-        // Default issue type based on requirement type: BUG → "Bug", FEATURE → "Task"
+        String project = firstNonBlank(projectKey, configKey, jiraConfig.getProjectKey());
+
         String defaultType = analysis.getRequirement().getType() == RequirementType.BUG ? "Bug" : "Task";
-        String type = (issueType != null && !issueType.isBlank()) ? issueType : defaultType;
+        String projectDefaultType = projectConfig != null && projectConfig.getJira() != null
+                ? projectConfig.getJira().getDefaultIssueType() : null;
+        String type = firstNonBlank(issueType, projectDefaultType, defaultType);
 
         List<Map<String, String>> created = new ArrayList<>();
         List<Map<String, String>> failed = new ArrayList<>();
@@ -174,5 +182,21 @@ public class JiraService {
                 "attrs", Map.of("level", 3),
                 "content", List.of(Map.of("type", "text", "text", text))
         );
+    }
+
+    private IntegrationConfigDTO parseIntegrationConfig(String json) {
+        if (json == null || json.isBlank()) return null;
+        try {
+            return new ObjectMapper().readValue(json, IntegrationConfigDTO.class);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String v : values) {
+            if (v != null && !v.isBlank()) return v;
+        }
+        return null;
     }
 }

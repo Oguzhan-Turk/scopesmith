@@ -1,11 +1,13 @@
 package com.scopesmith.service;
 
 import com.scopesmith.config.GitHubConfig;
+import com.scopesmith.dto.IntegrationConfigDTO;
 import com.scopesmith.entity.Analysis;
 import com.scopesmith.entity.RequirementType;
 import com.scopesmith.entity.Task;
 import com.scopesmith.repository.AnalysisRepository;
 import com.scopesmith.repository.TaskRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,7 +49,11 @@ public class GitHubService {
             throw new IllegalStateException("No tasks to sync for analysis #" + analysisId);
         }
 
-        String targetRepo = (repo != null && !repo.isBlank()) ? repo : gitHubConfig.getRepo();
+        // Resolve config: request param → project integration config → server config (.env)
+        IntegrationConfigDTO projectConfig = parseIntegrationConfig(analysis.getRequirement().getProject().getIntegrationConfig());
+        String configRepo = projectConfig != null && projectConfig.getGithub() != null
+                ? projectConfig.getGithub().getRepo() : null;
+        String targetRepo = firstNonBlank(repo, configRepo, gitHubConfig.getRepo());
         boolean isBug = analysis.getRequirement().getType() == RequirementType.BUG;
 
         // Ensure labels exist
@@ -184,5 +190,21 @@ public class GitHubService {
         headers.set("Accept", "application/vnd.github+json");
 
         restTemplate.exchange(url, HttpMethod.POST, new HttpEntity<>(body, headers), Map.class);
+    }
+
+    private IntegrationConfigDTO parseIntegrationConfig(String json) {
+        if (json == null || json.isBlank()) return null;
+        try {
+            return new ObjectMapper().readValue(json, IntegrationConfigDTO.class);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String v : values) {
+            if (v != null && !v.isBlank()) return v;
+        }
+        return null;
     }
 }

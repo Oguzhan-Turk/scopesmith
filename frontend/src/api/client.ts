@@ -40,6 +40,15 @@ export const scanProject = (id: number, folderPath: string) =>
     body: JSON.stringify({ folderPath }),
   });
 
+// Integration Config
+export const getIntegrationConfig = (projectId: number) =>
+  request<IntegrationConfig>(`/projects/${projectId}/integration-config`);
+export const updateIntegrationConfig = (projectId: number, config: IntegrationConfig) =>
+  request<IntegrationConfig>(`/projects/${projectId}/integration-config`, {
+    method: "PUT",
+    body: JSON.stringify(config),
+  });
+
 // Requirements
 export const getRequirements = (projectId: number) =>
   request<Requirement[]>(`/projects/${projectId}/requirements`);
@@ -178,8 +187,15 @@ export interface Project {
   lastScannedAt: string | null;
   requirementCount: number;
   documentCount: number;
+  integrationConfig: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface IntegrationConfig {
+  jira?: { projectKey?: string; defaultIssueType?: string };
+  github?: { repo?: string };
+  preferredProvider?: "JIRA" | "GITHUB";
 }
 
 export interface Requirement {

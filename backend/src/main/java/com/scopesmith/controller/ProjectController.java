@@ -1,9 +1,12 @@
 package com.scopesmith.controller;
 
+import com.scopesmith.dto.IntegrationConfigDTO;
 import com.scopesmith.dto.ProjectRequest;
 import com.scopesmith.dto.ProjectResponse;
+import com.scopesmith.entity.Project;
 import com.scopesmith.service.ProjectContextService;
 import com.scopesmith.service.ProjectService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -19,6 +22,7 @@ public class ProjectController {
 
     private final ProjectService projectService;
     private final ProjectContextService contextService;
+    private final ObjectMapper objectMapper;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -45,6 +49,33 @@ public class ProjectController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Long id) {
         projectService.delete(id);
+    }
+
+    @GetMapping("/{id}/integration-config")
+    public IntegrationConfigDTO getIntegrationConfig(@PathVariable Long id) {
+        Project project = projectService.getProjectOrThrow(id);
+        if (project.getIntegrationConfig() == null) {
+            return new IntegrationConfigDTO();
+        }
+        try {
+            return objectMapper.readValue(project.getIntegrationConfig(), IntegrationConfigDTO.class);
+        } catch (Exception e) {
+            return new IntegrationConfigDTO();
+        }
+    }
+
+    @PutMapping("/{id}/integration-config")
+    public IntegrationConfigDTO updateIntegrationConfig(
+            @PathVariable Long id,
+            @RequestBody IntegrationConfigDTO config) {
+        Project project = projectService.getProjectOrThrow(id);
+        try {
+            project.setIntegrationConfig(objectMapper.writeValueAsString(config));
+            projectService.save(project);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid integration config");
+        }
+        return config;
     }
 
     /**

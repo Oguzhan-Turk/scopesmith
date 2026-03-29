@@ -46,6 +46,15 @@ public class Project {
     private String structuredContext;
 
     /**
+     * Per-project integration settings (Jira, GitHub, etc.) stored as JSONB.
+     * Credentials stay in .env (server-level), this stores project-specific config
+     * like Jira project key, GitHub repo, default issue type.
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private String integrationConfig;
+
+    /**
      * Git repository URL (GitHub, Bitbucket, GitLab).
      * Null if project context is provided via local folder scan.
      */

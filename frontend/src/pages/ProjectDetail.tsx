@@ -17,7 +17,10 @@ import {
   getAnalysesByRequirement,
   getTasksByAnalysis,
   scanProject,
+  getIntegrationConfig,
+  updateIntegrationConfig,
   type Project,
+  type IntegrationConfig,
   type Requirement,
   type Analysis,
   type Task,
@@ -30,7 +33,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
 import { Tooltip } from "@/components/ui/tooltip";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/useToast";
 
 type BadgeVariant = "default" | "secondary" | "destructive";
@@ -69,9 +71,7 @@ export default function ProjectDetail() {
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [summaryInstruction, setSummaryInstruction] = useState("");
   const [taskInstruction, setTaskInstruction] = useState("");
-  const [exportProjectKey, setExportProjectKey] = useState("");
-  const [exportIssueType, setExportIssueType] = useState("Story");
-  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [integrationConfig, setIntegrationConfig] = useState<IntegrationConfig>({});
 
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -100,12 +100,14 @@ export default function ProjectDetail() {
 
   async function loadProject() {
     try {
-      const [proj, reqs] = await Promise.all([
+      const [proj, reqs, config] = await Promise.all([
         getProject(projectId),
         getRequirements(projectId),
+        getIntegrationConfig(projectId).catch(() => ({})),
       ]);
       setProject(proj);
       setRequirements(reqs);
+      setIntegrationConfig(config);
     } catch (e) {
       showToast("Proje yüklenemedi. Lütfen sayfayı yenileyin.");
       console.error("Failed to load project:", e);
@@ -280,13 +282,12 @@ export default function ProjectDetail() {
     if (!selectedAnalysis) return;
     setActionLoading("github-sync");
     try {
-      const result = await syncToGitHub(selectedAnalysis.id);
+      const result = await syncToGitHub(selectedAnalysis.id, integrationConfig.github?.repo);
       if (result.failed > 0) {
         showToast(`${result.created} issue oluşturuldu, ${result.failed} başarısız.`);
       } else {
         showToast(`${result.created} issue GitHub'da oluşturuldu!`, "success");
       }
-      setExportDialogOpen(false);
       await loadTasks(selectedAnalysis.id);
     } catch (e) {
       showToast("GitHub sync başarısız oldu.");
@@ -334,12 +335,13 @@ export default function ProjectDetail() {
   }
 
   async function handleExportCsv() {
-    if (!selectedAnalysis || !exportProjectKey.trim()) return;
+    if (!selectedAnalysis) return;
+    const key = integrationConfig.jira?.projectKey;
+    if (!key) { showToast("Önce Entegrasyonlar sekmesinden Jira proje key'ini ayarlayın."); return; }
     setActionLoading("export");
     try {
-      await exportJiraCsv(selectedAnalysis.id, exportProjectKey.trim(), exportIssueType.trim() || "Story");
+      await exportJiraCsv(selectedAnalysis.id, key, integrationConfig.jira?.defaultIssueType || "Story");
       showToast("CSV dosyası indirildi.", "success");
-      setExportDialogOpen(false);
     } catch (e) {
       showToast("Export başarısız oldu.");
       console.error("Export failed:", e);
@@ -349,21 +351,35 @@ export default function ProjectDetail() {
   }
 
   async function handleSyncJira() {
-    if (!selectedAnalysis || !exportProjectKey.trim()) return;
+    if (!selectedAnalysis) return;
+    const key = integrationConfig.jira?.projectKey;
+    if (!key) { showToast("Önce Entegrasyonlar sekmesinden Jira proje key'ini ayarlayın."); return; }
     setActionLoading("jira-sync");
     try {
-      const result = await syncToJira(selectedAnalysis.id, exportProjectKey.trim(), exportIssueType.trim() || "Task");
+      const result = await syncToJira(selectedAnalysis.id, key, integrationConfig.jira?.defaultIssueType || "Task");
       if (result.failed > 0) {
         showToast(`${result.created} issue oluşturuldu, ${result.failed} başarısız.`);
       } else {
-        showToast(`${result.created} issue Jira'da oluşturuldu! (${exportProjectKey})`, "success");
+        showToast(`${result.created} issue Jira'da oluşturuldu! (${key})`, "success");
       }
-      setExportDialogOpen(false);
-      // Reload tasks to get updated jiraKey values
       await loadTasks(selectedAnalysis.id);
     } catch (e) {
-      showToast("Jira sync başarısız oldu. Bağlantı ayarlarını kontrol edin.");
+      showToast("Jira sync başarısız oldu.");
       console.error("Jira sync failed:", e);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleSaveIntegrationConfig() {
+    setActionLoading("save-config");
+    try {
+      const saved = await updateIntegrationConfig(projectId, integrationConfig);
+      setIntegrationConfig(saved);
+      showToast("Entegrasyon ayarları kaydedildi.", "success");
+    } catch (e) {
+      showToast("Ayarlar kaydedilemedi.");
+      console.error("Save config failed:", e);
     } finally {
       setActionLoading(null);
     }
@@ -419,6 +435,7 @@ export default function ProjectDetail() {
             Task'lar
             {tasks.length > 0 && <span className="ml-1.5 text-xs opacity-60">({tasks.length})</span>}
           </TabsTrigger>
+          <TabsTrigger value="integrations">Entegrasyonlar</TabsTrigger>
         </TabsList>
 
         {/* REQUIREMENTS TAB */}
@@ -742,65 +759,28 @@ export default function ProjectDetail() {
                   {tasks.length} Task — Toplam{" "}
                   {tasks.reduce((sum, t) => sum + (t.spFinal || t.spSuggestion || 0), 0)} SP
                 </h2>
-                <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button size="sm" variant="outline">Jira'ya Aktar</Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Jira'ya Aktar</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 pt-2">
-                      <div>
-                        <label className="text-sm font-medium mb-1 block">Jira Proje Key'i</label>
-                        <input
-                          type="text"
-                          placeholder="Örn: SS, PROJ, MYAPP"
-                          value={exportProjectKey}
-                          onChange={(e) => setExportProjectKey(e.target.value.toUpperCase())}
-                          className="w-full px-3 py-2 border rounded-md bg-background text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium mb-1 block">Issue Type</label>
-                        <input
-                          type="text"
-                          value={exportIssueType}
-                          onChange={(e) => setExportIssueType(e.target.value)}
-                          className="w-full px-3 py-2 border rounded-md bg-background text-sm"
-                        />
-                      </div>
-                      <div className="flex justify-end gap-2">
-                        <DialogClose asChild>
-                          <Button variant="outline" size="sm">İptal</Button>
-                        </DialogClose>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={handleExportCsv}
-                          disabled={!exportProjectKey.trim() || !!actionLoading}
-                        >
-                          {actionLoading === "export" ? "İndiriliyor..." : "CSV İndir"}
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={handleSyncJira}
-                          disabled={!exportProjectKey.trim() || !!actionLoading}
-                        >
-                          {actionLoading === "jira-sync" ? "Gönderiliyor..." : "Jira'ya Gönder"}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={handleSyncGitHub}
-                          disabled={!!actionLoading}
-                        >
-                          {actionLoading === "github-sync" ? "Gönderiliyor..." : "GitHub Issues"}
-                        </Button>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
+                <div className="flex gap-2">
+                  {integrationConfig.jira?.projectKey && (
+                    <>
+                      <Button size="sm" onClick={handleSyncJira} disabled={!!actionLoading}>
+                        {actionLoading === "jira-sync" ? "Gönderiliyor..." : `Jira (${integrationConfig.jira.projectKey})`}
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={handleExportCsv} disabled={!!actionLoading}>
+                        {actionLoading === "export" ? "İndiriliyor..." : "CSV"}
+                      </Button>
+                    </>
+                  )}
+                  {integrationConfig.github?.repo && (
+                    <Button size="sm" variant="outline" onClick={handleSyncGitHub} disabled={!!actionLoading}>
+                      {actionLoading === "github-sync" ? "Gönderiliyor..." : "GitHub"}
+                    </Button>
+                  )}
+                  {!integrationConfig.jira?.projectKey && !integrationConfig.github?.repo && (
+                    <Button size="sm" variant="outline" onClick={() => setActiveTab("integrations")}>
+                      Entegrasyon Ayarla
+                    </Button>
+                  )}
+                </div>
               </div>
               {tasks.map((task) => (
                 <Card key={task.id}>
@@ -869,6 +849,71 @@ export default function ProjectDetail() {
               </Card>
             </>
           )}
+        </TabsContent>
+
+        {/* INTEGRATIONS TAB */}
+        <TabsContent value="integrations" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Jira Ayarları</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <label className="text-sm font-medium mb-1 block">Proje Key'i</label>
+                <input
+                  type="text"
+                  placeholder="Örn: SS, PROJ"
+                  value={integrationConfig.jira?.projectKey || ""}
+                  onChange={(e) => setIntegrationConfig({
+                    ...integrationConfig,
+                    jira: { ...integrationConfig.jira, projectKey: e.target.value.toUpperCase() },
+                  })}
+                  className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Varsayılan Issue Type</label>
+                <input
+                  type="text"
+                  placeholder="Task, Story, Bug"
+                  value={integrationConfig.jira?.defaultIssueType || ""}
+                  onChange={(e) => setIntegrationConfig({
+                    ...integrationConfig,
+                    jira: { ...integrationConfig.jira, defaultIssueType: e.target.value },
+                  })}
+                  className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">GitHub Ayarları</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <label className="text-sm font-medium mb-1 block">Repository</label>
+                <input
+                  type="text"
+                  placeholder="Örn: Oguzhan-Turk/scopesmith"
+                  value={integrationConfig.github?.repo || ""}
+                  onChange={(e) => setIntegrationConfig({
+                    ...integrationConfig,
+                    github: { repo: e.target.value },
+                  })}
+                  className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Button
+            onClick={handleSaveIntegrationConfig}
+            disabled={actionLoading === "save-config"}
+          >
+            {actionLoading === "save-config" ? "Kaydediliyor..." : "Ayarları Kaydet"}
+          </Button>
         </TabsContent>
       </Tabs>
     </div>

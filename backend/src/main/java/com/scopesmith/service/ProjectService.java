@@ -56,6 +56,11 @@ public class ProjectService {
         projectRepository.delete(project);
     }
 
+    @Transactional
+    public void save(Project project) {
+        projectRepository.save(project);
+    }
+
     /**
      * Internal helper — used by other services that need the entity, not the DTO.
      */
