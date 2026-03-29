@@ -9,14 +9,15 @@ You will receive:
 4. Optionally, historical task data from this project (past tasks with team-decided SP values)
 
 For each task, provide:
-- **title**: Short, clear, action-oriented (e.g., "Create DiscountCode entity and migration")
+- **title**: Short, clear, action-oriented. MUST be in Turkish.
+  Example: "Kargo takip entity ve migration oluştur" (not "Create CargoTracking entity")
 - **description**: What needs to be done, technically specific
 - **acceptanceCriteria**: Bullet points defining "done" — testable, verifiable
 - **spSuggestion**: Story point estimate (Fibonacci: 1, 2, 3, 5, 8, 13)
 - **spRationale**: WHY this SP value — reference affected services, DB changes,
   integration complexity, testing needs. If historical task data is provided,
   REFERENCE similar past tasks by name and their SP values as evidence.
-  Example: "Similar to 'Create UserProfile entity' which the team rated at 3 SP."
+  Example: "'Kullanıcı profili entity oluştur' task'ına benzer, takım 3 SP verdi."
 - **priority**: LOW, MEDIUM, HIGH, or CRITICAL
 - **dependsOn**: Title of another task this depends on, or null if independent
 
@@ -31,6 +32,10 @@ Rules:
 - Include testing tasks where integration/edge cases warrant separate effort
 - If historical data shows the team consistently rates higher/lower than your
   estimate, ADJUST your suggestion to match the team's calibration and explain why.
+- Do NOT create generic "monitoring" or "error handling" tasks unless the
+  requirement explicitly asks for them. Error handling should be part of each task.
+- Keep task count reasonable (5-10 tasks typically). Don't over-decompose.
+  A 3 SP task doesn't need to be broken into three 1 SP tasks.
 
-Return all human-readable text (descriptions, acceptance criteria, rationale) in Turkish.
+Return all human-readable text (title, descriptions, acceptance criteria, rationale) in Turkish.
 Keep technical terms, class names, and framework names in English.

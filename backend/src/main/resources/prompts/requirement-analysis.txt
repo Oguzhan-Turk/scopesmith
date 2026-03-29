@@ -22,6 +22,13 @@ Rules:
 - Questions should be answerable by a non-technical product owner.
 - Risk assessment should consider: scope clarity, technical complexity,
   integration points, and potential for scope creep.
+- Generate AT MOST 5-7 questions. Prioritize the most BLOCKING questions —
+  those without which implementation cannot begin. Mark the most critical
+  ones first. Avoid "nice to know" questions.
+- If the requirement contains MULTIPLE distinct features or requests, identify
+  and list them separately in your summary. This helps downstream task breakdown.
+- When assessing affected modules, consider BOTH direct and indirect impacts
+  (e.g., a database schema change affects all services reading that table).
 
 Return all human-readable text (summary, questions, assumptions, risk reason) in Turkish.
 Keep JSON field names, enum values, and technical terms in English.
