@@ -164,3 +164,27 @@ stale context, results will be inaccurate and users will lose trust.
 - MVP: Layer 1 (time-based) — implemented with Feature E
 - MVP+: Layer 2 (git diff) — when remote git is connected
 - Future: Layer 3 (AI detection) — prompt engineering addition
+
+## ADR-008: Usage Tracking & Billing
+**Date:** 2026-03-29
+**Status:** Accepted
+
+**Decision:** Lightweight usage tracking in MVP, full billing dashboard deferred.
+
+**MVP:**
+- `durationMs` field on Analysis entity — track how long each analysis took
+- Display "this analysis completed in X seconds" in UI
+- Analysis count per project (simple DB count)
+- Cost discussed verbally in presentation using Anthropic Console data
+
+**Future (full billing dashboard):**
+- Token usage tracking per API call (input/output tokens)
+- Cost calculation per analysis, per project, per team
+- Monthly usage reports
+- Budget alerts and limits
+- ROI metrics: manual analysis time vs ScopeSmith time + cost
+
+**Rationale:**
+- MVP: zero extra effort, durationMs is one field, high presentation impact
+- Full billing: requires Spring AI token usage extraction, aggregation logic, dedicated UI — not worth the effort in 15-day sprint
+- "This analysis cost $0.45 and took 12 seconds" is a killer demo line
