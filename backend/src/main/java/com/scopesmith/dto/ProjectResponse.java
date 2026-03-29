@@ -17,6 +17,7 @@ public class ProjectResponse {
     private String localPath;
     private boolean hasContext;
     private String techContext;
+    private String structuredContext;
     private Integer contextVersion;
     private LocalDateTime lastScannedAt;
     private int requirementCount;
@@ -33,6 +34,7 @@ public class ProjectResponse {
                 .localPath(project.getLocalPath())
                 .hasContext(project.getTechContext() != null)
                 .techContext(project.getTechContext())
+                .structuredContext(project.getStructuredContext())
                 .contextVersion(project.getContextVersion())
                 .lastScannedAt(project.getLastScannedAt())
                 .requirementCount(project.getRequirements().size())

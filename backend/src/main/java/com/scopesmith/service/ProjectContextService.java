@@ -1,6 +1,8 @@
 package com.scopesmith.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scopesmith.config.PromptLoader;
+import com.scopesmith.dto.ProjectContextResult;
 import com.scopesmith.entity.Project;
 import com.scopesmith.repository.ProjectRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +28,7 @@ public class ProjectContextService {
     private final ProjectService projectService;
     private final ProjectRepository projectRepository;
     private final PromptLoader promptLoader;
+    private final ObjectMapper objectMapper;
 
     /**
      * Key files that reveal project structure.
@@ -91,14 +94,26 @@ public class ProjectContextService {
         String userMessage = "## File Tree\n```\n" + fileTree + "\n```\n\n" +
                 "## Key File Contents\n" + keyFileContents;
 
-        // Call AI
+        // Call AI — two calls: one for free-text summary, one for structured data
         long startTime = System.currentTimeMillis();
+
+        // 1. Free-text context (human-readable, used in analysis prompts)
         String context = aiService.chat(promptLoader.load("project-context"), userMessage);
+
+        // 2. Structured context (queryable, used for precise module/entity matching)
+        ProjectContextResult structured = aiService.chatWithStructuredOutput(
+                promptLoader.load("project-context-structured"), userMessage, ProjectContextResult.class);
+
         long duration = System.currentTimeMillis() - startTime;
-        log.info("Project context generated for #{} in {}ms", projectId, duration);
+        log.info("Project context generated for #{} in {}ms (text + structured)", projectId, duration);
 
         // Update project
         project.setTechContext(context);
+        try {
+            project.setStructuredContext(objectMapper.writeValueAsString(structured));
+        } catch (Exception e) {
+            log.warn("Failed to serialize structured context for project #{}", projectId, e);
+        }
         project.setLocalPath(folderPath);
         project.setLastScannedAt(LocalDateTime.now());
         project.setContextVersion(project.getContextVersion() + 1);

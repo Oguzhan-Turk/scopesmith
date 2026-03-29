@@ -3,7 +3,9 @@ package com.scopesmith.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -29,12 +31,19 @@ public class Project {
     private String description;
 
     /**
-     * AI-generated structured summary of the project's codebase.
-     * Created when a project's source code is scanned.
-     * Used as context for all subsequent requirement analyses.
+     * AI-generated free-text summary of the project's codebase.
+     * Kept for backward compatibility and human-readable context.
      */
     @Column(columnDefinition = "TEXT")
     private String techContext;
+
+    /**
+     * Structured project context — parsed into queryable fields.
+     * Stored as JSONB in PostgreSQL for efficient querying.
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private String structuredContext;
 
     /**
      * Git repository URL (GitHub, Bitbucket, GitLab).
