@@ -24,6 +24,8 @@ public class TaskBreakdownService {
     private final AnalysisRepository analysisRepository;
     private final TaskRepository taskRepository;
 
+    private static final long MIN_TASKS_FOR_CALIBRATION = 20;
+
     private static final String SYSTEM_PROMPT = """
             You are a senior software architect breaking down a requirement analysis into
             actionable development tasks. You have deep expertise in agile task decomposition
@@ -33,6 +35,7 @@ public class TaskBreakdownService {
             1. The structured analysis of a requirement
             2. Optionally, project context (tech stack, existing modules)
             3. Optionally, Q&A clarifications
+            4. Optionally, historical task data from this project (past tasks with team-decided SP values)
 
             For each task, provide:
             - **title**: Short, clear, action-oriented (e.g., "Create DiscountCode entity and migration")
@@ -40,7 +43,9 @@ public class TaskBreakdownService {
             - **acceptanceCriteria**: Bullet points defining "done" — testable, verifiable
             - **spSuggestion**: Story point estimate (Fibonacci: 1, 2, 3, 5, 8, 13)
             - **spRationale**: WHY this SP value — reference affected services, DB changes,
-              integration complexity, testing needs, and any similar past work patterns
+              integration complexity, testing needs. If historical task data is provided,
+              REFERENCE similar past tasks by name and their SP values as evidence.
+              Example: "Similar to 'Create UserProfile entity' which the team rated at 3 SP."
             - **priority**: LOW, MEDIUM, HIGH, or CRITICAL
             - **dependsOn**: Title of another task this depends on, or null if independent
 
@@ -53,6 +58,11 @@ public class TaskBreakdownService {
               testing requirements, and requirement clarity
             - Order tasks by dependency and priority
             - Include testing tasks where integration/edge cases warrant separate effort
+            - If historical data shows the team consistently rates higher/lower than your
+              estimate, ADJUST your suggestion to match the team's calibration and explain why.
+
+            Return all human-readable text (descriptions, acceptance criteria, rationale) in Turkish.
+            Keep technical terms, class names, and framework names in English.
             """;
 
     @Transactional
@@ -154,6 +164,53 @@ public class TaskBreakdownService {
                     }
                 }
             }
+        }
+
+        // Historical task data for Learning SP (ADR-003)
+        Long projectId = requirement.getProject().getId();
+        long finalizedCount = taskRepository.countFinalizedTasksByProjectId(projectId);
+
+        if (finalizedCount > 0) {
+            List<Task> historicalTasks = taskRepository.findFinalizedTasksByProjectId(projectId);
+
+            message.append("## Historical Task Data (Learning SP)\n");
+
+            if (finalizedCount >= MIN_TASKS_FOR_CALIBRATION) {
+                // Layer 1: Team calibration
+                double avgSuggested = historicalTasks.stream()
+                        .filter(t -> t.getSpSuggestion() != null)
+                        .mapToInt(Task::getSpSuggestion)
+                        .average().orElse(0);
+                double avgFinal = historicalTasks.stream()
+                        .mapToInt(Task::getSpFinal)
+                        .average().orElse(0);
+
+                message.append(String.format(
+                        "**Team Calibration** (%d completed tasks): AI average suggestion: %.1f SP, " +
+                                "Team average decision: %.1f SP. ", finalizedCount, avgSuggested, avgFinal));
+
+                if (avgFinal > avgSuggested * 1.2) {
+                    message.append("The team tends to rate tasks HIGHER than AI suggestions. Adjust accordingly.\n\n");
+                } else if (avgFinal < avgSuggested * 0.8) {
+                    message.append("The team tends to rate tasks LOWER than AI suggestions. Adjust accordingly.\n\n");
+                } else {
+                    message.append("Team decisions are well-aligned with AI suggestions.\n\n");
+                }
+            }
+
+            // Layer 3: Similar task reference (always available, even with few tasks)
+            message.append("**Past Tasks for Reference** (use these to calibrate your estimates):\n");
+            // Send last 30 tasks max to avoid token overflow
+            historicalTasks.stream().limit(30).forEach(t ->
+                    message.append(String.format("- \"%s\" — AI suggested: %s SP, Team decided: %d SP\n",
+                            t.getTitle(),
+                            t.getSpSuggestion() != null ? t.getSpSuggestion().toString() : "N/A",
+                            t.getSpFinal()))
+            );
+            message.append("\n");
+
+            log.info("Learning SP: {} historical tasks included for project #{} (calibration: {})",
+                    finalizedCount, projectId, finalizedCount >= MIN_TASKS_FOR_CALIBRATION ? "active" : "insufficient data");
         }
 
         message.append("Break this down into development tasks with story point estimates.");
