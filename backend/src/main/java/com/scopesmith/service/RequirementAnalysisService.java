@@ -17,6 +17,7 @@ public class RequirementAnalysisService {
     private final AiService aiService;
     private final RequirementService requirementService;
     private final AnalysisRepository analysisRepository;
+    private final DocumentService documentService;
     private final PromptLoader promptLoader;
 
     /**
@@ -143,6 +144,14 @@ public class RequirementAnalysisService {
         if (techContext != null && !techContext.isBlank()) {
             message.append("## Project Context\n");
             message.append(techContext);
+            message.append("\n\n");
+        }
+
+        // Add document context if available (Feature F)
+        String docContext = documentService.getProjectDocumentContext(requirement.getProject().getId());
+        if (docContext != null) {
+            message.append("## Project Documents\n");
+            message.append(docContext);
             message.append("\n\n");
         }
 
