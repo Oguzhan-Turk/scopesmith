@@ -96,6 +96,21 @@ export const refineStakeholderSummary = (analysisId: number, instruction: string
     body: JSON.stringify({ instruction }),
   });
 
+// GitHub Sync
+export const syncToGitHub = (analysisId: number, repo?: string) =>
+  request<GitHubSyncResult>(`/analyses/${analysisId}/sync/github`, {
+    method: "POST",
+    body: JSON.stringify({ repo }),
+  });
+
+export interface GitHubSyncResult {
+  totalTasks: number;
+  created: number;
+  failed: number;
+  issues: Array<{ taskId: string; issueNumber: string; status: string }>;
+  errors?: Array<{ taskId: string; title: string; error: string }>;
+}
+
 // Jira Sync
 export const syncToJira = (analysisId: number, projectKey?: string, issueType?: string) =>
   request<JiraSyncResult>(`/analyses/${analysisId}/sync/jira`, {

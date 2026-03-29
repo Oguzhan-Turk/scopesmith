@@ -25,6 +25,10 @@ spring:
           model: claude-sonnet-4-20250514
           max-tokens: 4096
 
+github:
+  token: ${GITHUB_TOKEN:}
+  repo: ${GITHUB_REPO:}
+
 jira:
   url: ${JIRA_URL:}
   email: ${JIRA_EMAIL:}

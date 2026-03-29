@@ -13,6 +13,7 @@ import {
   refineTasks,
   exportJiraCsv,
   syncToJira,
+  syncToGitHub,
   getAnalysesByRequirement,
   getTasksByAnalysis,
   scanProject,
@@ -270,6 +271,26 @@ export default function ProjectDetail() {
     } catch (e) {
       showToast("Özet oluşturulamadı.");
       console.error("Summary failed:", e);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleSyncGitHub() {
+    if (!selectedAnalysis) return;
+    setActionLoading("github-sync");
+    try {
+      const result = await syncToGitHub(selectedAnalysis.id);
+      if (result.failed > 0) {
+        showToast(`${result.created} issue oluşturuldu, ${result.failed} başarısız.`);
+      } else {
+        showToast(`${result.created} issue GitHub'da oluşturuldu!`, "success");
+      }
+      setExportDialogOpen(false);
+      await loadTasks(selectedAnalysis.id);
+    } catch (e) {
+      showToast("GitHub sync başarısız oldu.");
+      console.error("GitHub sync failed:", e);
     } finally {
       setActionLoading(null);
     }
@@ -767,6 +788,14 @@ export default function ProjectDetail() {
                           disabled={!exportProjectKey.trim() || !!actionLoading}
                         >
                           {actionLoading === "jira-sync" ? "Gönderiliyor..." : "Jira'ya Gönder"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleSyncGitHub}
+                          disabled={!!actionLoading}
+                        >
+                          {actionLoading === "github-sync" ? "Gönderiliyor..." : "GitHub Issues"}
                         </Button>
                       </div>
                     </div>

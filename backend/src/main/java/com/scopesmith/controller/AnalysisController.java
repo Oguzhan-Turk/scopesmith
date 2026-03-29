@@ -6,6 +6,7 @@ import com.scopesmith.entity.Analysis;
 import com.scopesmith.entity.Task;
 import com.scopesmith.repository.AnalysisRepository;
 import com.scopesmith.repository.TaskRepository;
+import com.scopesmith.service.GitHubService;
 import com.scopesmith.service.JiraExportService;
 import com.scopesmith.service.JiraService;
 import com.scopesmith.service.StakeholderSummaryService;
@@ -29,6 +30,7 @@ public class AnalysisController {
 
     private final TaskBreakdownService taskBreakdownService;
     private final StakeholderSummaryService stakeholderSummaryService;
+    private final GitHubService gitHubService;
     private final JiraExportService jiraExportService;
     private final JiraService jiraService;
     private final AnalysisRepository analysisRepository;
@@ -82,6 +84,14 @@ public class AnalysisController {
         String projectKey = request != null ? request.get("projectKey") : null;
         String issueType = request != null ? request.get("issueType") : null;
         return jiraService.syncTasksToJira(id, projectKey, issueType != null ? issueType : "Task");
+    }
+
+    @PostMapping("/{id}/sync/github")
+    public Map<String, Object> syncToGitHub(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, String> request) {
+        String repo = request != null ? request.get("repo") : null;
+        return gitHubService.syncTasksToGitHub(id, repo);
     }
 
     @GetMapping("/{id}/export/jira-csv")
