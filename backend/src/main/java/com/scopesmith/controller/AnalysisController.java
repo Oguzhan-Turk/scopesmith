@@ -7,6 +7,7 @@ import com.scopesmith.entity.Task;
 import com.scopesmith.repository.AnalysisRepository;
 import com.scopesmith.repository.TaskRepository;
 import com.scopesmith.service.JiraExportService;
+import com.scopesmith.service.JiraService;
 import com.scopesmith.service.StakeholderSummaryService;
 import com.scopesmith.service.TaskBreakdownService;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,7 @@ public class AnalysisController {
     private final TaskBreakdownService taskBreakdownService;
     private final StakeholderSummaryService stakeholderSummaryService;
     private final JiraExportService jiraExportService;
+    private final JiraService jiraService;
     private final AnalysisRepository analysisRepository;
     private final TaskRepository taskRepository;
 
@@ -71,6 +73,15 @@ public class AnalysisController {
         String instruction = extractInstruction(request);
         String refined = stakeholderSummaryService.refineSummary(id, instruction);
         return Map.of("summary", refined);
+    }
+
+    @PostMapping("/{id}/sync/jira")
+    public Map<String, Object> syncToJira(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, String> request) {
+        String projectKey = request != null ? request.get("projectKey") : null;
+        String issueType = request != null ? request.get("issueType") : null;
+        return jiraService.syncTasksToJira(id, projectKey, issueType != null ? issueType : "Task");
     }
 
     @GetMapping("/{id}/export/jira-csv")

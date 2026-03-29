@@ -96,6 +96,21 @@ export const refineStakeholderSummary = (analysisId: number, instruction: string
     body: JSON.stringify({ instruction }),
   });
 
+// Jira Sync
+export const syncToJira = (analysisId: number, projectKey?: string, issueType?: string) =>
+  request<JiraSyncResult>(`/analyses/${analysisId}/sync/jira`, {
+    method: "POST",
+    body: JSON.stringify({ projectKey, issueType }),
+  });
+
+export interface JiraSyncResult {
+  totalTasks: number;
+  created: number;
+  failed: number;
+  issues: Array<{ taskId: string; jiraKey: string; status: string }>;
+  errors?: Array<{ taskId: string; title: string; error: string }>;
+}
+
 // Jira Export
 export async function exportJiraCsv(analysisId: number, projectKey: string, issueType: string = "Story") {
   const params = new URLSearchParams({ projectKey, issueType });

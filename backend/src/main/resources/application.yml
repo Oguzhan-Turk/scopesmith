@@ -25,6 +25,12 @@ spring:
           model: claude-sonnet-4-20250514
           max-tokens: 4096
 
+jira:
+  url: ${JIRA_URL:}
+  email: ${JIRA_EMAIL:}
+  api-token: ${JIRA_API_TOKEN:}
+  project-key: ${JIRA_PROJECT_KEY:SS}
+
 server:
   port: 8080
 

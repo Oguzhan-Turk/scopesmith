@@ -12,6 +12,7 @@ import {
   refineStakeholderSummary,
   refineTasks,
   exportJiraCsv,
+  syncToJira,
   getAnalysesByRequirement,
   getTasksByAnalysis,
   scanProject,
@@ -309,7 +310,7 @@ export default function ProjectDetail() {
     }
   }
 
-  async function handleExportJira() {
+  async function handleExportCsv() {
     if (!selectedAnalysis || !exportProjectKey.trim()) return;
     setActionLoading("export");
     try {
@@ -319,6 +320,27 @@ export default function ProjectDetail() {
     } catch (e) {
       showToast("Export başarısız oldu.");
       console.error("Export failed:", e);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleSyncJira() {
+    if (!selectedAnalysis || !exportProjectKey.trim()) return;
+    setActionLoading("jira-sync");
+    try {
+      const result = await syncToJira(selectedAnalysis.id, exportProjectKey.trim(), exportIssueType.trim() || "Task");
+      if (result.failed > 0) {
+        showToast(`${result.created} issue oluşturuldu, ${result.failed} başarısız.`);
+      } else {
+        showToast(`${result.created} issue Jira'da oluşturuldu! (${exportProjectKey})`, "success");
+      }
+      setExportDialogOpen(false);
+      // Reload tasks to get updated jiraKey values
+      await loadTasks(selectedAnalysis.id);
+    } catch (e) {
+      showToast("Jira sync başarısız oldu. Bağlantı ayarlarını kontrol edin.");
+      console.error("Jira sync failed:", e);
     } finally {
       setActionLoading(null);
     }
@@ -671,14 +693,14 @@ export default function ProjectDetail() {
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
-                      <DialogTitle>Jira CSV Export</DialogTitle>
+                      <DialogTitle>Jira'ya Aktar</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4 pt-2">
                       <div>
                         <label className="text-sm font-medium mb-1 block">Jira Proje Key'i</label>
                         <input
                           type="text"
-                          placeholder="Örn: SCOPE, PROJ, MYAPP"
+                          placeholder="Örn: SS, PROJ, MYAPP"
                           value={exportProjectKey}
                           onChange={(e) => setExportProjectKey(e.target.value.toUpperCase())}
                           className="w-full px-3 py-2 border rounded-md bg-background text-sm"
@@ -693,19 +715,24 @@ export default function ProjectDetail() {
                           className="w-full px-3 py-2 border rounded-md bg-background text-sm"
                         />
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        İndirilen CSV dosyasını Jira'da "System → External System Import → CSV" ile import edebilirsiniz.
-                      </p>
                       <div className="flex justify-end gap-2">
                         <DialogClose asChild>
                           <Button variant="outline" size="sm">İptal</Button>
                         </DialogClose>
                         <Button
                           size="sm"
-                          onClick={handleExportJira}
-                          disabled={!exportProjectKey.trim() || actionLoading === "export"}
+                          variant="outline"
+                          onClick={handleExportCsv}
+                          disabled={!exportProjectKey.trim() || !!actionLoading}
                         >
                           {actionLoading === "export" ? "İndiriliyor..." : "CSV İndir"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={handleSyncJira}
+                          disabled={!exportProjectKey.trim() || !!actionLoading}
+                        >
+                          {actionLoading === "jira-sync" ? "Gönderiliyor..." : "Jira'ya Gönder"}
                         </Button>
                       </div>
                     </div>
@@ -725,6 +752,9 @@ export default function ProjectDetail() {
                           <Badge variant="default">Final: {task.spFinal} SP</Badge>
                         )}
                         <Badge variant="secondary">{task.priority}</Badge>
+                        {task.jiraKey && (
+                          <Badge variant="default">{task.jiraKey}</Badge>
+                        )}
                       </div>
                     </div>
                   </CardHeader>
