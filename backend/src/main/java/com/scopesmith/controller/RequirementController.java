@@ -1,8 +1,10 @@
 package com.scopesmith.controller;
 
 import com.scopesmith.dto.AnalysisResponse;
+import com.scopesmith.dto.ChangeImpactResult;
 import com.scopesmith.dto.RequirementRequest;
 import com.scopesmith.dto.RequirementResponse;
+import com.scopesmith.service.ChangeImpactService;
 import com.scopesmith.service.RequirementAnalysisService;
 import com.scopesmith.service.RequirementService;
 import jakarta.validation.Valid;
@@ -20,6 +22,7 @@ public class RequirementController {
 
     private final RequirementService requirementService;
     private final RequirementAnalysisService analysisService;
+    private final ChangeImpactService changeImpactService;
 
     @PostMapping("/projects/{projectId}/requirements")
     @ResponseStatus(HttpStatus.CREATED)
@@ -49,5 +52,10 @@ public class RequirementController {
     @PostMapping("/requirements/{id}/analyze")
     public AnalysisResponse analyze(@PathVariable Long id) {
         return AnalysisResponse.from(analysisService.analyze(id));
+    }
+
+    @PostMapping("/requirements/{id}/change-impact")
+    public ChangeImpactResult changeImpact(@PathVariable Long id) {
+        return changeImpactService.analyzeImpact(id);
     }
 }
