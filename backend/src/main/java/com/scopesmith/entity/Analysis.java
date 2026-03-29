@@ -64,6 +64,11 @@ public class Analysis {
      */
     private Integer requirementVersion;
 
+    /**
+     * How long the AI analysis took, in milliseconds. (ADR-008)
+     */
+    private Long durationMs;
+
     @Builder.Default
     @OneToMany(mappedBy = "analysis", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Question> questions = new ArrayList<>();

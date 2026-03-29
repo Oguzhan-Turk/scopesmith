@@ -56,8 +56,10 @@ public class RequirementAnalysisService {
 
         // Call AI
         log.info("Starting analysis for requirement #{}", requirementId);
+        long startTime = System.currentTimeMillis();
         AnalysisResult result = aiService.chatWithStructuredOutput(SYSTEM_PROMPT, userMessage, AnalysisResult.class);
-        log.info("Analysis complete for requirement #{}", requirementId);
+        long durationMs = System.currentTimeMillis() - startTime;
+        log.info("Analysis complete for requirement #{} in {}ms", requirementId, durationMs);
 
         // Save analysis
         Analysis analysis = Analysis.builder()
@@ -68,6 +70,7 @@ public class RequirementAnalysisService {
                 .riskReason(result.getRiskReason())
                 .affectedModules(String.join(", ", result.getAffectedModules()))
                 .requirementVersion(requirement.getVersion())
+                .durationMs(durationMs)
                 .build();
 
         Analysis savedAnalysis = analysisRepository.save(analysis);
@@ -104,8 +107,10 @@ public class RequirementAnalysisService {
 
         log.info("Starting re-analysis for requirement #{} (previous analysis #{})",
                 requirement.getId(), previousAnalysis.getId());
+        long startTime = System.currentTimeMillis();
         AnalysisResult result = aiService.chatWithStructuredOutput(SYSTEM_PROMPT, userMessage, AnalysisResult.class);
-        log.info("Re-analysis complete for requirement #{}", requirement.getId());
+        long durationMs = System.currentTimeMillis() - startTime;
+        log.info("Re-analysis complete for requirement #{} in {}ms", requirement.getId(), durationMs);
 
         Analysis newAnalysis = Analysis.builder()
                 .requirement(requirement)
@@ -115,6 +120,7 @@ public class RequirementAnalysisService {
                 .riskReason(result.getRiskReason())
                 .affectedModules(String.join(", ", result.getAffectedModules()))
                 .requirementVersion(requirement.getVersion())
+                .durationMs(durationMs)
                 .build();
 
         Analysis savedAnalysis = analysisRepository.save(newAnalysis);

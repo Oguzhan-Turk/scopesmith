@@ -42,6 +42,31 @@ public class Project {
      */
     private String repoUrl;
 
+    /**
+     * Local folder path for projects accessed via filesystem.
+     * Null if project context is provided via remote git.
+     */
+    private String localPath;
+
+    /**
+     * When the project's codebase was last scanned for context.
+     * Null means never scanned. (ADR-007 Layer 1)
+     */
+    private LocalDateTime lastScannedAt;
+
+    /**
+     * Git commit hash at the time of last scan.
+     * Used for staleness detection via git diff. (ADR-007 Layer 2)
+     */
+    private String lastScannedCommitHash;
+
+    /**
+     * Incremented on each context rescan.
+     * Enables tracking which analysis used which context version.
+     */
+    @Builder.Default
+    private Integer contextVersion = 0;
+
     @Builder.Default
     @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Requirement> requirements = new ArrayList<>();

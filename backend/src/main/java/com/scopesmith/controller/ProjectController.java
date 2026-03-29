@@ -2,6 +2,7 @@ package com.scopesmith.controller;
 
 import com.scopesmith.dto.ProjectRequest;
 import com.scopesmith.dto.ProjectResponse;
+import com.scopesmith.service.ProjectContextService;
 import com.scopesmith.service.ProjectService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,7 @@ import java.util.List;
 public class ProjectController {
 
     private final ProjectService projectService;
+    private final ProjectContextService contextService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -43,5 +45,21 @@ public class ProjectController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Long id) {
         projectService.delete(id);
+    }
+
+    /**
+     * Scan a local folder to generate project context.
+     * ScopeSmith reads the code, understands the project structure,
+     * and uses this context for all subsequent requirement analyses.
+     */
+    @PostMapping("/{id}/scan")
+    public ProjectResponse scanLocalFolder(
+            @PathVariable Long id,
+            @RequestBody java.util.Map<String, String> request) {
+        String folderPath = request.get("folderPath");
+        if (folderPath == null || folderPath.isBlank()) {
+            throw new IllegalArgumentException("folderPath is required");
+        }
+        return ProjectResponse.from(contextService.scanLocalFolder(id, folderPath));
     }
 }
