@@ -2,6 +2,7 @@ package com.scopesmith.dto;
 
 import com.scopesmith.entity.Requirement;
 import com.scopesmith.entity.RequirementStatus;
+import com.scopesmith.entity.RequirementType;
 import lombok.Builder;
 import lombok.Data;
 
@@ -14,6 +15,7 @@ public class RequirementResponse {
     private Long id;
     private Long projectId;
     private String rawText;
+    private RequirementType type;
     private Integer version;
     private RequirementStatus status;
     private int analysisCount;
@@ -25,6 +27,7 @@ public class RequirementResponse {
                 .id(requirement.getId())
                 .projectId(requirement.getProject().getId())
                 .rawText(requirement.getRawText())
+                .type(requirement.getType())
                 .version(requirement.getVersion())
                 .status(requirement.getStatus())
                 .analysisCount(requirement.getAnalyses().size())

@@ -4,6 +4,7 @@ import com.scopesmith.dto.RequirementRequest;
 import com.scopesmith.dto.RequirementResponse;
 import com.scopesmith.entity.Project;
 import com.scopesmith.entity.Requirement;
+import com.scopesmith.entity.RequirementType;
 import com.scopesmith.repository.RequirementRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -23,9 +24,12 @@ public class RequirementService {
     public RequirementResponse create(Long projectId, RequirementRequest request) {
         Project project = projectService.getProjectOrThrow(projectId);
 
+        RequirementType type = parseType(request.getType());
+
         Requirement requirement = Requirement.builder()
                 .project(project)
                 .rawText(request.getRawText())
+                .type(type)
                 .build();
 
         return RequirementResponse.from(requirementRepository.save(requirement));
@@ -57,6 +61,15 @@ public class RequirementService {
         requirement.setVersion(requirement.getVersion() + 1);
 
         return RequirementResponse.from(requirementRepository.save(requirement));
+    }
+
+    private RequirementType parseType(String type) {
+        if (type == null || type.isBlank()) return RequirementType.FEATURE;
+        try {
+            return RequirementType.valueOf(type.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return RequirementType.FEATURE;
+        }
     }
 
     public Requirement getRequirementOrThrow(Long id) {

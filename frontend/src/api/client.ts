@@ -43,10 +43,10 @@ export const scanProject = (id: number, folderPath: string) =>
 // Requirements
 export const getRequirements = (projectId: number) =>
   request<Requirement[]>(`/projects/${projectId}/requirements`);
-export const createRequirement = (projectId: number, rawText: string) =>
+export const createRequirement = (projectId: number, rawText: string, type?: string) =>
   request<Requirement>(`/projects/${projectId}/requirements`, {
     method: "POST",
-    body: JSON.stringify({ rawText }),
+    body: JSON.stringify({ rawText, type }),
   });
 export const analyzeRequirement = (id: number) =>
   request<Analysis>(`/requirements/${id}/analyze`, { method: "POST" });
@@ -171,6 +171,7 @@ export interface Requirement {
   id: number;
   projectId: number;
   rawText: string;
+  type: "FEATURE" | "BUG";
   version: number;
   status: string;
   analysisCount: number;

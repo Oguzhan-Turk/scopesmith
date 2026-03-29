@@ -30,10 +30,12 @@ public class RequirementAnalysisService {
         String userMessage = buildUserMessage(requirement);
 
         // 2. Call AI — NO transaction held during this long-running call
-        log.info("Starting analysis for requirement #{}", requirementId);
+        String promptName = requirement.getType() == RequirementType.BUG
+                ? "bug-analysis" : "requirement-analysis";
+        log.info("Starting {} analysis for requirement #{}", requirement.getType(), requirementId);
         long startTime = System.currentTimeMillis();
         AnalysisResult result = aiService.chatWithStructuredOutput(
-                promptLoader.load("requirement-analysis"), userMessage, AnalysisResult.class);
+                promptLoader.load(promptName), userMessage, AnalysisResult.class);
         long durationMs = System.currentTimeMillis() - startTime;
         log.info("Analysis complete for requirement #{} in {}ms", requirementId, durationMs);
 
@@ -83,11 +85,13 @@ public class RequirementAnalysisService {
         Requirement requirement = previousAnalysis.getRequirement();
         String userMessage = buildReAnalysisMessage(requirement, previousAnalysis);
 
-        log.info("Starting re-analysis for requirement #{} (previous analysis #{})",
-                requirement.getId(), previousAnalysis.getId());
+        String promptName = requirement.getType() == RequirementType.BUG
+                ? "bug-analysis" : "requirement-analysis";
+        log.info("Starting {} re-analysis for requirement #{} (previous analysis #{})",
+                requirement.getType(), requirement.getId(), previousAnalysis.getId());
         long startTime = System.currentTimeMillis();
         AnalysisResult result = aiService.chatWithStructuredOutput(
-                promptLoader.load("requirement-analysis"), userMessage, AnalysisResult.class);
+                promptLoader.load(promptName), userMessage, AnalysisResult.class);
         long durationMs = System.currentTimeMillis() - startTime;
         log.info("Re-analysis complete for requirement #{} in {}ms", requirement.getId(), durationMs);
 

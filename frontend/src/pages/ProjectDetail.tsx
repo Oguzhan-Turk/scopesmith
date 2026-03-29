@@ -63,6 +63,7 @@ export default function ProjectDetail() {
   const [tasks, setTasks] = useState<Task[]>([]);
 
   const [newRequirement, setNewRequirement] = useState("");
+  const [newRequirementType, setNewRequirementType] = useState<"FEATURE" | "BUG">("FEATURE");
   const [scanPath, setScanPath] = useState("");
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [summaryInstruction, setSummaryInstruction] = useState("");
@@ -170,8 +171,9 @@ export default function ProjectDetail() {
     if (!newRequirement.trim()) return;
     setActionLoading("create-req");
     try {
-      await createRequirement(projectId, newRequirement);
+      await createRequirement(projectId, newRequirement, newRequirementType);
       setNewRequirement("");
+      setNewRequirementType("FEATURE");
       const reqs = await getRequirements(projectId);
       setRequirements(reqs);
       showToast("Talep eklendi.", "success");
@@ -349,6 +351,9 @@ export default function ProjectDetail() {
   if (loading) return <Spinner label="Proje yükleniyor..." />;
   if (!project) return <div className="text-center text-destructive py-12">Proje bulunamadı</div>;
 
+  const selectedRequirement = requirements.find((r) => r.id === selectedRequirementId);
+  const isBug = selectedRequirement?.type === "BUG";
+
   // Check if current action is a long-running AI call
   const aiLoadingLabel = actionLoading ? LOADING_LABELS[actionLoading] : null;
   const isAnalyzing = actionLoading?.startsWith("analyze-");
@@ -402,8 +407,32 @@ export default function ProjectDetail() {
               <CardTitle className="text-lg">Yeni Talep Ekle</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setNewRequirementType("FEATURE")}
+                  className={`px-3 py-1.5 text-sm rounded-md border ${
+                    newRequirementType === "FEATURE"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-background hover:bg-muted"
+                  }`}
+                >
+                  Feature
+                </button>
+                <button
+                  onClick={() => setNewRequirementType("BUG")}
+                  className={`px-3 py-1.5 text-sm rounded-md border ${
+                    newRequirementType === "BUG"
+                      ? "bg-destructive text-destructive-foreground"
+                      : "bg-background hover:bg-muted"
+                  }`}
+                >
+                  Bug
+                </button>
+              </div>
               <Textarea
-                placeholder="Ham talebi buraya yapıştırın... (e-posta, toplantı notu, Slack mesajı)"
+                placeholder={newRequirementType === "BUG"
+                  ? "Bug raporunu buraya yapıştırın... (hata açıklaması, ekran görüntüsü notu, kullanıcı şikayeti)"
+                  : "Ham talebi buraya yapıştırın... (e-posta, toplantı notu, Slack mesajı)"}
                 value={newRequirement}
                 onChange={(e) => setNewRequirement(e.target.value)}
                 rows={5}
@@ -412,7 +441,7 @@ export default function ProjectDetail() {
                 onClick={handleCreateRequirement}
                 disabled={actionLoading === "create-req" || !newRequirement.trim()}
               >
-                {actionLoading === "create-req" ? "Ekleniyor..." : "Talep Ekle"}
+                {actionLoading === "create-req" ? "Ekleniyor..." : newRequirementType === "BUG" ? "Bug Ekle" : "Talep Ekle"}
               </Button>
             </CardContent>
           </Card>
@@ -434,8 +463,13 @@ export default function ProjectDetail() {
             >
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-base">Talep #{req.id}</CardTitle>
+                  <CardTitle className="text-base">
+                    {req.type === "BUG" ? "Bug" : "Talep"} #{req.id}
+                  </CardTitle>
                   <div className="flex gap-2">
+                    <Badge variant={req.type === "BUG" ? "destructive" : "default"}>
+                      {req.type === "BUG" ? "Bug" : "Feature"}
+                    </Badge>
                     <Badge variant="outline">v{req.version}</Badge>
                     <Badge variant="secondary">{req.status}</Badge>
                   </div>
@@ -517,12 +551,12 @@ export default function ProjectDetail() {
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">Analiz Sonucu</CardTitle>
+                    <CardTitle className="text-lg">{isBug ? "Bug Analizi" : "Analiz Sonucu"}</CardTitle>
                     <div className="flex gap-2">
                       {/* Madde 7: Risk tooltip */}
                       <Tooltip content={selectedAnalysis.riskReason || "Risk bilgisi yok"}>
                         <Badge variant={riskColor(selectedAnalysis.riskLevel)} className="cursor-help">
-                          Risk: {selectedAnalysis.riskLevel}
+                          {isBug ? "Severity" : "Risk"}: {selectedAnalysis.riskLevel}
                         </Badge>
                       </Tooltip>
                       {selectedAnalysis.durationMs && (

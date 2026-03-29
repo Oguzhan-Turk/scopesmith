@@ -1,6 +1,8 @@
 package com.scopesmith.service;
 
 import com.scopesmith.config.JiraConfig;
+import com.scopesmith.entity.Analysis;
+import com.scopesmith.entity.RequirementType;
 import com.scopesmith.entity.Task;
 import com.scopesmith.repository.AnalysisRepository;
 import com.scopesmith.repository.TaskRepository;
@@ -42,7 +44,7 @@ public class JiraService {
             throw new IllegalStateException("Jira is not configured. Set JIRA_URL, JIRA_EMAIL, and JIRA_API_TOKEN.");
         }
 
-        analysisRepository.findById(analysisId)
+        Analysis analysis = analysisRepository.findById(analysisId)
                 .orElseThrow(() -> new EntityNotFoundException("Analysis not found: " + analysisId));
 
         List<Task> tasks = taskRepository.findByAnalysisId(analysisId);
@@ -51,7 +53,10 @@ public class JiraService {
         }
 
         String project = (projectKey != null && !projectKey.isBlank()) ? projectKey : jiraConfig.getProjectKey();
-        String type = (issueType != null && !issueType.isBlank()) ? issueType : "Task";
+
+        // Default issue type based on requirement type: BUG → "Bug", FEATURE → "Task"
+        String defaultType = analysis.getRequirement().getType() == RequirementType.BUG ? "Bug" : "Task";
+        String type = (issueType != null && !issueType.isBlank()) ? issueType : defaultType;
 
         List<Map<String, String>> created = new ArrayList<>();
         List<Map<String, String>> failed = new ArrayList<>();

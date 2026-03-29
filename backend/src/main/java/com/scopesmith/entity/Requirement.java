@@ -42,6 +42,10 @@ public class Requirement {
 
     @Enumerated(EnumType.STRING)
     @Builder.Default
+    private RequirementType type = RequirementType.FEATURE;
+
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
     private RequirementStatus status = RequirementStatus.DRAFT;
 
     @Builder.Default
