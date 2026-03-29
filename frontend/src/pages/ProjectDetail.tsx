@@ -853,58 +853,74 @@ export default function ProjectDetail() {
 
         {/* INTEGRATIONS TAB */}
         <TabsContent value="integrations" className="space-y-6">
+          <p className="text-sm text-muted-foreground">
+            Task'ların aktarılacağı hedefleri ayarlayın.
+          </p>
+
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Jira Ayarları</CardTitle>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-lg">Jira</CardTitle>
+                {integrationConfig.jira?.projectKey && <Badge variant="default">Aktif</Badge>}
+              </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div>
-                <label className="text-sm font-medium mb-1 block">Proje Key'i</label>
-                <input
-                  type="text"
-                  placeholder="Örn: SS, PROJ"
-                  value={integrationConfig.jira?.projectKey || ""}
-                  onChange={(e) => setIntegrationConfig({
-                    ...integrationConfig,
-                    jira: { ...integrationConfig.jira, projectKey: e.target.value.toUpperCase() },
-                  })}
-                  className="w-full px-3 py-2 border rounded-md bg-background text-sm"
-                />
+              <div className="flex items-center gap-2">
+                <Tooltip side="right" content="Jira'daki issue numaralarının öneki. Örn: SS yazarsanız issue'lar SS-1, SS-2 olarak oluşur.">
+                  <label className="text-sm font-medium cursor-help border-b border-dotted border-muted-foreground">Proje Key</label>
+                </Tooltip>
               </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Varsayılan Issue Type</label>
-                <input
-                  type="text"
-                  placeholder="Task, Story, Bug"
-                  value={integrationConfig.jira?.defaultIssueType || ""}
-                  onChange={(e) => setIntegrationConfig({
-                    ...integrationConfig,
-                    jira: { ...integrationConfig.jira, defaultIssueType: e.target.value },
-                  })}
-                  className="w-full px-3 py-2 border rounded-md bg-background text-sm"
-                />
+              <input
+                type="text"
+                placeholder="SS"
+                value={integrationConfig.jira?.projectKey || ""}
+                onChange={(e) => setIntegrationConfig({
+                  ...integrationConfig,
+                  jira: { ...integrationConfig.jira, projectKey: e.target.value.toUpperCase() },
+                })}
+                className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+              />
+              <div className="flex items-center gap-2">
+                <Tooltip side="right" content="Feature task'ları için varsayılan tip. Bug raporlarından üretilen task'lar otomatik 'Bug' olarak gönderilir.">
+                  <label className="text-sm font-medium cursor-help border-b border-dotted border-muted-foreground">Issue Type</label>
+                </Tooltip>
               </div>
+              <input
+                type="text"
+                placeholder="Task"
+                value={integrationConfig.jira?.defaultIssueType || ""}
+                onChange={(e) => setIntegrationConfig({
+                  ...integrationConfig,
+                  jira: { ...integrationConfig.jira, defaultIssueType: e.target.value },
+                })}
+                className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+              />
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">GitHub Ayarları</CardTitle>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-lg">GitHub Issues</CardTitle>
+                {integrationConfig.github?.repo && <Badge variant="default">Aktif</Badge>}
+              </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div>
-                <label className="text-sm font-medium mb-1 block">Repository</label>
-                <input
-                  type="text"
-                  placeholder="Örn: Oguzhan-Turk/scopesmith"
-                  value={integrationConfig.github?.repo || ""}
-                  onChange={(e) => setIntegrationConfig({
-                    ...integrationConfig,
-                    github: { repo: e.target.value },
-                  })}
-                  className="w-full px-3 py-2 border rounded-md bg-background text-sm"
-                />
+              <div className="flex items-center gap-2">
+                <Tooltip side="right" content="Task'ların GitHub Issue olarak oluşturulacağı repo. Kod repo'sundan farklı olabilir.">
+                  <label className="text-sm font-medium cursor-help border-b border-dotted border-muted-foreground">Repository</label>
+                </Tooltip>
               </div>
+              <input
+                type="text"
+                placeholder="owner/repo"
+                value={integrationConfig.github?.repo || ""}
+                onChange={(e) => setIntegrationConfig({
+                  ...integrationConfig,
+                  github: { repo: e.target.value },
+                })}
+                className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+              />
             </CardContent>
           </Card>
 
@@ -912,7 +928,7 @@ export default function ProjectDetail() {
             onClick={handleSaveIntegrationConfig}
             disabled={actionLoading === "save-config"}
           >
-            {actionLoading === "save-config" ? "Kaydediliyor..." : "Ayarları Kaydet"}
+            {actionLoading === "save-config" ? "Kaydediliyor..." : "Kaydet"}
           </Button>
         </TabsContent>
       </Tabs>
