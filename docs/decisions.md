@@ -66,3 +66,64 @@
 **Implementation priority:**
 - MVP: Layer 1 (calibration) + Layer 3 (similar task reference)
 - Post-MVP: Layer 2 (pattern detection, needs Jira data)
+
+## ADR-004: Language Strategy
+**Date:** 2026-03-29
+**Status:** Accepted
+
+**Decision:** Prompts in English, user-facing output in Turkish. Multi-language support deferred.
+
+**Rationale:**
+- Claude produces more consistent structured output in English
+- JSON field names and enum values stay English regardless
+- Atmosware users work in Turkish — PO'lar teknik İngilizce bilmeyebilir
+- Demo impact: Turkish output much more impressive for Turkish jury
+
+**Implementation:**
+- System prompts: English
+- Prompt instruction: "Return all human-readable text in Turkish. Keep JSON field names, enum values, and technical terms in English."
+- Future: language parameter per project/user profile (e.g., `language: tr`)
+
+**Trade-off:**
+- Single API call (no separate translation step) — cost efficient
+- Mixed language in JSON (English keys, Turkish values) — acceptable, frontend handles display
+
+## ADR-005: Feature Prioritization
+**Date:** 2026-03-29
+**Status:** Accepted
+
+**Decision:** All features stay in scope. Priority order for implementation:
+
+**Core (this week):**
+1. Feature E: Project Context — differentiator, without it we're a chatbot
+2. Feature A+B: Already done, iterate prompts
+3. Learning SP: Layer 1 + Layer 3
+4. Feature D: PO Summary
+5. Frontend: 3 core pages
+
+**Enrichment (next week):**
+6. Feature C: Change Impact Analysis
+7. Feature F: Document Management
+8. Jira integration (JSON export minimum)
+9. UI polish + testing
+
+**Rationale:**
+- Feature E first because it's the key differentiator from ChatGPT
+- No features cut — team committed to full delivery
+- Prioritization ensures core value is deliverable even if time runs short
+
+## ADR-006: Demo Data Requirements
+**Date:** 2026-03-29
+**Status:** Action Required
+
+**Decision:** Request anonymized data from Atmosware for demo and learning SP testing.
+
+**What we need:**
+1. Real requirement examples (5-10) — raw, unstructured, real-world
+2. Historical tasks (20-30) — title, description, SP final value
+3. One project's general structure — tech stack, module names, entity list
+
+**Rules:**
+- All data must be anonymized (no customer names, no sensitive info)
+- Structure and format matter, not actual content
+- Can be from any directorate's projects
