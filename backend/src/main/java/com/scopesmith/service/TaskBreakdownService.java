@@ -33,6 +33,11 @@ public class TaskBreakdownService {
         Analysis analysis = analysisRepository.findById(analysisId)
                 .orElseThrow(() -> new EntityNotFoundException("Analysis not found with id: " + analysisId));
 
+        if (!analysis.getTasks().isEmpty()) {
+            throw new IllegalStateException("Tasks already exist for analysis #" + analysisId
+                    + ". Use the refine endpoint to modify existing tasks.");
+        }
+
         String userMessage = buildTaskBreakdownMessage(analysis);
 
         log.info("Generating task breakdown for analysis #{}", analysisId);
@@ -67,6 +72,65 @@ public class TaskBreakdownService {
 
         // Update requirement status
         analysis.getRequirement().setStatus(RequirementStatus.READY);
+
+        return analysis.getTasks().stream()
+                .map(TaskResponse::from)
+                .toList();
+    }
+
+    @Transactional
+    public List<TaskResponse> refineTasks(Long analysisId, String instruction) {
+        Analysis analysis = analysisRepository.findById(analysisId)
+                .orElseThrow(() -> new EntityNotFoundException("Analysis not found with id: " + analysisId));
+
+        if (analysis.getTasks().isEmpty()) {
+            throw new IllegalStateException("No existing tasks to refine for analysis #" + analysisId);
+        }
+
+        // Build message with current tasks + instruction
+        StringBuilder userMessage = new StringBuilder();
+        userMessage.append("## Current Tasks\n");
+        for (Task task : analysis.getTasks()) {
+            int sp = task.getSpFinal() != null ? task.getSpFinal() :
+                    (task.getSpSuggestion() != null ? task.getSpSuggestion() : 0);
+            userMessage.append(String.format("- %s (%d SP, %s priority): %s\n",
+                    task.getTitle(), sp, task.getPriority().name(), task.getDescription()));
+        }
+        userMessage.append("\n## Analysis Context\n");
+        userMessage.append(analysis.getStructuredSummary());
+        userMessage.append("\n\n## Refinement Instruction\n");
+        userMessage.append(instruction);
+
+        log.info("Refining tasks for analysis #{}", analysisId);
+        TaskBreakdownResult result = aiService.chatWithStructuredOutput(
+                promptLoader.load("task-breakdown-refine"), userMessage.toString(), TaskBreakdownResult.class);
+        log.info("Task refinement complete for analysis #{}. {} tasks generated.", analysisId, result.getTasks().size());
+
+        // Delete old tasks
+        taskRepository.deleteAll(analysis.getTasks());
+        analysis.getTasks().clear();
+
+        // Save new tasks
+        Map<String, Task> savedTasks = new HashMap<>();
+        for (TaskBreakdownResult.TaskItem item : result.getTasks()) {
+            Task task = Task.builder()
+                    .analysis(analysis)
+                    .title(item.getTitle())
+                    .description(item.getDescription())
+                    .acceptanceCriteria(item.getAcceptanceCriteria())
+                    .spSuggestion(item.getSpSuggestion())
+                    .spRationale(item.getSpRationale())
+                    .priority(parsePriority(item.getPriority()))
+                    .build();
+
+            if (item.getDependsOn() != null && savedTasks.containsKey(item.getDependsOn())) {
+                task.setDependency(savedTasks.get(item.getDependsOn()));
+            }
+
+            Task saved = taskRepository.save(task);
+            savedTasks.put(saved.getTitle(), saved);
+            analysis.getTasks().add(saved);
+        }
 
         return analysis.getTasks().stream()
                 .map(TaskResponse::from)

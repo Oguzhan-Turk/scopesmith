@@ -8,7 +8,11 @@ import {
   answerQuestion,
   dismissQuestion,
   generateTasks,
-  getStakeholderSummary,
+  generateStakeholderSummary,
+  refineStakeholderSummary,
+  refineTasks,
+  getAnalysesByRequirement,
+  getTasksByAnalysis,
   scanProject,
   type Project,
   type Requirement,
@@ -28,13 +32,16 @@ export default function ProjectDetail() {
 
   const [project, setProject] = useState<Project | null>(null);
   const [requirements, setRequirements] = useState<Requirement[]>([]);
+  const [selectedRequirementId, setSelectedRequirementId] = useState<number | null>(null);
+  const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [selectedAnalysis, setSelectedAnalysis] = useState<Analysis | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [stakeholderSummary, setStakeholderSummary] = useState<string | null>(null);
 
   const [newRequirement, setNewRequirement] = useState("");
   const [scanPath, setScanPath] = useState("");
   const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [summaryInstruction, setSummaryInstruction] = useState("");
+  const [taskInstruction, setTaskInstruction] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -56,6 +63,37 @@ export default function ProjectDetail() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function loadAnalyses(requirementId: number) {
+    try {
+      const result = await getAnalysesByRequirement(requirementId);
+      setAnalyses(result);
+      if (result.length > 0) {
+        const latest = result[0]; // sorted by createdAt DESC
+        setSelectedAnalysis(latest);
+        loadTasks(latest.id);
+      } else {
+        setSelectedAnalysis(null);
+        setTasks([]);
+      }
+    } catch (e) {
+      console.error("Failed to load analyses:", e);
+    }
+  }
+
+  async function loadTasks(analysisId: number) {
+    try {
+      const result = await getTasksByAnalysis(analysisId);
+      setTasks(result);
+    } catch (e) {
+      console.error("Failed to load tasks:", e);
+    }
+  }
+
+  function handleSelectRequirement(reqId: number) {
+    setSelectedRequirementId(reqId);
+    loadAnalyses(reqId);
   }
 
   async function handleScan() {
@@ -91,9 +129,12 @@ export default function ProjectDetail() {
     setActionLoading(`analyze-${reqId}`);
     try {
       const analysis = await analyzeRequirement(reqId);
+      setSelectedRequirementId(reqId);
       setSelectedAnalysis(analysis);
       setTasks([]);
-      setStakeholderSummary(null);
+      // Reload analyses list so it includes the new one
+      const updatedAnalyses = await getAnalysesByRequirement(reqId);
+      setAnalyses(updatedAnalyses);
     } catch (e) {
       console.error("Analysis failed:", e);
     } finally {
@@ -108,6 +149,7 @@ export default function ProjectDetail() {
     try {
       const updated = await answerQuestion(questionId, answer);
       setSelectedAnalysis(updated);
+      setAnalyses((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
       setAnswers((prev) => ({ ...prev, [questionId]: "" }));
     } catch (e) {
       console.error("Failed to answer:", e);
@@ -121,6 +163,7 @@ export default function ProjectDetail() {
     try {
       const updated = await dismissQuestion(questionId);
       setSelectedAnalysis(updated);
+      setAnalyses((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
     } catch (e) {
       console.error("Failed to dismiss:", e);
     } finally {
@@ -145,10 +188,50 @@ export default function ProjectDetail() {
     if (!selectedAnalysis) return;
     setActionLoading("summary");
     try {
-      const result = await getStakeholderSummary(selectedAnalysis.id);
-      setStakeholderSummary(result.summary);
+      const result = await generateStakeholderSummary(selectedAnalysis.id);
+      // Update the selected analysis with the new summary
+      setSelectedAnalysis({ ...selectedAnalysis, stakeholderSummary: result.summary });
+      // Also update in analyses list
+      setAnalyses((prev) =>
+        prev.map((a) =>
+          a.id === selectedAnalysis.id ? { ...a, stakeholderSummary: result.summary } : a
+        )
+      );
     } catch (e) {
       console.error("Summary failed:", e);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleRefineTasks() {
+    if (!selectedAnalysis || !taskInstruction.trim()) return;
+    setActionLoading("refine-tasks");
+    try {
+      const refined = await refineTasks(selectedAnalysis.id, taskInstruction);
+      setTasks(refined);
+      setTaskInstruction("");
+    } catch (e) {
+      console.error("Task refinement failed:", e);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleRefineSummary() {
+    if (!selectedAnalysis || !summaryInstruction.trim()) return;
+    setActionLoading("refine-summary");
+    try {
+      const result = await refineStakeholderSummary(selectedAnalysis.id, summaryInstruction);
+      setSelectedAnalysis({ ...selectedAnalysis, stakeholderSummary: result.summary });
+      setAnalyses((prev) =>
+        prev.map((a) =>
+          a.id === selectedAnalysis.id ? { ...a, stakeholderSummary: result.summary } : a
+        )
+      );
+      setSummaryInstruction("");
+    } catch (e) {
+      console.error("Summary refinement failed:", e);
     } finally {
       setActionLoading(null);
     }
@@ -226,13 +309,22 @@ export default function ProjectDetail() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm whitespace-pre-wrap mb-4">{req.rawText}</p>
-                <Button
-                  size="sm"
-                  onClick={() => handleAnalyze(req.id)}
-                  disabled={actionLoading === `analyze-${req.id}`}
-                >
-                  {actionLoading === `analyze-${req.id}` ? "Analiz ediliyor..." : "Analiz Et"}
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleSelectRequirement(req.id)}
+                  >
+                    {selectedRequirementId === req.id ? "Seçili" : "Görüntüle"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => handleAnalyze(req.id)}
+                    disabled={actionLoading === `analyze-${req.id}`}
+                  >
+                    {actionLoading === `analyze-${req.id}` ? "Analiz ediliyor..." : "Analiz Et"}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ))}
@@ -382,26 +474,59 @@ export default function ProjectDetail() {
 
               {/* Actions */}
               <div className="flex gap-3">
-                <Button onClick={handleGenerateTasks} disabled={actionLoading === "tasks"}>
-                  {actionLoading === "tasks" ? "Üretiliyor..." : "Task'lara Böl"}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleStakeholderSummary}
-                  disabled={actionLoading === "summary"}
-                >
-                  {actionLoading === "summary" ? "Hazırlanıyor..." : "Stakeholder Özeti"}
-                </Button>
+                {tasks.length === 0 ? (
+                  <Button onClick={handleGenerateTasks} disabled={actionLoading === "tasks"}>
+                    {actionLoading === "tasks" ? "Üretiliyor..." : "Task'lara Böl"}
+                  </Button>
+                ) : (
+                  <Badge variant="outline">{tasks.length} task üretildi</Badge>
+                )}
+                {!selectedAnalysis.stakeholderSummary && (
+                  <Button
+                    variant="outline"
+                    onClick={handleStakeholderSummary}
+                    disabled={actionLoading === "summary"}
+                  >
+                    {actionLoading === "summary" ? "Hazırlanıyor..." : "Stakeholder Özeti Üret"}
+                  </Button>
+                )}
               </div>
 
               {/* Stakeholder Summary */}
-              {stakeholderSummary && (
+              {selectedAnalysis.stakeholderSummary && (
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">Stakeholder Özeti</CardTitle>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg">Stakeholder Özeti</CardTitle>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleStakeholderSummary}
+                        disabled={actionLoading === "summary"}
+                      >
+                        {actionLoading === "summary" ? "Üretiliyor..." : "Yeniden Üret"}
+                      </Button>
+                    </div>
                   </CardHeader>
-                  <CardContent>
-                    <pre className="text-sm whitespace-pre-wrap font-sans">{stakeholderSummary}</pre>
+                  <CardContent className="space-y-4">
+                    <pre className="text-sm whitespace-pre-wrap font-sans">{selectedAnalysis.stakeholderSummary}</pre>
+                    <Separator />
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="İyileştirme talimatı (örn: daha kısa olsun, riskleri vurgula)"
+                        value={summaryInstruction}
+                        onChange={(e) => setSummaryInstruction(e.target.value)}
+                        className="flex-1 px-3 py-1.5 text-sm border rounded-md bg-background"
+                      />
+                      <Button
+                        size="sm"
+                        onClick={handleRefineSummary}
+                        disabled={actionLoading === "refine-summary" || !summaryInstruction.trim()}
+                      >
+                        {actionLoading === "refine-summary" ? "İyileştiriliyor..." : "İyileştir"}
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               )}
@@ -467,6 +592,28 @@ export default function ProjectDetail() {
                   </CardContent>
                 </Card>
               ))}
+
+              {/* Task Refinement */}
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Task iyileştirme talimatı (örn: bu task'ı böl, frontend task'larını ayır)"
+                      value={taskInstruction}
+                      onChange={(e) => setTaskInstruction(e.target.value)}
+                      className="flex-1 px-3 py-1.5 text-sm border rounded-md bg-background"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={handleRefineTasks}
+                      disabled={actionLoading === "refine-tasks" || !taskInstruction.trim()}
+                    >
+                      {actionLoading === "refine-tasks" ? "İyileştiriliyor..." : "İyileştir"}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             </>
           )}
         </TabsContent>

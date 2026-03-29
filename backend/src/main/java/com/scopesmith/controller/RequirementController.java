@@ -4,6 +4,8 @@ import com.scopesmith.dto.AnalysisResponse;
 import com.scopesmith.dto.ChangeImpactResult;
 import com.scopesmith.dto.RequirementRequest;
 import com.scopesmith.dto.RequirementResponse;
+import com.scopesmith.entity.Analysis;
+import com.scopesmith.repository.AnalysisRepository;
 import com.scopesmith.service.ChangeImpactService;
 import com.scopesmith.service.RequirementAnalysisService;
 import com.scopesmith.service.RequirementService;
@@ -23,6 +25,7 @@ public class RequirementController {
     private final RequirementService requirementService;
     private final RequirementAnalysisService analysisService;
     private final ChangeImpactService changeImpactService;
+    private final AnalysisRepository analysisRepository;
 
     @PostMapping("/projects/{projectId}/requirements")
     @ResponseStatus(HttpStatus.CREATED)
@@ -47,6 +50,12 @@ public class RequirementController {
             @PathVariable Long id,
             @Valid @RequestBody RequirementRequest request) {
         return requirementService.update(id, request);
+    }
+
+    @GetMapping("/requirements/{id}/analyses")
+    public List<AnalysisResponse> getAnalyses(@PathVariable Long id) {
+        List<Analysis> analyses = analysisRepository.findByRequirementIdOrderByCreatedAtDesc(id);
+        return analyses.stream().map(AnalysisResponse::from).toList();
     }
 
     @PostMapping("/requirements/{id}/analyze")

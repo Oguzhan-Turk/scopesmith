@@ -39,6 +39,28 @@ public class StakeholderSummaryService {
         return summary;
     }
 
+    @Transactional
+    public String refineSummary(Long analysisId, String instruction) {
+        Analysis analysis = analysisRepository.findById(analysisId)
+                .orElseThrow(() -> new EntityNotFoundException("Analysis not found with id: " + analysisId));
+
+        if (analysis.getPoSummary() == null || analysis.getPoSummary().isBlank()) {
+            throw new IllegalStateException("No existing stakeholder summary to refine for analysis: " + analysisId);
+        }
+
+        String userMessage = "## Current Summary\n" + analysis.getPoSummary()
+                + "\n\n## Refinement Instruction\n" + instruction;
+
+        log.info("Refining stakeholder summary for analysis #{}", analysisId);
+        String refined = aiService.chat(promptLoader.load("stakeholder-summary-refine"), userMessage);
+        log.info("Stakeholder summary refined for analysis #{}", analysisId);
+
+        analysis.setPoSummary(refined);
+        analysisRepository.save(analysis);
+
+        return refined;
+    }
+
     private String buildSummaryMessage(Analysis analysis) {
         StringBuilder message = new StringBuilder();
 

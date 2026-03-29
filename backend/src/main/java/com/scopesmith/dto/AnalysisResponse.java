@@ -19,7 +19,9 @@ public class AnalysisResponse {
     private String riskLevel;
     private String riskReason;
     private String affectedModules;
+    private String stakeholderSummary;
     private Integer requirementVersion;
+    private Long durationMs;
     private List<QuestionResponse> questions;
     private LocalDateTime createdAt;
 
@@ -50,7 +52,9 @@ public class AnalysisResponse {
                 .riskLevel(analysis.getRiskLevel())
                 .riskReason(analysis.getRiskReason())
                 .affectedModules(analysis.getAffectedModules())
+                .stakeholderSummary(analysis.getPoSummary())
                 .requirementVersion(analysis.getRequirementVersion())
+                .durationMs(analysis.getDurationMs())
                 .questions(questionResponses)
                 .createdAt(analysis.getCreatedAt())
                 .build();

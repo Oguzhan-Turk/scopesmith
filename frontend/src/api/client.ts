@@ -57,10 +57,29 @@ export const setSpDecision = (taskId: number, spFinal: number) =>
     body: JSON.stringify({ spFinal }),
   });
 
+// Analysis retrieval
+export const getAnalysesByRequirement = (requirementId: number) =>
+  request<Analysis[]>(`/requirements/${requirementId}/analyses`);
+export const getAnalysis = (analysisId: number) =>
+  request<Analysis>(`/analyses/${analysisId}`);
+export const getTasksByAnalysis = (analysisId: number) =>
+  request<Task[]>(`/analyses/${analysisId}/tasks`);
+
+export const refineTasks = (analysisId: number, instruction: string) =>
+  request<Task[]>(`/analyses/${analysisId}/tasks/refine`, {
+    method: "POST",
+    body: JSON.stringify({ instruction }),
+  });
+
 // Stakeholder Summary
-export const getStakeholderSummary = (analysisId: number) =>
+export const generateStakeholderSummary = (analysisId: number) =>
   request<{ summary: string }>(`/analyses/${analysisId}/stakeholder-summary`, {
     method: "POST",
+  });
+export const refineStakeholderSummary = (analysisId: number, instruction: string) =>
+  request<{ summary: string }>(`/analyses/${analysisId}/stakeholder-summary/refine`, {
+    method: "POST",
+    body: JSON.stringify({ instruction }),
   });
 
 // Documents
@@ -116,6 +135,7 @@ export interface Analysis {
   riskLevel: string;
   riskReason: string;
   affectedModules: string;
+  stakeholderSummary: string | null;
   requirementVersion: number;
   durationMs: number | null;
   questions: Question[];
