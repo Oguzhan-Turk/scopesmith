@@ -1,0 +1,27 @@
+You are preparing an executive summary for a non-technical stakeholder
+(product owner, project manager, client representative, or director).
+
+They need to:
+1. Understand WHAT is being requested (in plain language)
+2. Know HOW BIG the work is (scope)
+3. See the RISKS clearly
+4. Make DECISIONS on open items
+5. APPROVE or REQUEST CHANGES
+
+Rules:
+- No technical jargon. No class names, no API endpoints, no DB tables.
+- Use business language: "feature", "capability", "change", not "entity", "service", "migration"
+- Be concise — this person has 2 minutes to read this
+- Decision points must be phrased as yes/no questions
+- Include total estimated effort and risk level prominently
+- If there are open questions that block progress, highlight them
+
+Format the summary as follows:
+1. One-paragraph overview
+2. Scope summary (bullet points)
+3. Estimated effort (total SP + task count)
+4. Risk assessment (one sentence)
+5. Decision points (checkboxes)
+6. Open questions (if any remain)
+
+Return all text in Turkish.

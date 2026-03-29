@@ -1,5 +1,6 @@
 package com.scopesmith.service;
 
+import com.scopesmith.config.PromptLoader;
 import com.scopesmith.dto.AnalysisResult;
 import com.scopesmith.entity.*;
 import com.scopesmith.repository.AnalysisRepository;
@@ -16,52 +17,33 @@ public class RequirementAnalysisService {
     private final AiService aiService;
     private final RequirementService requirementService;
     private final AnalysisRepository analysisRepository;
+    private final PromptLoader promptLoader;
 
-    private static final String SYSTEM_PROMPT = """
-            You are a senior business analyst and software architect with deep expertise in
-            requirement analysis. Your job is to analyze raw, unstructured requirements and
-            produce a structured analysis.
-
-            You will receive:
-            1. A raw requirement (possibly vague, incomplete, or containing multiple requests)
-            2. Optionally, project context (tech stack, existing modules, architecture)
-
-            Your analysis must be thorough but practical. Focus on:
-            - What is actually being asked (cut through ambiguity)
-            - What information is MISSING that would be needed for implementation
-            - What CONTRADICTIONS exist within the requirement
-            - What ASSUMPTIONS you had to make
-            - What QUESTIONS should be asked to the product owner or stakeholder
-            - Which existing modules/services would be AFFECTED
-            - What is the RISK level and why
-
-            Rules:
-            - Be specific, not generic. "What is the expected behavior?" is too vague.
-              "Should the discount code be case-sensitive?" is specific.
-            - If project context is provided, reference actual module/service names.
-            - Questions should be answerable by a non-technical product owner.
-            - Risk assessment should consider: scope clarity, technical complexity,
-              integration points, and potential for scope creep.
-            """;
-
-    @Transactional
+    /**
+     * Analyze a requirement. AI call is made OUTSIDE the transaction
+     * to avoid holding a DB connection during the 15-30 second API call.
+     */
     public Analysis analyze(Long requirementId) {
+        // 1. Read requirement and build message (short transaction)
         Requirement requirement = requirementService.getRequirementOrThrow(requirementId);
-
-        // Update status
-        requirement.setStatus(RequirementStatus.ANALYZING);
-
-        // Build user message with optional project context
         String userMessage = buildUserMessage(requirement);
 
-        // Call AI
+        // 2. Call AI — NO transaction held during this long-running call
         log.info("Starting analysis for requirement #{}", requirementId);
         long startTime = System.currentTimeMillis();
-        AnalysisResult result = aiService.chatWithStructuredOutput(SYSTEM_PROMPT, userMessage, AnalysisResult.class);
+        AnalysisResult result = aiService.chatWithStructuredOutput(
+                promptLoader.load("requirement-analysis"), userMessage, AnalysisResult.class);
         long durationMs = System.currentTimeMillis() - startTime;
         log.info("Analysis complete for requirement #{} in {}ms", requirementId, durationMs);
 
-        // Save analysis
+        // 3. Save results (short transaction)
+        return saveAnalysisResult(requirement, result, durationMs);
+    }
+
+    @Transactional
+    protected Analysis saveAnalysisResult(Requirement requirement, AnalysisResult result, long durationMs) {
+        requirement.setStatus(RequirementStatus.ANALYZING);
+
         Analysis analysis = Analysis.builder()
                 .requirement(requirement)
                 .structuredSummary(result.getStructuredSummary())
@@ -75,7 +57,6 @@ public class RequirementAnalysisService {
 
         Analysis savedAnalysis = analysisRepository.save(analysis);
 
-        // Save questions
         for (String questionText : result.getQuestions()) {
             Question question = Question.builder()
                     .analysis(savedAnalysis)
@@ -84,61 +65,32 @@ public class RequirementAnalysisService {
             savedAnalysis.getQuestions().add(question);
         }
 
-        // Update requirement status
         requirement.setStatus(
                 result.getQuestions().isEmpty() ? RequirementStatus.ANALYZED : RequirementStatus.CLARIFYING
         );
 
         analysisRepository.save(savedAnalysis);
-
         return savedAnalysis;
     }
 
     /**
      * Re-analyze a requirement using the previous analysis + answers as additional context.
      * Creates a NEW analysis record — the old one is preserved for history.
+     * AI call is outside transaction, same pattern as analyze().
      */
-    @Transactional
     public Analysis reAnalyze(Analysis previousAnalysis) {
         Requirement requirement = previousAnalysis.getRequirement();
-        requirement.setStatus(RequirementStatus.ANALYZING);
-
         String userMessage = buildReAnalysisMessage(requirement, previousAnalysis);
 
         log.info("Starting re-analysis for requirement #{} (previous analysis #{})",
                 requirement.getId(), previousAnalysis.getId());
         long startTime = System.currentTimeMillis();
-        AnalysisResult result = aiService.chatWithStructuredOutput(SYSTEM_PROMPT, userMessage, AnalysisResult.class);
+        AnalysisResult result = aiService.chatWithStructuredOutput(
+                promptLoader.load("requirement-analysis"), userMessage, AnalysisResult.class);
         long durationMs = System.currentTimeMillis() - startTime;
         log.info("Re-analysis complete for requirement #{} in {}ms", requirement.getId(), durationMs);
 
-        Analysis newAnalysis = Analysis.builder()
-                .requirement(requirement)
-                .structuredSummary(result.getStructuredSummary())
-                .assumptions(String.join("\n", result.getAssumptions()))
-                .riskLevel(result.getRiskLevel())
-                .riskReason(result.getRiskReason())
-                .affectedModules(String.join(", ", result.getAffectedModules()))
-                .requirementVersion(requirement.getVersion())
-                .durationMs(durationMs)
-                .build();
-
-        Analysis savedAnalysis = analysisRepository.save(newAnalysis);
-
-        for (String questionText : result.getQuestions()) {
-            Question question = Question.builder()
-                    .analysis(savedAnalysis)
-                    .questionText(questionText)
-                    .build();
-            savedAnalysis.getQuestions().add(question);
-        }
-
-        requirement.setStatus(
-                result.getQuestions().isEmpty() ? RequirementStatus.ANALYZED : RequirementStatus.CLARIFYING
-        );
-
-        analysisRepository.save(savedAnalysis);
-        return savedAnalysis;
+        return saveAnalysisResult(requirement, result, durationMs);
     }
 
     private String buildReAnalysisMessage(Requirement requirement, Analysis previousAnalysis) {

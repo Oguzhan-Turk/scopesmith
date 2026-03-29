@@ -1,5 +1,6 @@
 package com.scopesmith.service;
 
+import com.scopesmith.config.PromptLoader;
 import com.scopesmith.dto.TaskBreakdownResult;
 import com.scopesmith.dto.TaskResponse;
 import com.scopesmith.entity.*;
@@ -23,47 +24,9 @@ public class TaskBreakdownService {
     private final AiService aiService;
     private final AnalysisRepository analysisRepository;
     private final TaskRepository taskRepository;
+    private final PromptLoader promptLoader;
 
     private static final long MIN_TASKS_FOR_CALIBRATION = 20;
-
-    private static final String SYSTEM_PROMPT = """
-            You are a senior software architect breaking down a requirement analysis into
-            actionable development tasks. You have deep expertise in agile task decomposition
-            and story point estimation.
-
-            You will receive:
-            1. The structured analysis of a requirement
-            2. Optionally, project context (tech stack, existing modules)
-            3. Optionally, Q&A clarifications
-            4. Optionally, historical task data from this project (past tasks with team-decided SP values)
-
-            For each task, provide:
-            - **title**: Short, clear, action-oriented (e.g., "Create DiscountCode entity and migration")
-            - **description**: What needs to be done, technically specific
-            - **acceptanceCriteria**: Bullet points defining "done" — testable, verifiable
-            - **spSuggestion**: Story point estimate (Fibonacci: 1, 2, 3, 5, 8, 13)
-            - **spRationale**: WHY this SP value — reference affected services, DB changes,
-              integration complexity, testing needs. If historical task data is provided,
-              REFERENCE similar past tasks by name and their SP values as evidence.
-              Example: "Similar to 'Create UserProfile entity' which the team rated at 3 SP."
-            - **priority**: LOW, MEDIUM, HIGH, or CRITICAL
-            - **dependsOn**: Title of another task this depends on, or null if independent
-
-            Rules:
-            - Tasks should be independently deliverable when possible
-            - Each task should be completable within one sprint
-            - If a task is larger than 8 SP, break it down further
-            - SP reflects COMPLEXITY, not time. Consider: number of services affected,
-              DB schema changes, external integrations, business logic complexity,
-              testing requirements, and requirement clarity
-            - Order tasks by dependency and priority
-            - Include testing tasks where integration/edge cases warrant separate effort
-            - If historical data shows the team consistently rates higher/lower than your
-              estimate, ADJUST your suggestion to match the team's calibration and explain why.
-
-            Return all human-readable text (descriptions, acceptance criteria, rationale) in Turkish.
-            Keep technical terms, class names, and framework names in English.
-            """;
 
     @Transactional
     public List<TaskResponse> generateTasks(Long analysisId) {
@@ -74,7 +37,7 @@ public class TaskBreakdownService {
 
         log.info("Generating task breakdown for analysis #{}", analysisId);
         TaskBreakdownResult result = aiService.chatWithStructuredOutput(
-                SYSTEM_PROMPT, userMessage, TaskBreakdownResult.class);
+                promptLoader.load("task-breakdown"), userMessage, TaskBreakdownResult.class);
         log.info("Task breakdown complete for analysis #{}. {} tasks generated.",
                 analysisId, result.getTasks().size());
 

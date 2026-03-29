@@ -34,6 +34,28 @@ public class GlobalExceptionHandler {
         return response;
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Map<String, Object> handleBadRequest(IllegalArgumentException ex) {
+        return buildError(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    /**
+     * AI service errors — timeout, rate limit, invalid response.
+     * Catches Spring AI and HTTP client exceptions.
+     */
+    @ExceptionHandler({
+            org.springframework.web.client.ResourceAccessException.class,
+            org.springframework.web.client.HttpClientErrorException.class,
+            org.springframework.web.client.HttpServerErrorException.class
+    })
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    public Map<String, Object> handleAiServiceError(Exception ex) {
+        log.error("AI service error", ex);
+        return buildError(HttpStatus.SERVICE_UNAVAILABLE,
+                "AI service is temporarily unavailable. Please try again in a moment.");
+    }
+
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public Map<String, Object> handleGeneral(Exception ex) {

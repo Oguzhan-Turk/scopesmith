@@ -1,5 +1,6 @@
 package com.scopesmith.service;
 
+import com.scopesmith.config.PromptLoader;
 import com.scopesmith.entity.Project;
 import com.scopesmith.repository.ProjectRepository;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,7 @@ public class ProjectContextService {
     private final AiService aiService;
     private final ProjectService projectService;
     private final ProjectRepository projectRepository;
+    private final PromptLoader promptLoader;
 
     /**
      * Key files that reveal project structure.
@@ -63,29 +65,7 @@ public class ProjectContextService {
      */
     private static final long MAX_TOTAL_CONTENT = 100 * 1024;
 
-    private static final String SYSTEM_PROMPT = """
-            You are a senior software architect analyzing a project's codebase.
-            You will receive a file tree and the contents of key files from a software project.
-
-            Produce a structured project context summary that includes:
-            1. **Tech Stack**: Languages, frameworks, build tools, databases
-            2. **Architecture**: Monolith/microservices, layering pattern, key design patterns
-            3. **Modules/Services**: List of main modules or services with one-line descriptions
-            4. **Domain Model**: Key entities/models and their relationships
-            5. **API Surface**: Main endpoints or interfaces exposed
-            6. **External Integrations**: Third-party services, APIs, databases
-            7. **Key Observations**: Anything notable — code quality, patterns, potential concerns
-
-            Rules:
-            - Be concise but complete. This summary will be used as context for requirement analysis.
-            - Focus on WHAT the project does and HOW it's structured, not line-by-line code review.
-            - Use actual class/module/service names from the code.
-            - If you can't determine something from the provided files, say so.
-            - Return plain text, not JSON. This will be stored as project context.
-
-            Return all human-readable text in Turkish.
-            Keep technical terms, class names, and framework names in English.
-            """;
+    // Prompt loaded from resources/prompts/project-context.txt via PromptLoader
 
     /**
      * Scan a local folder and generate project context using AI.
@@ -113,7 +93,7 @@ public class ProjectContextService {
 
         // Call AI
         long startTime = System.currentTimeMillis();
-        String context = aiService.chat(SYSTEM_PROMPT, userMessage);
+        String context = aiService.chat(promptLoader.load("project-context"), userMessage);
         long duration = System.currentTimeMillis() - startTime;
         log.info("Project context generated for #{} in {}ms", projectId, duration);
 
