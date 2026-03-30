@@ -897,30 +897,51 @@ export default function ProjectDetail() {
                   {tasks.length} Task — Toplam{" "}
                   {tasks.reduce((sum, t) => sum + (t.spFinal || t.spSuggestion || 0), 0)} SP
                 </h2>
-                {isAdmin && (
-                  <div className="flex gap-2">
-                    {integrationConfig.jira?.projectKey && (
-                      <>
-                        <Button size="sm" onClick={handleSyncJira} disabled={!!actionLoading}>
-                          {actionLoading === "jira-sync" ? "Gönderiliyor..." : `Jira (${integrationConfig.jira.projectKey})`}
+                {isAdmin && (() => {
+                  const syncedCount = tasks.filter((t) => t.jiraKey).length;
+                  const unsyncedCount = tasks.length - syncedCount;
+                  const allSynced = unsyncedCount === 0;
+
+                  return (
+                    <div className="flex items-center gap-2">
+                      {syncedCount > 0 && (
+                        <span className="text-xs text-muted-foreground">{syncedCount}/{tasks.length} gönderildi</span>
+                      )}
+                      {integrationConfig.jira?.projectKey && (
+                        <>
+                          <Button size="sm" variant="outline" onClick={() => {
+                            const msg = allSynced
+                              ? `Tüm task'lar zaten gönderilmiş. Tekrar göndermek istiyor musunuz?`
+                              : `${unsyncedCount} task Jira'ya (${integrationConfig.jira!.projectKey}) gönderilecek. Devam?`;
+                            if (confirm(msg)) handleSyncJira();
+                          }} disabled={!!actionLoading}>
+                            {actionLoading === "jira-sync" ? "Gönderiliyor..." : "Jira'ya Gönder"}
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => {
+                            if (confirm("CSV dosyası indirilecek. Devam?")) handleExportCsv();
+                          }} disabled={!!actionLoading}>
+                            {actionLoading === "export" ? "İndiriliyor..." : "CSV İndir"}
+                          </Button>
+                        </>
+                      )}
+                      {integrationConfig.github?.repo && (
+                        <Button size="sm" variant="outline" onClick={() => {
+                          const msg = allSynced
+                            ? `Tüm task'lar zaten gönderilmiş. Tekrar göndermek istiyor musunuz?`
+                            : `${unsyncedCount} task GitHub Issues'a gönderilecek. Devam?`;
+                          if (confirm(msg)) handleSyncGitHub();
+                        }} disabled={!!actionLoading}>
+                          {actionLoading === "github-sync" ? "Gönderiliyor..." : "GitHub'a Gönder"}
                         </Button>
-                        <Button size="sm" variant="outline" onClick={handleExportCsv} disabled={!!actionLoading}>
-                          {actionLoading === "export" ? "İndiriliyor..." : "CSV"}
+                      )}
+                      {!integrationConfig.jira?.projectKey && !integrationConfig.github?.repo && (
+                        <Button size="sm" variant="outline" onClick={() => setActiveTab("integrations")}>
+                          Entegrasyon Ayarla
                         </Button>
-                      </>
-                    )}
-                    {integrationConfig.github?.repo && (
-                      <Button size="sm" variant="outline" onClick={handleSyncGitHub} disabled={!!actionLoading}>
-                        {actionLoading === "github-sync" ? "Gönderiliyor..." : "GitHub"}
-                      </Button>
-                    )}
-                    {!integrationConfig.jira?.projectKey && !integrationConfig.github?.repo && (
-                      <Button size="sm" variant="outline" onClick={() => setActiveTab("integrations")}>
-                        Entegrasyon Ayarla
-                      </Button>
-                    )}
-                  </div>
-                )}
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
               {tasks.map((task) => (
                 <Card key={task.id}>

@@ -225,7 +225,9 @@ export interface JiraSyncResult {
 // Jira Export
 export async function exportJiraCsv(analysisId: number, projectKey: string, issueType: string = "Story") {
   const params = new URLSearchParams({ projectKey, issueType });
-  const res = await fetch(`${API_BASE}/analyses/${analysisId}/export/jira-csv?${params}`);
+  const res = await fetch(`${API_BASE}/analyses/${analysisId}/export/jira-csv?${params}`, {
+    credentials: "include",
+  });
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({ message: `HTTP ${res.status}` }));
