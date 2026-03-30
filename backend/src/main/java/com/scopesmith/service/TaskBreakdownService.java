@@ -91,8 +91,10 @@ public class TaskBreakdownService {
         for (Task task : analysis.getTasks()) {
             int sp = task.getSpFinal() != null ? task.getSpFinal() :
                     (task.getSpSuggestion() != null ? task.getSpSuggestion() : 0);
-            userMessage.append(String.format("- %s (%d SP, %s priority): %s\n",
-                    task.getTitle(), sp, task.getPriority().name(), task.getDescription()));
+            String synced = task.getJiraKey() != null ? ", SYNCED:" + task.getJiraKey() : "";
+            String cat = task.getCategory() != null ? ", " + task.getCategory() : "";
+            userMessage.append(String.format("- [ID:%d] %s (%d SP, %s priority%s%s): %s\n",
+                    task.getId(), task.getTitle(), sp, task.getPriority().name(), cat, synced, task.getDescription()));
         }
         userMessage.append("\n## Analysis Context\n");
         userMessage.append(analysis.getStructuredSummary());
@@ -123,14 +125,16 @@ public class TaskBreakdownService {
     protected TaskRefineResponse replaceTasksWithRefined(Long analysisId, TaskBreakdownResult result) {
         Analysis analysis = findAnalysis(analysisId);
 
-        // Build old task map for smart merge (title → task)
+        // Build old task maps for smart merge — ID (primary) + title (fallback)
+        Map<Long, Task> oldTasksById = new HashMap<>();
         Map<String, Task> oldTasksByTitle = new HashMap<>();
         for (Task t : analysis.getTasks()) {
+            oldTasksById.put(t.getId(), t);
             oldTasksByTitle.put(normalizeTitle(t.getTitle()), t);
         }
 
-        // Track which old tasks got matched
-        Set<String> matchedOldTitles = new HashSet<>();
+        // Track which old task IDs got matched
+        Set<Long> matchedOldIds = new HashSet<>();
 
         // Delete old tasks
         for (Task task : analysis.getTasks()) {
@@ -156,10 +160,18 @@ public class TaskBreakdownService {
                     .priority(parsePriority(item.getPriority()))
                     .category(item.getCategory());
 
-            // Smart merge: check if this task matches an old task by title
-            Task oldMatch = oldTasksByTitle.get(normalizeTitle(item.getTitle()));
-            if (oldMatch != null) {
-                matchedOldTitles.add(normalizeTitle(oldMatch.getTitle()));
+            // Smart merge: match by previousTaskId first, fall back to title
+            Task oldMatch = null;
+            if (item.getPreviousTaskId() != null) {
+                oldMatch = oldTasksById.get(item.getPreviousTaskId());
+            }
+            if (oldMatch == null) {
+                // Fallback: title matching
+                oldMatch = oldTasksByTitle.get(normalizeTitle(item.getTitle()));
+            }
+
+            if (oldMatch != null && !matchedOldIds.contains(oldMatch.getId())) {
+                matchedOldIds.add(oldMatch.getId());
                 if (oldMatch.getJiraKey() != null) {
                     builder.jiraKey(oldMatch.getJiraKey());
                     preservedIssues.add(oldMatch.getJiraKey());
@@ -180,8 +192,8 @@ public class TaskBreakdownService {
         }
 
         // Find orphaned issues — old tasks with jiraKey that weren't matched
-        List<String> orphanedIssues = oldTasksByTitle.values().stream()
-                .filter(t -> t.getJiraKey() != null && !matchedOldTitles.contains(normalizeTitle(t.getTitle())))
+        List<String> orphanedIssues = oldTasksById.values().stream()
+                .filter(t -> t.getJiraKey() != null && !matchedOldIds.contains(t.getId()))
                 .map(Task::getJiraKey)
                 .toList();
 

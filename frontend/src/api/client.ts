@@ -161,6 +161,8 @@ export const dismissQuestion = (id: number) =>
 // Tasks
 export const generateTasks = (analysisId: number) =>
   request<Task[]>(`/analyses/${analysisId}/tasks`, { method: "POST" });
+export const updateTask = (taskId: number, data: Partial<Pick<Task, "title" | "description" | "acceptanceCriteria" | "priority" | "category">>) =>
+  request<Task>(`/tasks/${taskId}`, { method: "PUT", body: JSON.stringify(data) });
 export const setSpDecision = (taskId: number, spFinal: number) =>
   request<Task>(`/tasks/${taskId}/sp-decision`, {
     method: "PUT",

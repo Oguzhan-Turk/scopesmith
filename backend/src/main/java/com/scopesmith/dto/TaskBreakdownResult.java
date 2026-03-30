@@ -23,6 +23,7 @@ public class TaskBreakdownResult {
         private String spRationale;
         private String priority; // LOW, MEDIUM, HIGH, CRITICAL
         private String category; // BACKEND, FRONTEND, MOBILE, DATABASE, DEVOPS, TESTING
+        private Long previousTaskId; // ID of the old task this evolved from (for smart merge)
         private String dependsOn; // title of another task, null if independent
 
         /**

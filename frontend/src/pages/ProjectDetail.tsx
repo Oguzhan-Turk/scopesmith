@@ -13,6 +13,7 @@ import {
   refineStakeholderSummary,
   refineTasks,
   setSpDecision,
+  updateTask,
   exportJiraCsv,
   verifySyncStatus,
   syncToJira,
@@ -100,6 +101,7 @@ export default function ProjectDetail() {
   const [taskInstruction, setTaskInstruction] = useState("");
   const [integrationConfig, setIntegrationConfig] = useState<IntegrationConfig>({});
   const [confirmDialog, setConfirmDialog] = useState<{ message: string; onConfirm: () => void } | null>(null);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [taskGroups, setTaskGroups] = useState<TaskGroup[]>([]);
   const [usageSummary, setUsageSummary] = useState<UsageSummary | null>(null);
 
@@ -361,6 +363,24 @@ export default function ProjectDetail() {
       console.error("GitHub sync failed:", e);
     } finally {
       setActionLoading(null);
+    }
+  }
+
+  async function handleSaveTask() {
+    if (!editingTask) return;
+    try {
+      const updated = await updateTask(editingTask.id, {
+        title: editingTask.title,
+        description: editingTask.description,
+        acceptanceCriteria: editingTask.acceptanceCriteria,
+        priority: editingTask.priority,
+        category: editingTask.category || undefined,
+      });
+      setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      setEditingTask(null);
+      showToast("Task güncellendi.", "success");
+    } catch (e) {
+      showToast("Task güncellenemedi.");
     }
   }
 
@@ -1008,7 +1028,12 @@ export default function ProjectDetail() {
                 <Card key={task.id}>
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-base">{task.title}</CardTitle>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        {task.title}
+                        <button onClick={() => setEditingTask({...task})} className="text-xs text-muted-foreground hover:text-foreground">
+                          Düzenle
+                        </button>
+                      </CardTitle>
                       <div className="flex gap-2">
                         <Badge variant="outline">
                           AI: {task.spSuggestion} SP
@@ -1343,6 +1368,80 @@ export default function ProjectDetail() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Task Edit Dialog */}
+      <Dialog open={!!editingTask} onOpenChange={(open) => { if (!open) setEditingTask(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Task Düzenle</DialogTitle>
+          </DialogHeader>
+          {editingTask && (
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium mb-1 block">Başlık</label>
+                <input
+                  type="text"
+                  value={editingTask.title}
+                  onChange={(e) => setEditingTask({ ...editingTask, title: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Açıklama</label>
+                <Textarea
+                  value={editingTask.description}
+                  onChange={(e) => setEditingTask({ ...editingTask, description: e.target.value })}
+                  rows={3}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Kabul Kriterleri</label>
+                <Textarea
+                  value={editingTask.acceptanceCriteria}
+                  onChange={(e) => setEditingTask({ ...editingTask, acceptanceCriteria: e.target.value })}
+                  rows={3}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Priority</label>
+                  <select
+                    value={editingTask.priority}
+                    onChange={(e) => setEditingTask({ ...editingTask, priority: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                  >
+                    <option value="LOW">LOW</option>
+                    <option value="MEDIUM">MEDIUM</option>
+                    <option value="HIGH">HIGH</option>
+                    <option value="CRITICAL">CRITICAL</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Category</label>
+                  <select
+                    value={editingTask.category || ""}
+                    onChange={(e) => setEditingTask({ ...editingTask, category: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                  >
+                    <option value="">—</option>
+                    <option value="BACKEND">BACKEND</option>
+                    <option value="FRONTEND">FRONTEND</option>
+                    <option value="MOBILE">MOBILE</option>
+                    <option value="DATABASE">DATABASE</option>
+                    <option value="DEVOPS">DEVOPS</option>
+                    <option value="TESTING">TESTING</option>
+                    <option value="FULLSTACK">FULLSTACK</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button size="sm" variant="outline" onClick={() => setEditingTask(null)}>İptal</Button>
+                <Button size="sm" onClick={handleSaveTask}>Kaydet</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Confirmation Dialog */}
       <Dialog open={!!confirmDialog} onOpenChange={(open) => { if (!open) setConfirmDialog(null); }}>
