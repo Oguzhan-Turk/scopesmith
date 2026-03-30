@@ -583,9 +583,18 @@ export default function ProjectDetail() {
                   <Button
                     size="sm"
                     variant={selectedRequirementId === req.id ? "default" : "outline"}
-                    onClick={() => handleSelectRequirement(req.id)}
+                    onClick={() => {
+                      if (selectedRequirementId === req.id) {
+                        setSelectedRequirementId(null);
+                        setSelectedAnalysis(null);
+                        setTasks([]);
+                        setAnalyses([]);
+                      } else {
+                        handleSelectRequirement(req.id);
+                      }
+                    }}
                   >
-                    {selectedRequirementId === req.id ? "Seçili" : "Görüntüle"}
+                    {selectedRequirementId === req.id ? "Seçili ✕" : "Görüntüle"}
                   </Button>
                   <Button
                     size="sm"
