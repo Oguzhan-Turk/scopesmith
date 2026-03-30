@@ -18,6 +18,7 @@ public class RequirementAnalysisService {
     private final RequirementService requirementService;
     private final AnalysisRepository analysisRepository;
     private final DocumentService documentService;
+    private final InsightService insightService;
     private final PromptLoader promptLoader;
 
     /**
@@ -157,6 +158,14 @@ public class RequirementAnalysisService {
             message.append("## Project Documents\n");
             message.append(docContext);
             message.append("\n\n");
+        }
+
+        // Add intelligence insights (Layer 3 — Project Intelligence Insights)
+        String insights = insightService.buildInsightsSection(
+                requirement.getProject(), requirement.getType());
+        if (insights != null) {
+            message.append(insights);
+            message.append("\n");
         }
 
         message.append("## Raw Requirement\n");

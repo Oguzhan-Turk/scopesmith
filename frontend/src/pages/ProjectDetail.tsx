@@ -425,7 +425,15 @@ export default function ProjectDetail() {
         )}
         <div className="flex gap-3 mt-3">
           {project.hasContext ? (
-            <Badge variant="default">Context v{project.contextVersion}</Badge>
+            project.contextStale ? (
+              <Tooltip side="right" content={project.stalenessWarning || "Context güncel değil"}>
+                <Badge variant="destructive" className="cursor-help">
+                  Context v{project.contextVersion} — güncel değil
+                </Badge>
+              </Tooltip>
+            ) : (
+              <Badge variant="default">Context v{project.contextVersion}</Badge>
+            )
           ) : (
             <Badge variant="secondary">Context Yok</Badge>
           )}

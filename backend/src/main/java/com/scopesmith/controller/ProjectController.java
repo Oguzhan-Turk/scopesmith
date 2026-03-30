@@ -4,6 +4,7 @@ import com.scopesmith.dto.IntegrationConfigDTO;
 import com.scopesmith.dto.ProjectRequest;
 import com.scopesmith.dto.ProjectResponse;
 import com.scopesmith.entity.Project;
+import com.scopesmith.service.InsightService;
 import com.scopesmith.service.ProjectContextService;
 import com.scopesmith.service.ProjectService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -22,6 +23,7 @@ public class ProjectController {
 
     private final ProjectService projectService;
     private final ProjectContextService contextService;
+    private final InsightService insightService;
     private final ObjectMapper objectMapper;
 
     @PostMapping
@@ -37,7 +39,9 @@ public class ProjectController {
 
     @GetMapping("/{id}")
     public ProjectResponse findById(@PathVariable Long id) {
-        return projectService.findById(id);
+        Project project = projectService.getProjectOrThrow(id);
+        InsightService.StalenessInfo staleness = insightService.getStalenessInfo(project);
+        return ProjectResponse.from(project, staleness);
     }
 
     @PutMapping("/{id}")

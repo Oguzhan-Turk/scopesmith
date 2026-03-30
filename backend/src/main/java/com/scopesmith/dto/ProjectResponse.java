@@ -1,6 +1,7 @@
 package com.scopesmith.dto;
 
 import com.scopesmith.entity.Project;
+import com.scopesmith.service.InsightService;
 import lombok.Builder;
 import lombok.Data;
 
@@ -23,11 +24,19 @@ public class ProjectResponse {
     private int requirementCount;
     private int documentCount;
     private String integrationConfig;
+    private Integer daysSinceLastScan;
+    private Integer commitsBehind;
+    private boolean contextStale;
+    private String stalenessWarning;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
     public static ProjectResponse from(Project project) {
-        return ProjectResponse.builder()
+        return from(project, null);
+    }
+
+    public static ProjectResponse from(Project project, InsightService.StalenessInfo staleness) {
+        ProjectResponseBuilder builder = ProjectResponse.builder()
                 .id(project.getId())
                 .name(project.getName())
                 .description(project.getDescription())
@@ -42,7 +51,15 @@ public class ProjectResponse {
                 .documentCount(project.getDocuments().size())
                 .integrationConfig(project.getIntegrationConfig())
                 .createdAt(project.getCreatedAt())
-                .updatedAt(project.getUpdatedAt())
-                .build();
+                .updatedAt(project.getUpdatedAt());
+
+        if (staleness != null) {
+            builder.daysSinceLastScan(staleness.daysSinceLastScan())
+                    .commitsBehind(staleness.commitsBehind())
+                    .contextStale(staleness.isStale())
+                    .stalenessWarning(staleness.warningMessage());
+        }
+
+        return builder.build();
     }
 }

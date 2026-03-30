@@ -188,6 +188,10 @@ export interface Project {
   requirementCount: number;
   documentCount: number;
   integrationConfig: string | null;
+  daysSinceLastScan: number | null;
+  commitsBehind: number | null;
+  contextStale: boolean;
+  stalenessWarning: string | null;
   createdAt: string;
   updatedAt: string;
 }
