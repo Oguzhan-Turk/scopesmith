@@ -183,6 +183,15 @@ export const refineTasks = (analysisId: number, instruction: string) =>
     body: JSON.stringify({ instruction }),
   });
 
+export const createManualTask = (
+  analysisId: number,
+  data: { title: string; description?: string; priority?: string; category?: string }
+) =>
+  request<Task>(`/analyses/${analysisId}/tasks/manual`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+
 export interface TaskRefineResult {
   tasks: Task[];
   orphanedIssues: string[];

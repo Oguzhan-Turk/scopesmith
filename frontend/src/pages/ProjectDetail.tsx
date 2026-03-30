@@ -9,6 +9,7 @@ import {
   answerQuestion,
   dismissQuestion,
   generateTasks,
+  createManualTask,
   generateStakeholderSummary,
   refineStakeholderSummary,
   refineTasks,
@@ -107,6 +108,8 @@ export default function ProjectDetail() {
 
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [manualTaskDialog, setManualTaskDialog] = useState(false);
+  const [manualTaskForm, setManualTaskForm] = useState({ title: "", description: "", priority: "MEDIUM", category: "" });
 
   // Tab state from URL (madde 6 + 8)
   const activeTab = searchParams.get("tab") || "requirements";
@@ -322,6 +325,28 @@ export default function ProjectDetail() {
     } catch (e) {
       showToast("Task üretimi başarısız oldu.");
       console.error("Task generation failed:", e);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleCreateManualTask() {
+    if (!selectedAnalysis || !manualTaskForm.title.trim()) return;
+    setActionLoading("manual-task");
+    try {
+      const created = await createManualTask(selectedAnalysis.id, {
+        title: manualTaskForm.title.trim(),
+        description: manualTaskForm.description || undefined,
+        priority: manualTaskForm.priority,
+        category: manualTaskForm.category || undefined,
+      });
+      setTasks((prev) => [...prev, created]);
+      setManualTaskForm({ title: "", description: "", priority: "MEDIUM", category: "" });
+      setManualTaskDialog(false);
+      showToast("Task eklendi.", "success");
+    } catch (e) {
+      showToast("Task eklenemedi.");
+      console.error("Manual task creation failed:", e);
     } finally {
       setActionLoading(null);
     }
@@ -887,13 +912,18 @@ export default function ProjectDetail() {
               )}
 
               {/* Actions */}
-              <div className="flex gap-3">
+              <div className="flex gap-3 flex-wrap">
                 {tasks.length === 0 ? (
                   <Button onClick={handleGenerateTasks} disabled={!!actionLoading}>
                     {actionLoading === "tasks" ? "Üretiliyor..." : "Task'lara Böl"}
                   </Button>
                 ) : (
                   <Badge variant="outline">{tasks.length} task üretildi</Badge>
+                )}
+                {selectedAnalysis && (
+                  <Button variant="outline" onClick={() => setManualTaskDialog(true)} disabled={!!actionLoading}>
+                    + Manuel Task
+                  </Button>
                 )}
                 {!selectedAnalysis.stakeholderSummary && (
                   <Button
@@ -1440,6 +1470,73 @@ export default function ProjectDetail() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Manuel Task Dialog */}
+      <Dialog open={manualTaskDialog} onOpenChange={(open) => { if (!open) setManualTaskDialog(false); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Manuel Task Ekle</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-2">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Başlık *</label>
+              <input
+                type="text"
+                value={manualTaskForm.title}
+                onChange={(e) => setManualTaskForm((f) => ({ ...f, title: e.target.value }))}
+                className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                placeholder="Task başlığı"
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Açıklama</label>
+              <textarea
+                value={manualTaskForm.description}
+                onChange={(e) => setManualTaskForm((f) => ({ ...f, description: e.target.value }))}
+                className="w-full px-3 py-2 border rounded-md bg-background text-sm resize-none"
+                rows={3}
+                placeholder="Opsiyonel"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-medium mb-1 block">Öncelik</label>
+                <select
+                  value={manualTaskForm.priority}
+                  onChange={(e) => setManualTaskForm((f) => ({ ...f, priority: e.target.value }))}
+                  className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                >
+                  <option value="LOW">Low</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="HIGH">High</option>
+                  <option value="CRITICAL">Critical</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Kategori</label>
+                <input
+                  type="text"
+                  value={manualTaskForm.category}
+                  onChange={(e) => setManualTaskForm((f) => ({ ...f, category: e.target.value }))}
+                  className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                  placeholder="Opsiyonel"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button size="sm" variant="outline" onClick={() => setManualTaskDialog(false)}>İptal</Button>
+              <Button
+                size="sm"
+                onClick={handleCreateManualTask}
+                disabled={!manualTaskForm.title.trim() || actionLoading === "manual-task"}
+              >
+                {actionLoading === "manual-task" ? "Ekleniyor..." : "Ekle"}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 

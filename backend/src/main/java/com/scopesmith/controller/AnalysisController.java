@@ -55,6 +55,40 @@ public class AnalysisController {
         return taskBreakdownService.generateTasks(id);
     }
 
+    @PostMapping("/{id}/tasks/manual")
+    public TaskResponse createManualTask(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> request) {
+        Analysis analysis = analysisRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Analysis not found"));
+
+        String title = request.get("title");
+        if (title == null || title.isBlank()) {
+            throw new IllegalArgumentException("title cannot be empty");
+        }
+
+        com.scopesmith.entity.TaskPriority priority;
+        try {
+            String p = request.get("priority");
+            priority = (p != null && !p.isBlank())
+                    ? com.scopesmith.entity.TaskPriority.valueOf(p.toUpperCase())
+                    : com.scopesmith.entity.TaskPriority.MEDIUM;
+        } catch (IllegalArgumentException e) {
+            priority = com.scopesmith.entity.TaskPriority.MEDIUM;
+        }
+
+        com.scopesmith.entity.Task task = com.scopesmith.entity.Task.builder()
+                .analysis(analysis)
+                .title(title.trim())
+                .description(request.get("description"))
+                .category(request.get("category"))
+                .priority(priority)
+                .build();
+
+        task = taskRepository.save(task);
+        return TaskResponse.from(task);
+    }
+
     @PostMapping("/{id}/tasks/refine")
     public TaskRefineResponse refineTasks(
             @PathVariable Long id,
