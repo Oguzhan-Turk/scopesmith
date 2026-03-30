@@ -1,6 +1,7 @@
 package com.scopesmith.controller;
 
 import com.scopesmith.dto.AnalysisResponse;
+import com.scopesmith.dto.TaskRefineResponse;
 import com.scopesmith.dto.TaskResponse;
 import com.scopesmith.entity.Analysis;
 import com.scopesmith.entity.Task;
@@ -55,7 +56,7 @@ public class AnalysisController {
     }
 
     @PostMapping("/{id}/tasks/refine")
-    public List<TaskResponse> refineTasks(
+    public TaskRefineResponse refineTasks(
             @PathVariable Long id,
             @RequestBody Map<String, String> request) {
         String instruction = extractInstruction(request);

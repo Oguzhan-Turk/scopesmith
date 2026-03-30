@@ -2,6 +2,7 @@ package com.scopesmith.service;
 
 import com.scopesmith.config.PromptLoader;
 import com.scopesmith.dto.TaskBreakdownResult;
+import com.scopesmith.dto.TaskRefineResponse;
 import com.scopesmith.dto.TaskResponse;
 import com.scopesmith.entity.*;
 import com.scopesmith.repository.AnalysisRepository;
@@ -12,9 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -51,7 +50,7 @@ public class TaskBreakdownService {
     /**
      * Refine existing tasks with user instruction. AI call is outside the transaction.
      */
-    public List<TaskResponse> refineTasks(Long analysisId, String instruction) {
+    public TaskRefineResponse refineTasks(Long analysisId, String instruction) {
         // Phase 1: Read current tasks (short tx)
         String userMessage = readRefineData(analysisId, instruction);
         Long projectId = getProjectId(analysisId);
@@ -121,10 +120,19 @@ public class TaskBreakdownService {
     }
 
     @Transactional
-    protected List<TaskResponse> replaceTasksWithRefined(Long analysisId, TaskBreakdownResult result) {
+    protected TaskRefineResponse replaceTasksWithRefined(Long analysisId, TaskBreakdownResult result) {
         Analysis analysis = findAnalysis(analysisId);
 
-        // Delete old tasks — dependency references are cleared first to avoid FK violations
+        // Build old task map for smart merge (title → task)
+        Map<String, Task> oldTasksByTitle = new HashMap<>();
+        for (Task t : analysis.getTasks()) {
+            oldTasksByTitle.put(normalizeTitle(t.getTitle()), t);
+        }
+
+        // Track which old tasks got matched
+        Set<String> matchedOldTitles = new HashSet<>();
+
+        // Delete old tasks
         for (Task task : analysis.getTasks()) {
             task.setDependency(null);
         }
@@ -133,12 +141,59 @@ public class TaskBreakdownService {
         analysis.getTasks().clear();
         taskRepository.flush();
 
-        // Save new tasks
-        saveTasks(analysis, result);
+        // Save new tasks with smart merge — inherit jiraKey + spFinal from matched old tasks
+        List<String> preservedIssues = new ArrayList<>();
+        Map<String, Task> savedTasks = new HashMap<>();
 
-        return analysis.getTasks().stream()
-                .map(TaskResponse::from)
+        for (TaskBreakdownResult.TaskItem item : result.getTasks()) {
+            Task.TaskBuilder builder = Task.builder()
+                    .analysis(analysis)
+                    .title(item.getTitle())
+                    .description(item.getDescription())
+                    .acceptanceCriteria(item.getAcceptanceCriteria())
+                    .spSuggestion(item.getSpSuggestion())
+                    .spRationale(item.getSpRationale())
+                    .priority(parsePriority(item.getPriority()))
+                    .category(item.getCategory());
+
+            // Smart merge: check if this task matches an old task by title
+            Task oldMatch = oldTasksByTitle.get(normalizeTitle(item.getTitle()));
+            if (oldMatch != null) {
+                matchedOldTitles.add(normalizeTitle(oldMatch.getTitle()));
+                if (oldMatch.getJiraKey() != null) {
+                    builder.jiraKey(oldMatch.getJiraKey());
+                    preservedIssues.add(oldMatch.getJiraKey());
+                }
+                if (oldMatch.getSpFinal() != null) {
+                    builder.spFinal(oldMatch.getSpFinal());
+                }
+            }
+
+            Task task = builder.build();
+            if (item.getDependsOn() != null && savedTasks.containsKey(item.getDependsOn())) {
+                task.setDependency(savedTasks.get(item.getDependsOn()));
+            }
+
+            Task saved = taskRepository.save(task);
+            savedTasks.put(saved.getTitle(), saved);
+            analysis.getTasks().add(saved);
+        }
+
+        // Find orphaned issues — old tasks with jiraKey that weren't matched
+        List<String> orphanedIssues = oldTasksByTitle.values().stream()
+                .filter(t -> t.getJiraKey() != null && !matchedOldTitles.contains(normalizeTitle(t.getTitle())))
+                .map(Task::getJiraKey)
                 .toList();
+
+        return TaskRefineResponse.builder()
+                .tasks(analysis.getTasks().stream().map(TaskResponse::from).toList())
+                .preservedIssues(preservedIssues)
+                .orphanedIssues(orphanedIssues)
+                .build();
+    }
+
+    private String normalizeTitle(String title) {
+        return title == null ? "" : title.toLowerCase().trim();
     }
 
     private Map<String, Task> saveTasks(Analysis analysis, TaskBreakdownResult result) {

@@ -176,10 +176,16 @@ export const getTasksByAnalysis = (analysisId: number) =>
   request<Task[]>(`/analyses/${analysisId}/tasks`);
 
 export const refineTasks = (analysisId: number, instruction: string) =>
-  request<Task[]>(`/analyses/${analysisId}/tasks/refine`, {
+  request<TaskRefineResult>(`/analyses/${analysisId}/tasks/refine`, {
     method: "POST",
     body: JSON.stringify({ instruction }),
   });
+
+export interface TaskRefineResult {
+  tasks: Task[];
+  orphanedIssues: string[];
+  preservedIssues: string[];
+}
 
 // Stakeholder Summary
 export const generateStakeholderSummary = (analysisId: number) =>

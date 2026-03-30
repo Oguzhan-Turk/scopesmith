@@ -396,14 +396,33 @@ export default function ProjectDetail() {
     }
   }
 
-  async function handleRefineTasks() {
+  function handleRefineTasks() {
+    if (!selectedAnalysis || !taskInstruction.trim()) return;
+
+    const hasSynced = tasks.some((t) => t.jiraKey);
+    if (hasSynced) {
+      setConfirmDialog({
+        message: `${tasks.filter((t) => t.jiraKey).length} task Jira/GitHub'da oluşturulmuş. İyileştirme sonrası aynı başlıklı task'ların bağlantısı korunur, değişen task'ların issue'ları yetim kalır. Devam?`,
+        onConfirm: () => executeRefineTasks(),
+      });
+    } else {
+      executeRefineTasks();
+    }
+  }
+
+  async function executeRefineTasks() {
     if (!selectedAnalysis || !taskInstruction.trim()) return;
     setActionLoading("refine-tasks");
     try {
-      const refined = await refineTasks(selectedAnalysis.id, taskInstruction);
-      setTasks(refined);
+      const result = await refineTasks(selectedAnalysis.id, taskInstruction);
+      setTasks(result.tasks);
       setTaskInstruction("");
-      showToast("Task'lar iyileştirildi.", "success");
+
+      if (result.orphanedIssues.length > 0) {
+        showToast(`Task'lar iyileştirildi. ${result.orphanedIssues.length} issue yetim kaldı: ${result.orphanedIssues.join(", ")}. Bu issue'ları manuel kapatmanız gerekebilir.`);
+      } else {
+        showToast(`Task'lar iyileştirildi. ${result.preservedIssues.length} issue bağlantısı korundu.`, "success");
+      }
     } catch (e) {
       showToast("Task iyileştirme başarısız oldu.");
       console.error("Task refinement failed:", e);
