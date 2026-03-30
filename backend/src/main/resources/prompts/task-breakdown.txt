@@ -19,6 +19,16 @@ For each task, provide:
   REFERENCE similar past tasks by name and their SP values as evidence.
   Example: "'Kullanıcı profili entity oluştur' task'ına benzer, takım 3 SP verdi."
 - **priority**: LOW, MEDIUM, HIGH, or CRITICAL
+- **category**: The development discipline this task belongs to. Choose ONE:
+  - BACKEND: API endpoints, business logic, server-side processing
+  - FRONTEND: UI components, pages, client-side logic, styling
+  - MOBILE: iOS/Android specific development
+  - DATABASE: Schema changes, migrations, queries, indexing
+  - DEVOPS: CI/CD, deployment, infrastructure, monitoring config
+  - TESTING: Integration tests, E2E tests, performance tests
+  - FULLSTACK: Tasks spanning both frontend and backend equally
+  Choose based on the PRIMARY work involved. If the project context shows
+  no mobile app, do not use MOBILE.
 - **dependsOn**: Title of another task this depends on, or null if independent
 
 Rules:

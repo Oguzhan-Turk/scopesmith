@@ -109,7 +109,12 @@ public class JiraService {
         fields.put("issuetype", Map.of("name", issueType));
         fields.put("description", buildAdfDescription(task));
         fields.put("priority", Map.of("name", PRIORITY_MAP.getOrDefault(task.getPriority().name(), "Medium")));
-        fields.put("labels", List.of("scopesmith"));
+        // Labels: always include scopesmith + category
+        List<String> labels = new ArrayList<>(List.of("scopesmith"));
+        if (task.getCategory() != null && !task.getCategory().isBlank()) {
+            labels.add("category:" + task.getCategory().toLowerCase());
+        }
+        fields.put("labels", labels);
 
         Map<String, Object> body = Map.of("fields", fields);
 

@@ -56,6 +56,13 @@ public class Task {
     private TaskPriority priority = TaskPriority.MEDIUM;
 
     /**
+     * Development discipline category — determines which team works on this task.
+     * AI-determined, user-overridable. Stored as String for custom category support.
+     * Standard values: BACKEND, FRONTEND, MOBILE, DATABASE, DEVOPS, TESTING
+     */
+    private String category;
+
+    /**
      * If this task depends on another task being completed first.
      */
     @ManyToOne(fetch = FetchType.LAZY)

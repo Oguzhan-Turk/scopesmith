@@ -31,4 +31,19 @@ public class TaskController {
         task.setSpFinal(request.getSpFinal());
         return TaskResponse.from(taskRepository.save(task));
     }
+
+    @PutMapping("/{id}/category")
+    public TaskResponse setCategory(
+            @PathVariable Long id,
+            @RequestBody java.util.Map<String, String> request) {
+        Task task = taskRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Task not found with id: " + id));
+
+        String category = request.get("category");
+        if (category == null || category.isBlank()) {
+            throw new IllegalArgumentException("category cannot be empty");
+        }
+        task.setCategory(category.toUpperCase());
+        return TaskResponse.from(taskRepository.save(task));
+    }
 }

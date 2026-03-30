@@ -22,6 +22,7 @@ public class TaskBreakdownResult {
         private Integer spSuggestion;
         private String spRationale;
         private String priority; // LOW, MEDIUM, HIGH, CRITICAL
+        private String category; // BACKEND, FRONTEND, MOBILE, DATABASE, DEVOPS, TESTING
         private String dependsOn; // title of another task, null if independent
 
         /**

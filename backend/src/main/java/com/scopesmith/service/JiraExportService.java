@@ -19,7 +19,7 @@ public class JiraExportService {
     private final AnalysisRepository analysisRepository;
 
     private static final String[] CSV_HEADERS = {
-            "Summary", "Description", "Issue Type", "Priority", "Story Points", "Labels", "Depends On"
+            "Summary", "Description", "Issue Type", "Priority", "Story Points", "Category", "Labels", "Depends On"
     };
 
     @Transactional(readOnly = true)
@@ -48,6 +48,7 @@ public class JiraExportService {
             csv.append(escapeCsv(issueType)).append(",");
             csv.append(escapeCsv(mapPriority(task.getPriority().name()))).append(",");
             csv.append(getStoryPoints(task)).append(",");
+            csv.append(escapeCsv(task.getCategory() != null ? task.getCategory() : "")).append(",");
             csv.append(escapeCsv("scopesmith")).append(",");
             csv.append(escapeCsv(task.getDependency() != null ? task.getDependency().getTitle() : ""));
             csv.append("\n");

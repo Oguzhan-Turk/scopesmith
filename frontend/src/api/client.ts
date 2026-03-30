@@ -334,6 +334,7 @@ export interface Task {
   spRationale: string | null;
   spFinal: number | null;
   priority: string;
+  category: string | null;
   dependencyTitle: string | null;
   jiraKey: string | null;
   createdAt: string;

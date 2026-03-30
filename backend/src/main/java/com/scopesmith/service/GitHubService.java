@@ -103,6 +103,9 @@ public class GitHubService {
         if (priorityLabel != null) {
             labels.add(priorityLabel);
         }
+        if (task.getCategory() != null && !task.getCategory().isBlank()) {
+            labels.add("category: " + task.getCategory().toLowerCase());
+        }
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("title", task.getTitle());
@@ -157,7 +160,9 @@ public class GitHubService {
 
     private void ensureLabelsExist(String repo, boolean isBug) {
         String[] labels = {"scopesmith", isBug ? "bug" : "enhancement",
-                "priority: low", "priority: medium", "priority: high", "priority: critical"};
+                "priority: low", "priority: medium", "priority: high", "priority: critical",
+                "category: backend", "category: frontend", "category: mobile",
+                "category: database", "category: devops", "category: testing", "category: fullstack"};
 
         for (String label : labels) {
             try {
@@ -179,6 +184,13 @@ public class GitHubService {
             case "priority: high" -> "D93F0B";
             case "priority: medium" -> "FBCA04";
             case "priority: low" -> "0E8A16";
+            case "category: backend" -> "0052CC";
+            case "category: frontend" -> "00875A";
+            case "category: mobile" -> "6554C0";
+            case "category: database" -> "FF991F";
+            case "category: devops" -> "403294";
+            case "category: testing" -> "00B8D9";
+            case "category: fullstack" -> "36B37E";
             default -> "CCCCCC";
         };
 

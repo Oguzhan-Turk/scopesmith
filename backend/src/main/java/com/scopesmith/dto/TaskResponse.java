@@ -19,6 +19,7 @@ public class TaskResponse {
     private String spRationale;
     private Integer spFinal;
     private String priority;
+    private String category;
     private String dependencyTitle;
     private String jiraKey;
     private LocalDateTime createdAt;
@@ -34,6 +35,7 @@ public class TaskResponse {
                 .spRationale(task.getSpRationale())
                 .spFinal(task.getSpFinal())
                 .priority(task.getPriority().name())
+                .category(task.getCategory())
                 .dependencyTitle(task.getDependency() != null ? task.getDependency().getTitle() : null)
                 .jiraKey(task.getJiraKey())
                 .createdAt(task.getCreatedAt())

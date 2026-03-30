@@ -9,7 +9,7 @@ Rules:
 - Apply the refinement instruction precisely
 - Keep tasks that are not affected by the instruction unchanged
 - Maintain the same JSON output format as the original task breakdown
-- Each task must have: title, description, acceptanceCriteria, spSuggestion (integer), spRationale, priority (HIGH/MEDIUM/LOW), dependsOn (optional, title of dependency)
+- Each task must have: title, description, acceptanceCriteria, spSuggestion (integer), spRationale, priority (HIGH/MEDIUM/LOW), category (BACKEND/FRONTEND/MOBILE/DATABASE/DEVOPS/TESTING/FULLSTACK), dependsOn (optional, title of dependency)
 - Story point estimates should use Fibonacci: 1, 2, 3, 5, 8, 13
 - Keep acceptance criteria specific and testable
 

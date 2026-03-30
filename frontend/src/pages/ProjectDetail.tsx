@@ -52,6 +52,19 @@ function riskColor(level: string): BadgeVariant {
   return "default";
 }
 
+function categoryColor(cat: string): string {
+  const colors: Record<string, string> = {
+    BACKEND: "border-blue-500 text-blue-700",
+    FRONTEND: "border-green-500 text-green-700",
+    MOBILE: "border-purple-500 text-purple-700",
+    DATABASE: "border-amber-500 text-amber-700",
+    DEVOPS: "border-indigo-500 text-indigo-700",
+    TESTING: "border-cyan-500 text-cyan-700",
+    FULLSTACK: "border-teal-500 text-teal-700",
+  };
+  return colors[cat?.toUpperCase()] || "";
+}
+
 const LOADING_LABELS: Record<string, string> = {
   scan: "Proje taranıyor... Bu birkaç dakika sürebilir.",
   tasks: "Task'lar AI tarafından üretiliyor...",
@@ -922,6 +935,7 @@ export default function ProjectDetail() {
                           <Badge variant="default">Final: {task.spFinal} SP</Badge>
                         )}
                         <Badge variant="secondary">{task.priority}</Badge>
+                        {task.category && <Badge variant="outline" className={categoryColor(task.category)}>{task.category}</Badge>}
                         {task.jiraKey && (
                           <Badge variant="default">{task.jiraKey}</Badge>
                         )}
@@ -1026,6 +1040,7 @@ export default function ProjectDetail() {
                               <div className="flex gap-2">
                                 <Badge variant="outline">{task.spFinal || task.spSuggestion} SP</Badge>
                                 <Badge variant="secondary">{task.priority}</Badge>
+                        {task.category && <Badge variant="outline" className={categoryColor(task.category)}>{task.category}</Badge>}
                                 {task.jiraKey && <Badge variant="default">{task.jiraKey}</Badge>}
                               </div>
                             </div>

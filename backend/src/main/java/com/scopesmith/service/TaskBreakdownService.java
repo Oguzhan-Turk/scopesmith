@@ -153,6 +153,7 @@ public class TaskBreakdownService {
                     .spSuggestion(item.getSpSuggestion())
                     .spRationale(item.getSpRationale())
                     .priority(parsePriority(item.getPriority()))
+                    .category(item.getCategory())
                     .build();
 
             if (item.getDependsOn() != null && savedTasks.containsKey(item.getDependsOn())) {
