@@ -3,7 +3,10 @@ package com.scopesmith.controller;
 import com.scopesmith.dto.IntegrationConfigDTO;
 import com.scopesmith.dto.ProjectRequest;
 import com.scopesmith.dto.ProjectResponse;
+import com.scopesmith.dto.TaskResponse;
+import com.scopesmith.entity.Analysis;
 import com.scopesmith.entity.Project;
+import com.scopesmith.repository.AnalysisRepository;
 import com.scopesmith.service.GitCloneService;
 import com.scopesmith.service.InsightService;
 import com.scopesmith.service.ProjectContextService;
@@ -25,6 +28,7 @@ public class ProjectController {
     private final ProjectContextService contextService;
     private final GitCloneService gitCloneService;
     private final InsightService insightService;
+    private final AnalysisRepository analysisRepository;
     private final ObjectMapper objectMapper;
 
     @PostMapping
@@ -81,6 +85,42 @@ public class ProjectController {
             throw new IllegalArgumentException("Invalid integration config");
         }
         return config;
+    }
+
+    /**
+     * Get all task groups for a project — grouped by analysis, ordered by newest first.
+     */
+    @GetMapping("/{id}/task-groups")
+    public List<java.util.Map<String, Object>> getTaskGroups(@PathVariable Long id) {
+        List<Analysis> analyses = analysisRepository.findByProjectId(id);
+        List<java.util.Map<String, Object>> groups = new java.util.ArrayList<>();
+
+        for (Analysis a : analyses) {
+            if (a.getTasks().isEmpty()) continue;
+
+            java.util.Map<String, Object> group = new java.util.LinkedHashMap<>();
+            group.put("analysisId", a.getId());
+            group.put("requirementId", a.getRequirement().getId());
+            group.put("requirementText", truncate(a.getRequirement().getRawText(), 100));
+            group.put("requirementType", a.getRequirement().getType().name());
+            group.put("requirementSeq", a.getRequirement().getSequenceNumber());
+            group.put("riskLevel", a.getRiskLevel());
+            group.put("createdAt", a.getCreatedAt());
+            group.put("taskCount", a.getTasks().size());
+            group.put("totalSp", a.getTasks().stream()
+                    .mapToInt(t -> t.getSpFinal() != null ? t.getSpFinal() :
+                            (t.getSpSuggestion() != null ? t.getSpSuggestion() : 0))
+                    .sum());
+            group.put("tasks", a.getTasks().stream().map(TaskResponse::from).toList());
+            groups.add(group);
+        }
+
+        return groups;
+    }
+
+    private String truncate(String text, int max) {
+        if (text == null) return "";
+        return text.length() > max ? text.substring(0, max) + "..." : text;
     }
 
     /**

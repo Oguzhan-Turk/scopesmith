@@ -117,6 +117,23 @@ export const updateIntegrationConfig = (projectId: number, config: IntegrationCo
     body: JSON.stringify(config),
   });
 
+// Task Groups
+export const getTaskGroups = (projectId: number) =>
+  request<TaskGroup[]>(`/projects/${projectId}/task-groups`);
+
+export interface TaskGroup {
+  analysisId: number;
+  requirementId: number;
+  requirementText: string;
+  requirementType: "FEATURE" | "BUG";
+  requirementSeq: number | null;
+  riskLevel: string;
+  createdAt: string;
+  taskCount: number;
+  totalSp: number;
+  tasks: Task[];
+}
+
 // Requirements
 export const getRequirements = (projectId: number) =>
   request<Requirement[]>(`/projects/${projectId}/requirements`);
