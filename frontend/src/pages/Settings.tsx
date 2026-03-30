@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
-import { getPrompts, updatePrompt, resetPrompt, type PromptItem } from "@/api/client";
+import {
+  getPrompts, updatePrompt, resetPrompt, type PromptItem,
+  getCredentials, updateCredentials,
+} from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
@@ -19,27 +22,42 @@ const PROMPT_LABELS: Record<string, string> = {
   "project-context-structured": "Yapısal Context",
 };
 
+const CREDENTIAL_LABELS: Record<string, { label: string; placeholder: string }> = {
+  JIRA_URL: { label: "Jira URL", placeholder: "https://yoursite.atlassian.net" },
+  JIRA_EMAIL: { label: "Jira Email", placeholder: "email@example.com" },
+  JIRA_API_TOKEN: { label: "Jira API Token", placeholder: "Token" },
+  GITHUB_TOKEN: { label: "GitHub Token", placeholder: "ghp_..." },
+  GITHUB_REPO: { label: "GitHub Repository", placeholder: "owner/repo" },
+};
+
+const CREDENTIAL_KEYS = ["JIRA_URL", "JIRA_EMAIL", "JIRA_API_TOKEN", "GITHUB_TOKEN", "GITHUB_REPO"];
+
 export default function Settings() {
   const [prompts, setPrompts] = useState<PromptItem[]>([]);
   const [selected, setSelected] = useState<PromptItem | null>(null);
   const [editContent, setEditContent] = useState("");
+  const [credentials, setCredentials] = useState<Record<string, string>>({});
+  const [credentialEdits, setCredentialEdits] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
   useEffect(() => {
-    loadPrompts();
+    loadAll();
   }, []);
 
-  async function loadPrompts() {
+  async function loadAll() {
     try {
-      const data = await getPrompts();
-      setPrompts(data);
-      if (data.length > 0 && !selected) {
-        selectPrompt(data[0]);
-      }
+      const [promptData, credData] = await Promise.all([
+        getPrompts(),
+        getCredentials().catch(() => ({})),
+      ]);
+      setPrompts(promptData);
+      setCredentials(credData);
+      setCredentialEdits(credData);
+      if (promptData.length > 0) selectPrompt(promptData[0]);
     } catch (e) {
-      console.error("Failed to load prompts:", e);
+      console.error("Failed to load settings:", e);
     } finally {
       setLoading(false);
     }
@@ -51,7 +69,7 @@ export default function Settings() {
     setMessage(null);
   }
 
-  async function handleSave() {
+  async function handleSavePrompt() {
     if (!selected) return;
     setSaving(true);
     try {
@@ -66,7 +84,7 @@ export default function Settings() {
     }
   }
 
-  async function handleReset() {
+  async function handleResetPrompt() {
     if (!selected || !confirm("Bu prompt'u varsayılan haline döndürmek istediğinizden emin misiniz?")) return;
     setSaving(true);
     try {
@@ -82,79 +100,158 @@ export default function Settings() {
     }
   }
 
-  if (loading) return <Spinner label="Prompt'lar yükleniyor..." />;
+  async function handleSaveCredentials() {
+    setSaving(true);
+    try {
+      const updated = await updateCredentials(credentialEdits);
+      setCredentials(updated);
+      setCredentialEdits(updated);
+      setMessage({ text: "Bağlantı bilgileri kaydedildi.", type: "success" });
+    } catch (e) {
+      setMessage({ text: "Kaydetme başarısız.", type: "error" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) return <Spinner label="Ayarlar yükleniyor..." />;
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Prompt Yönetimi</h1>
-        <p className="text-muted-foreground mt-1">
-          AI'ın davranışını belirleyen prompt'ları görüntüleyin ve düzenleyin.
-        </p>
+        <h1 className="text-3xl font-bold tracking-tight">Ayarlar</h1>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {/* Prompt List */}
-        <div className="space-y-2">
-          {prompts.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => selectPrompt(p)}
-              className={`w-full text-left px-3 py-2 rounded-md text-sm ${
-                selected?.id === p.id
-                  ? "bg-primary text-primary-foreground"
-                  : "hover:bg-muted"
-              }`}
-            >
-              <div>{PROMPT_LABELS[p.name] || p.name}</div>
-              <div className="text-xs opacity-60">v{p.version}</div>
-            </button>
-          ))}
-        </div>
+      <Tabs defaultValue="credentials">
+        <TabsList>
+          <TabsTrigger value="credentials">Bağlantılar</TabsTrigger>
+          <TabsTrigger value="prompts">Prompt Yönetimi</TabsTrigger>
+        </TabsList>
 
-        {/* Editor */}
-        <div className="md:col-span-3">
-          {selected ? (
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-lg">{PROMPT_LABELS[selected.name] || selected.name}</CardTitle>
-                    <p className="text-xs text-muted-foreground mt-1">{selected.name}.txt — v{selected.version}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={handleReset} disabled={saving}>
-                      Varsayılana Dön
-                    </Button>
-                    <Button size="sm" onClick={handleSave} disabled={saving || editContent === selected.content}>
-                      {saving ? "Kaydediliyor..." : "Kaydet"}
-                    </Button>
-                  </div>
+        {/* CREDENTIALS TAB */}
+        <TabsContent value="credentials" className="space-y-6">
+          <p className="text-sm text-muted-foreground">
+            Jira ve GitHub bağlantı bilgilerini buradan yönetin. Bu bilgiler DB'de saklanır, .env dosyasına gerek kalmaz.
+          </p>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Jira</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {["JIRA_URL", "JIRA_EMAIL", "JIRA_API_TOKEN"].map((key) => (
+                <div key={key}>
+                  <label className="text-sm font-medium mb-1 block">{CREDENTIAL_LABELS[key].label}</label>
+                  <input
+                    type={key.includes("TOKEN") ? "password" : "text"}
+                    placeholder={CREDENTIAL_LABELS[key].placeholder}
+                    value={credentialEdits[key] || ""}
+                    onChange={(e) => setCredentialEdits({ ...credentialEdits, [key]: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                  />
                 </div>
-              </CardHeader>
-              <CardContent>
-                <Textarea
-                  value={editContent}
-                  onChange={(e) => setEditContent(e.target.value)}
-                  rows={20}
-                  className="font-mono text-sm"
-                />
-                {message && (
-                  <p className={`text-sm mt-2 ${message.type === "success" ? "text-primary" : "text-destructive"}`}>
-                    {message.text}
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="text-center py-12">
-              <CardContent>
-                <p className="text-muted-foreground">Bir prompt seçin.</p>
-              </CardContent>
-            </Card>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">GitHub</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {["GITHUB_TOKEN", "GITHUB_REPO"].map((key) => (
+                <div key={key}>
+                  <label className="text-sm font-medium mb-1 block">{CREDENTIAL_LABELS[key].label}</label>
+                  <input
+                    type={key.includes("TOKEN") ? "password" : "text"}
+                    placeholder={CREDENTIAL_LABELS[key].placeholder}
+                    value={credentialEdits[key] || ""}
+                    onChange={(e) => setCredentialEdits({ ...credentialEdits, [key]: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                  />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Button onClick={handleSaveCredentials} disabled={saving}>
+            {saving ? "Kaydediliyor..." : "Kaydet"}
+          </Button>
+          {message && (
+            <p className={`text-sm ${message.type === "success" ? "text-primary" : "text-destructive"}`}>
+              {message.text}
+            </p>
           )}
-        </div>
-      </div>
+        </TabsContent>
+
+        {/* PROMPTS TAB */}
+        <TabsContent value="prompts" className="space-y-6">
+          <p className="text-sm text-muted-foreground">
+            AI'ın davranışını belirleyen prompt'ları görüntüleyin ve düzenleyin.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="space-y-2">
+              {prompts.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => selectPrompt(p)}
+                  className={`w-full text-left px-3 py-2 rounded-md text-sm ${
+                    selected?.id === p.id
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-muted"
+                  }`}
+                >
+                  <div>{PROMPT_LABELS[p.name] || p.name}</div>
+                  <div className="text-xs opacity-60">v{p.version}</div>
+                </button>
+              ))}
+            </div>
+
+            <div className="md:col-span-3">
+              {selected ? (
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-lg">{PROMPT_LABELS[selected.name] || selected.name}</CardTitle>
+                        <p className="text-xs text-muted-foreground mt-1">{selected.name}.txt — v{selected.version}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" onClick={handleResetPrompt} disabled={saving}>
+                          Varsayılana Dön
+                        </Button>
+                        <Button size="sm" onClick={handleSavePrompt} disabled={saving || editContent === selected.content}>
+                          {saving ? "Kaydediliyor..." : "Kaydet"}
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <Textarea
+                      value={editContent}
+                      onChange={(e) => setEditContent(e.target.value)}
+                      rows={20}
+                      className="font-mono text-sm"
+                    />
+                    {message && (
+                      <p className={`text-sm mt-2 ${message.type === "success" ? "text-primary" : "text-destructive"}`}>
+                        {message.text}
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="text-center py-12">
+                  <CardContent>
+                    <p className="text-muted-foreground">Bir prompt seçin.</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

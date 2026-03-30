@@ -45,6 +45,14 @@ export const scanProjectGit = (id: number, gitUrl: string, token?: string) =>
     body: JSON.stringify({ gitUrl, token }),
   });
 
+// Credentials
+export const getCredentials = () => request<Record<string, string>>("/settings/credentials");
+export const updateCredentials = (data: Record<string, string>) =>
+  request<Record<string, string>>("/settings/credentials", {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+
 // Prompts
 export const getPrompts = () => request<PromptItem[]>("/prompts");
 export const getPrompt = (name: string) => request<PromptItem>(`/prompts/${name}`);
