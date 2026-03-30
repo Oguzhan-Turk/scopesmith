@@ -63,10 +63,14 @@ public class SpringAiService implements AiService {
 
         long startTime = System.currentTimeMillis();
 
-        // Single API call — get chatResponse for both content and token metadata
+        // Add JSON format instruction to system prompt (since we use chatResponse instead of entity())
+        String jsonSystemPrompt = systemPrompt + "\n\nIMPORTANT: Return your response as a valid JSON object only. " +
+                "Do not include any text, markdown, or explanation before or after the JSON. " +
+                "The JSON must match the structure of " + responseType.getSimpleName() + ".";
+
         ChatResponse chatResponse = chatClientBuilder.build()
                 .prompt()
-                .system(systemPrompt)
+                .system(jsonSystemPrompt)
                 .user(userMessage)
                 .call()
                 .chatResponse();
@@ -77,19 +81,16 @@ public class SpringAiService implements AiService {
             trackUsage(chatResponse, operationType, projectId, durationMs);
         }
 
-        // Parse JSON response to target type manually
+        // Parse JSON response
         String content = chatResponse.getResult().getOutput().getText();
         try {
-            // Clean potential markdown code block wrapping
-            String json = content.trim();
-            if (json.startsWith("```")) {
-                json = json.replaceFirst("```(?:json)?\\s*", "").replaceFirst("\\s*```$", "");
-            }
+            String json = extractJson(content);
             T entity = objectMapper.readValue(json, responseType);
             log.debug("AI structured response — parsed to {}, {}ms", responseType.getSimpleName(), durationMs);
             return entity;
         } catch (Exception e) {
             log.error("Failed to parse AI response to {}: {}", responseType.getSimpleName(), e.getMessage());
+            log.debug("Raw AI response: {}", content);
             throw new RuntimeException("AI response could not be parsed to " + responseType.getSimpleName(), e);
         }
     }
@@ -101,6 +102,46 @@ public class SpringAiService implements AiService {
                 "Say 'ScopeSmith AI is ready!' in exactly those words.",
                 OperationType.HEALTH_CHECK, null
         );
+    }
+
+    /**
+     * Extract JSON from AI response — handles markdown code blocks and leading text.
+     */
+    private String extractJson(String content) {
+        if (content == null) throw new RuntimeException("AI returned null response");
+        String text = content.trim();
+
+        // Remove markdown code block wrapping
+        if (text.contains("```")) {
+            int start = text.indexOf("```");
+            int contentStart = text.indexOf('\n', start);
+            int end = text.lastIndexOf("```");
+            if (contentStart > 0 && end > contentStart) {
+                text = text.substring(contentStart + 1, end).trim();
+            }
+        }
+
+        // Find first { or [ — skip any leading text
+        int braceIdx = text.indexOf('{');
+        int bracketIdx = text.indexOf('[');
+        int startIdx = -1;
+        if (braceIdx >= 0 && bracketIdx >= 0) startIdx = Math.min(braceIdx, bracketIdx);
+        else if (braceIdx >= 0) startIdx = braceIdx;
+        else if (bracketIdx >= 0) startIdx = bracketIdx;
+
+        if (startIdx > 0) {
+            text = text.substring(startIdx);
+        }
+
+        // Find matching closing brace/bracket from the end
+        int lastBrace = text.lastIndexOf('}');
+        int lastBracket = text.lastIndexOf(']');
+        int endIdx = Math.max(lastBrace, lastBracket);
+        if (endIdx > 0 && endIdx < text.length() - 1) {
+            text = text.substring(0, endIdx + 1);
+        }
+
+        return text;
     }
 
     private void trackUsage(ChatResponse chatResponse, OperationType operationType,

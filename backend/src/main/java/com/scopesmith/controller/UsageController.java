@@ -1,6 +1,7 @@
 package com.scopesmith.controller;
 
 import com.scopesmith.entity.OperationType;
+import com.scopesmith.entity.UsageRecord;
 import com.scopesmith.repository.UsageRecordRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -19,27 +20,40 @@ public class UsageController {
 
     private final UsageRecordRepository usageRecordRepository;
 
-    // ROI assumptions
-    private static final double HOURS_PER_ANALYSIS = 3.5; // manual requirement analysis
+    private static final double HOURS_PER_ANALYSIS = 3.5;
     private static final double ANALYST_HOURLY_RATE_USD = 75.0;
 
     @GetMapping("/projects/{projectId}/summary")
     public Map<String, Object> getProjectSummary(@PathVariable Long projectId) {
-        Object[] summary = usageRecordRepository.getProjectSummary(projectId);
-        List<Object[]> byOp = usageRecordRepository.getProjectSummaryByOperation(projectId);
+        // Use entity-level aggregation instead of raw query to avoid cast issues
+        List<UsageRecord> records = usageRecordRepository.findByProjectIdOrderByCreatedAtDesc(projectId);
 
-        long totalInputTokens = ((Number) summary[0]).longValue();
-        long totalOutputTokens = ((Number) summary[1]).longValue();
-        BigDecimal totalCost = (BigDecimal) summary[2];
-        long totalCalls = ((Number) summary[3]).longValue();
-        long totalDurationMs = ((Number) summary[4]).longValue();
+        long totalInputTokens = 0;
+        long totalOutputTokens = 0;
+        BigDecimal totalCost = BigDecimal.ZERO;
+        long totalDurationMs = 0;
+        long analysisCount = 0;
+        Map<String, long[]> opStats = new LinkedHashMap<>(); // [count, costMicro, totalDurationMs]
 
-        // ROI calculation
-        long analysisCount = usageRecordRepository.countByProjectIdAndOperationType(
-                projectId, OperationType.REQUIREMENT_ANALYSIS);
+        for (UsageRecord r : records) {
+            totalInputTokens += r.getInputTokens() != null ? r.getInputTokens() : 0;
+            totalOutputTokens += r.getOutputTokens() != null ? r.getOutputTokens() : 0;
+            totalCost = totalCost.add(r.getEstimatedCostUsd() != null ? r.getEstimatedCostUsd() : BigDecimal.ZERO);
+            totalDurationMs += r.getDurationMs() != null ? r.getDurationMs() : 0;
+
+            if (r.getOperationType() == OperationType.REQUIREMENT_ANALYSIS) {
+                analysisCount++;
+            }
+
+            String opName = r.getOperationType().name();
+            long[] stats = opStats.computeIfAbsent(opName, k -> new long[3]);
+            stats[0]++; // count
+            stats[1] += r.getEstimatedCostUsd() != null ? r.getEstimatedCostUsd().multiply(BigDecimal.valueOf(1_000_000)).longValue() : 0;
+            stats[2] += r.getDurationMs() != null ? r.getDurationMs() : 0;
+        }
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("totalAiCalls", totalCalls);
+        result.put("totalAiCalls", records.size());
         result.put("totalInputTokens", totalInputTokens);
         result.put("totalOutputTokens", totalOutputTokens);
         result.put("totalTokens", totalInputTokens + totalOutputTokens);
@@ -48,13 +62,13 @@ public class UsageController {
 
         // Breakdown by operation
         Map<String, Object> operations = new LinkedHashMap<>();
-        for (Object[] row : byOp) {
-            OperationType opType = (OperationType) row[0];
+        for (var entry : opStats.entrySet()) {
+            long[] stats = entry.getValue();
             Map<String, Object> opData = new LinkedHashMap<>();
-            opData.put("count", ((Number) row[1]).longValue());
-            opData.put("costUsd", ((BigDecimal) row[2]).setScale(4, RoundingMode.HALF_UP));
-            opData.put("avgDurationMs", ((Number) row[3]).longValue());
-            operations.put(opType.name(), opData);
+            opData.put("count", stats[0]);
+            opData.put("costUsd", BigDecimal.valueOf(stats[1]).divide(BigDecimal.valueOf(1_000_000), 4, RoundingMode.HALF_UP));
+            opData.put("avgDurationMs", stats[0] > 0 ? stats[2] / stats[0] : 0);
+            operations.put(entry.getKey(), opData);
         }
         result.put("byOperationType", operations);
 

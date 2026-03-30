@@ -9,6 +9,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -53,17 +55,18 @@ public class RequirementAnalysisService {
         Analysis analysis = Analysis.builder()
                 .requirement(requirement)
                 .structuredSummary(result.getStructuredSummary())
-                .assumptions(String.join("\n", result.getAssumptions()))
+                .assumptions(result.getAssumptions() != null ? String.join("\n", result.getAssumptions()) : null)
                 .riskLevel(result.getRiskLevel())
                 .riskReason(result.getRiskReason())
-                .affectedModules(String.join(", ", result.getAffectedModules()))
+                .affectedModules(result.getAffectedModules() != null ? String.join(", ", result.getAffectedModules()) : null)
                 .requirementVersion(requirement.getVersion())
                 .durationMs(durationMs)
                 .build();
 
         Analysis savedAnalysis = analysisRepository.save(analysis);
 
-        for (String questionText : result.getQuestions()) {
+        List<String> questions = result.getQuestions() != null ? result.getQuestions() : List.of();
+        for (String questionText : questions) {
             Question question = Question.builder()
                     .analysis(savedAnalysis)
                     .questionText(questionText)
@@ -72,7 +75,7 @@ public class RequirementAnalysisService {
         }
 
         requirement.setStatus(
-                result.getQuestions().isEmpty() ? RequirementStatus.ANALYZED : RequirementStatus.CLARIFYING
+                questions.isEmpty() ? RequirementStatus.ANALYZED : RequirementStatus.CLARIFYING
         );
 
         analysisRepository.save(savedAnalysis);
