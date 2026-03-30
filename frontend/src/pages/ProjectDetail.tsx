@@ -39,6 +39,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/useToast";
 import { useAuth } from "@/hooks/useAuth";
@@ -97,6 +98,7 @@ export default function ProjectDetail() {
   const [summaryInstruction, setSummaryInstruction] = useState("");
   const [taskInstruction, setTaskInstruction] = useState("");
   const [integrationConfig, setIntegrationConfig] = useState<IntegrationConfig>({});
+  const [confirmDialog, setConfirmDialog] = useState<{ message: string; onConfirm: () => void } | null>(null);
   const [taskGroups, setTaskGroups] = useState<TaskGroup[]>([]);
   const [usageSummary, setUsageSummary] = useState<UsageSummary | null>(null);
 
@@ -186,7 +188,13 @@ export default function ProjectDetail() {
   }
 
   async function handleDeleteRequirement(reqId: number) {
-    if (!confirm("Bu talebi ve tüm analizlerini silmek istediğinizden emin misiniz?")) return;
+    setConfirmDialog({
+      message: "Bu talebi ve tüm analizlerini silmek istediğinizden emin misiniz?",
+      onConfirm: () => executeDeleteRequirement(reqId),
+    });
+  }
+
+  async function executeDeleteRequirement(reqId: number) {
     try {
       await deleteRequirement(reqId);
       const reqs = await getRequirements(projectId);
@@ -902,6 +910,10 @@ export default function ProjectDetail() {
                   const unsyncedCount = tasks.length - syncedCount;
                   const allSynced = unsyncedCount === 0;
 
+                  const askConfirm = (message: string, onConfirm: () => void) => {
+                    setConfirmDialog({ message, onConfirm });
+                  };
+
                   return (
                     <div className="flex items-center gap-2">
                       {syncedCount > 0 && (
@@ -910,26 +922,28 @@ export default function ProjectDetail() {
                       {integrationConfig.jira?.projectKey && (
                         <>
                           <Button size="sm" variant="outline" onClick={() => {
-                            const msg = allSynced
-                              ? `Tüm task'lar zaten gönderilmiş. Tekrar göndermek istiyor musunuz?`
-                              : `${unsyncedCount} task Jira'ya (${integrationConfig.jira!.projectKey}) gönderilecek. Devam?`;
-                            if (confirm(msg)) handleSyncJira();
+                            askConfirm(
+                              allSynced
+                                ? "Tüm task'lar zaten gönderilmiş. Tekrar göndermek istiyor musunuz?"
+                                : `${unsyncedCount} task Jira'ya (${integrationConfig.jira!.projectKey}) gönderilecek.`,
+                              handleSyncJira
+                            );
                           }} disabled={!!actionLoading}>
                             {actionLoading === "jira-sync" ? "Gönderiliyor..." : "Jira'ya Gönder"}
                           </Button>
-                          <Button size="sm" variant="outline" onClick={() => {
-                            if (confirm("CSV dosyası indirilecek. Devam?")) handleExportCsv();
-                          }} disabled={!!actionLoading}>
+                          <Button size="sm" variant="outline" onClick={handleExportCsv} disabled={!!actionLoading}>
                             {actionLoading === "export" ? "İndiriliyor..." : "CSV İndir"}
                           </Button>
                         </>
                       )}
                       {integrationConfig.github?.repo && (
                         <Button size="sm" variant="outline" onClick={() => {
-                          const msg = allSynced
-                            ? `Tüm task'lar zaten gönderilmiş. Tekrar göndermek istiyor musunuz?`
-                            : `${unsyncedCount} task GitHub Issues'a gönderilecek. Devam?`;
-                          if (confirm(msg)) handleSyncGitHub();
+                          askConfirm(
+                            allSynced
+                              ? "Tüm task'lar zaten gönderilmiş. Tekrar göndermek istiyor musunuz?"
+                              : `${unsyncedCount} task GitHub Issues'a gönderilecek.`,
+                            handleSyncGitHub
+                          );
                         }} disabled={!!actionLoading}>
                           {actionLoading === "github-sync" ? "Gönderiliyor..." : "GitHub'a Gönder"}
                         </Button>
@@ -1282,6 +1296,20 @@ export default function ProjectDetail() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Confirmation Dialog */}
+      <Dialog open={!!confirmDialog} onOpenChange={(open) => { if (!open) setConfirmDialog(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Onay</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">{confirmDialog?.message}</p>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button size="sm" variant="outline" onClick={() => setConfirmDialog(null)}>İptal</Button>
+            <Button size="sm" onClick={() => { confirmDialog?.onConfirm(); setConfirmDialog(null); }}>Gönder</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
