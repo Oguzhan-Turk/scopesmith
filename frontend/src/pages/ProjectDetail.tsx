@@ -19,6 +19,7 @@ import {
   getAnalysesByRequirement,
   getTasksByAnalysis,
   scanProject,
+  scanProjectGit,
   getIntegrationConfig,
   updateIntegrationConfig,
   getProjectUsage,
@@ -72,6 +73,9 @@ export default function ProjectDetail() {
   const [newRequirement, setNewRequirement] = useState("");
   const [newRequirementType, setNewRequirementType] = useState<"FEATURE" | "BUG">("FEATURE");
   const [scanPath, setScanPath] = useState("");
+  const [scanMode, setScanMode] = useState<"local" | "git">("local");
+  const [gitUrl, setGitUrl] = useState("");
+  const [gitToken, setGitToken] = useState("");
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [summaryInstruction, setSummaryInstruction] = useState("");
   const [taskInstruction, setTaskInstruction] = useState("");
@@ -181,15 +185,23 @@ export default function ProjectDetail() {
   }
 
   async function handleScan() {
-    if (!scanPath.trim()) return;
     setActionLoading("scan");
     try {
-      const updated = await scanProject(projectId, scanPath);
+      let updated: Project;
+      if (scanMode === "git") {
+        if (!gitUrl.trim()) return;
+        updated = await scanProjectGit(projectId, gitUrl.trim(), gitToken.trim() || undefined);
+        setGitUrl("");
+        setGitToken("");
+      } else {
+        if (!scanPath.trim()) return;
+        updated = await scanProject(projectId, scanPath.trim());
+        setScanPath("");
+      }
       setProject(updated);
-      setScanPath("");
       showToast("Proje başarıyla tarandı.", "success");
     } catch (e) {
-      showToast("Tarama başarısız oldu. Klasör yolunu kontrol edin.");
+      showToast("Tarama başarısız oldu.");
       console.error("Scan failed:", e);
     } finally {
       setActionLoading(null);
@@ -595,17 +607,56 @@ export default function ProjectDetail() {
             <CardHeader>
               <CardTitle className="text-lg">Proje Context Tara</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <input
-                type="text"
-                placeholder="Proje klasör yolu (örn: /Users/dev/my-project)"
-                value={scanPath}
-                onChange={(e) => setScanPath(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md bg-background"
-              />
+            <CardContent className="space-y-4">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setScanMode("local")}
+                  className={`px-3 py-1.5 text-sm rounded-md border ${
+                    scanMode === "local" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"
+                  }`}
+                >
+                  Yerel Klasör
+                </button>
+                <button
+                  onClick={() => setScanMode("git")}
+                  className={`px-3 py-1.5 text-sm rounded-md border ${
+                    scanMode === "git" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"
+                  }`}
+                >
+                  Git URL
+                </button>
+              </div>
+
+              {scanMode === "local" ? (
+                <input
+                  type="text"
+                  placeholder="Proje klasör yolu (örn: /Users/dev/my-project)"
+                  value={scanPath}
+                  onChange={(e) => setScanPath(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                />
+              ) : (
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    placeholder="https://github.com/owner/repo.git"
+                    value={gitUrl}
+                    onChange={(e) => setGitUrl(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                  />
+                  <input
+                    type="password"
+                    placeholder="Token (private repo için, opsiyonel)"
+                    value={gitToken}
+                    onChange={(e) => setGitToken(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                  />
+                </div>
+              )}
+
               <Button
                 onClick={handleScan}
-                disabled={!!actionLoading || !scanPath.trim()}
+                disabled={!!actionLoading || (scanMode === "local" ? !scanPath.trim() : !gitUrl.trim())}
               >
                 {actionLoading === "scan" ? "Taranıyor..." : "Tara"}
               </Button>

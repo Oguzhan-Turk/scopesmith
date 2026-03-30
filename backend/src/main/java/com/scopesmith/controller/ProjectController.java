@@ -4,6 +4,7 @@ import com.scopesmith.dto.IntegrationConfigDTO;
 import com.scopesmith.dto.ProjectRequest;
 import com.scopesmith.dto.ProjectResponse;
 import com.scopesmith.entity.Project;
+import com.scopesmith.service.GitCloneService;
 import com.scopesmith.service.InsightService;
 import com.scopesmith.service.ProjectContextService;
 import com.scopesmith.service.ProjectService;
@@ -22,6 +23,7 @@ public class ProjectController {
 
     private final ProjectService projectService;
     private final ProjectContextService contextService;
+    private final GitCloneService gitCloneService;
     private final InsightService insightService;
     private final ObjectMapper objectMapper;
 
@@ -95,5 +97,38 @@ public class ProjectController {
             throw new IllegalArgumentException("folderPath is required");
         }
         return ProjectResponse.from(contextService.scanLocalFolder(id, folderPath));
+    }
+
+    /**
+     * Clone a git repo and scan it for project context.
+     */
+    @PostMapping("/{id}/scan-git")
+    public ProjectResponse scanGitRepo(
+            @PathVariable Long id,
+            @RequestBody java.util.Map<String, String> request) {
+        String gitUrl = request.get("gitUrl");
+        String token = request.get("token");
+        if (gitUrl == null || gitUrl.isBlank()) {
+            throw new IllegalArgumentException("gitUrl is required");
+        }
+
+        java.nio.file.Path clonedDir = null;
+        try {
+            clonedDir = gitCloneService.cloneRepo(gitUrl, token);
+
+            // Update project with git URL
+            Project project = projectService.getProjectOrThrow(id);
+            project.setRepoUrl(gitUrl);
+            projectService.save(project);
+
+            // Scan cloned directory using existing context service
+            return ProjectResponse.from(contextService.scanLocalFolder(id, clonedDir.toString()));
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("Git clone başarısız: " + e.getMessage());
+        } finally {
+            if (clonedDir != null) {
+                gitCloneService.cleanup(clonedDir);
+            }
+        }
     }
 }

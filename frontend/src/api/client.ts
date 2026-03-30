@@ -39,6 +39,11 @@ export const scanProject = (id: number, folderPath: string) =>
     method: "POST",
     body: JSON.stringify({ folderPath }),
   });
+export const scanProjectGit = (id: number, gitUrl: string, token?: string) =>
+  request<Project>(`/projects/${id}/scan-git`, {
+    method: "POST",
+    body: JSON.stringify({ gitUrl, token }),
+  });
 
 // Usage & ROI
 export const getProjectUsage = (projectId: number) =>
