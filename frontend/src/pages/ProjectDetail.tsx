@@ -11,6 +11,7 @@ import {
   generateStakeholderSummary,
   refineStakeholderSummary,
   refineTasks,
+  setSpDecision,
   exportJiraCsv,
   syncToJira,
   syncToGitHub,
@@ -47,7 +48,7 @@ function riskColor(level: string): BadgeVariant {
 const LOADING_LABELS: Record<string, string> = {
   scan: "Proje taranıyor... Bu birkaç dakika sürebilir.",
   tasks: "Task'lar AI tarafından üretiliyor...",
-  summary: "Stakeholder özeti hazırlanıyor...",
+  summary: "İş özeti hazırlanıyor...",
   "refine-summary": "Özet iyileştiriliyor...",
   "refine-tasks": "Task'lar iyileştiriliyor...",
 };
@@ -269,7 +270,7 @@ export default function ProjectDetail() {
           a.id === selectedAnalysis.id ? { ...a, stakeholderSummary: result.summary } : a
         )
       );
-      showToast("Stakeholder özeti hazır.", "success");
+      showToast("İş özeti hazır.", "success");
     } catch (e) {
       showToast("Özet oluşturulamadı.");
       console.error("Summary failed:", e);
@@ -294,6 +295,16 @@ export default function ProjectDetail() {
       console.error("GitHub sync failed:", e);
     } finally {
       setActionLoading(null);
+    }
+  }
+
+  async function handleSpDecision(taskId: number, spFinal: number) {
+    try {
+      const updated = await setSpDecision(taskId, spFinal);
+      setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    } catch (e) {
+      showToast("SP kararı kaydedilemedi.");
+      console.error("SP decision failed:", e);
     }
   }
 
@@ -693,17 +704,17 @@ export default function ProjectDetail() {
                     onClick={handleStakeholderSummary}
                     disabled={!!actionLoading}
                   >
-                    {actionLoading === "summary" ? "Hazırlanıyor..." : "Stakeholder Özeti Üret"}
+                    {actionLoading === "summary" ? "Hazırlanıyor..." : "İş Özeti Üret"}
                   </Button>
                 )}
               </div>
 
-              {/* Stakeholder Summary */}
+              {/* İş Özeti */}
               {selectedAnalysis.stakeholderSummary && (
                 <Card>
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">Stakeholder Özeti</CardTitle>
+                      <CardTitle className="text-lg">İş Özeti</CardTitle>
                       <Button
                         size="sm"
                         variant="outline"
@@ -822,6 +833,25 @@ export default function ProjectDetail() {
                         Bağımlılık: {task.dependencyTitle}
                       </p>
                     )}
+                    <Separator />
+                    <div>
+                      <h5 className="text-xs font-medium mb-2">SP Kararı</h5>
+                      <div className="flex gap-1.5">
+                        {[1, 2, 3, 5, 8, 13].map((sp) => (
+                          <button
+                            key={sp}
+                            onClick={() => handleSpDecision(task.id, sp)}
+                            className={`px-2.5 py-1 text-xs rounded-md border ${
+                              task.spFinal === sp
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-background hover:bg-muted"
+                            }`}
+                          >
+                            {sp}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               ))}
