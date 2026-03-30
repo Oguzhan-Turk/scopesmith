@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Separator } from "@/components/ui/separator";
+import { Separator as _Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
 
 const PROMPT_LABELS: Record<string, string> = {
@@ -30,13 +30,12 @@ const CREDENTIAL_LABELS: Record<string, { label: string; placeholder: string }> 
   GITHUB_REPO: { label: "GitHub Repository", placeholder: "owner/repo" },
 };
 
-const CREDENTIAL_KEYS = ["JIRA_URL", "JIRA_EMAIL", "JIRA_API_TOKEN", "GITHUB_TOKEN", "GITHUB_REPO"];
 
 export default function Settings() {
   const [prompts, setPrompts] = useState<PromptItem[]>([]);
   const [selected, setSelected] = useState<PromptItem | null>(null);
   const [editContent, setEditContent] = useState("");
-  const [credentials, setCredentials] = useState<Record<string, string>>({});
+  const [_credentials, setCredentials] = useState<Record<string, string>>({});
   const [credentialEdits, setCredentialEdits] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

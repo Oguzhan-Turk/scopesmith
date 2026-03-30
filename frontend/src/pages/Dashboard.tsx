@@ -61,12 +61,12 @@ export default function Dashboard() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Projeler</h1>
           <p className="text-muted-foreground mt-1">
-            Proje seçin veya yeni proje oluşturun
+            Ham talebi yapılandırılmış analize dönüştürün
           </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger>
-            <Button>Yeni Proje</Button>
+            <Button>+ Yeni Proje</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
@@ -97,37 +97,50 @@ export default function Dashboard() {
       </div>
 
       {projects.length === 0 ? (
-        <Card className="text-center py-12">
-          <CardContent>
-            <p className="text-muted-foreground mb-4">Henüz proje yok</p>
-            <Button onClick={() => setDialogOpen(true)}>İlk Projenizi Oluşturun</Button>
+        <Card className="text-center py-16 border-dashed">
+          <CardContent className="flex flex-col items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl" style={{ background: "var(--gradient-brand)" }}>
+              🎯
+            </div>
+            <div>
+              <p className="font-semibold text-foreground mb-1">Henüz proje yok</p>
+              <p className="text-sm text-muted-foreground">İlk projenizi oluşturarak başlayın</p>
+            </div>
+            <Button onClick={() => setDialogOpen(true)}>+ İlk Projenizi Oluşturun</Button>
           </CardContent>
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {projects.map((project) => (
             <Link key={project.id} to={`/projects/${project.id}`}>
-              <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
+              <Card className="hover:border-primary/40 hover:shadow-md hover:shadow-primary/5 transition-all duration-200 cursor-pointer h-full group">
                 <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">{project.name}</CardTitle>
+                  <div className="flex items-center justify-between gap-2">
+                    <CardTitle className="text-lg group-hover:text-primary transition-colors truncate">
+                      {project.name}
+                    </CardTitle>
                     {project.hasContext ? (
-                      <Badge variant="default">Context Hazır</Badge>
+                      <Badge variant="default" className="shrink-0">Context Hazır</Badge>
                     ) : (
-                      <Badge variant="secondary">Context Yok</Badge>
+                      <Badge variant="secondary" className="shrink-0">Context Yok</Badge>
                     )}
                   </div>
                 </CardHeader>
                 <CardContent>
                   {project.description && (
-                    <p className="text-sm text-muted-foreground mb-3">{project.description}</p>
+                    <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{project.description}</p>
                   )}
                   <div className="flex gap-4 text-xs text-muted-foreground">
-                    <span>{project.requirementCount} talep</span>
-                    <span>{project.documentCount} belge</span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary/60 inline-block" />
+                      {project.requirementCount} talep
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 inline-block" />
+                      {project.documentCount} belge
+                    </span>
                     {project.lastScannedAt && (
                       <span>
-                        Son tarama:{" "}
                         {new Date(project.lastScannedAt).toLocaleDateString("tr-TR")}
                       </span>
                     )}

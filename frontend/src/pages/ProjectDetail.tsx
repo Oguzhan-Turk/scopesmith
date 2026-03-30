@@ -86,7 +86,7 @@ export default function ProjectDetail() {
   const [project, setProject] = useState<Project | null>(null);
   const [requirements, setRequirements] = useState<Requirement[]>([]);
   const [selectedRequirementId, setSelectedRequirementId] = useState<number | null>(null);
-  const [analyses, setAnalyses] = useState<Analysis[]>([]);
+  const [_analyses, setAnalyses] = useState<Analysis[]>([]);
   const [selectedAnalysis, setSelectedAnalysis] = useState<Analysis | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
 
