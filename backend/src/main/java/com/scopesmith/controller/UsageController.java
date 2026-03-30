@@ -15,16 +15,15 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/usage")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:5173")
 public class UsageController {
 
     private final UsageRecordRepository usageRecordRepository;
 
-    private static final double HOURS_PER_ANALYSIS = 3.5;
-    private static final double ANALYST_HOURLY_RATE_USD = 75.0;
-
     @GetMapping("/projects/{projectId}/summary")
-    public Map<String, Object> getProjectSummary(@PathVariable Long projectId) {
+    public Map<String, Object> getProjectSummary(
+            @PathVariable Long projectId,
+            @RequestParam(defaultValue = "1.5") double hoursPerAnalysis,
+            @RequestParam(defaultValue = "50.0") double hourlyRate) {
         // Use entity-level aggregation instead of raw query to avoid cast issues
         List<UsageRecord> records = usageRecordRepository.findByProjectIdOrderByCreatedAtDesc(projectId);
 
@@ -74,15 +73,16 @@ public class UsageController {
 
         // ROI
         if (analysisCount > 0 && totalCost.compareTo(BigDecimal.ZERO) > 0) {
-            double estimatedHoursSaved = analysisCount * HOURS_PER_ANALYSIS;
-            double estimatedValueSaved = estimatedHoursSaved * ANALYST_HOURLY_RATE_USD;
+            double estimatedHoursSaved = analysisCount * hoursPerAnalysis;
+            double estimatedValueSaved = estimatedHoursSaved * hourlyRate;
             double roiMultiplier = estimatedValueSaved / totalCost.doubleValue();
 
             Map<String, Object> roi = new LinkedHashMap<>();
             roi.put("totalAnalyses", analysisCount);
             roi.put("estimatedHoursSaved", estimatedHoursSaved);
             roi.put("costPerAnalysis", totalCost.doubleValue() / analysisCount);
-            roi.put("analystHourlyRateUsd", ANALYST_HOURLY_RATE_USD);
+            roi.put("hoursPerAnalysis", hoursPerAnalysis);
+            roi.put("analystHourlyRateUsd", hourlyRate);
             roi.put("estimatedValueSavedUsd", Math.round(estimatedValueSaved));
             roi.put("roiMultiplier", Math.round(roiMultiplier));
             result.put("roi", roi);

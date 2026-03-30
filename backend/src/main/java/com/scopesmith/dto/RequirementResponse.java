@@ -16,6 +16,7 @@ public class RequirementResponse {
     private Long projectId;
     private String rawText;
     private RequirementType type;
+    private Integer sequenceNumber;
     private Integer version;
     private RequirementStatus status;
     private int analysisCount;
@@ -28,6 +29,7 @@ public class RequirementResponse {
                 .projectId(requirement.getProject().getId())
                 .rawText(requirement.getRawText())
                 .type(requirement.getType())
+                .sequenceNumber(requirement.getSequenceNumber())
                 .version(requirement.getVersion())
                 .status(requirement.getStatus())
                 .analysisCount(requirement.getAnalyses().size())

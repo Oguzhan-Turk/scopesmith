@@ -19,7 +19,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:5173")
 public class RequirementController {
 
     private final RequirementService requirementService;
@@ -56,6 +55,12 @@ public class RequirementController {
     public List<AnalysisResponse> getAnalyses(@PathVariable Long id) {
         List<Analysis> analyses = analysisRepository.findByRequirementIdOrderByCreatedAtDesc(id);
         return analyses.stream().map(AnalysisResponse::from).toList();
+    }
+
+    @DeleteMapping("/requirements/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable Long id) {
+        requirementService.delete(id);
     }
 
     @PostMapping("/requirements/{id}/analyze")

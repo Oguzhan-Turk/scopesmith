@@ -25,11 +25,13 @@ public class RequirementService {
         Project project = projectService.getProjectOrThrow(projectId);
 
         RequirementType type = parseType(request.getType());
+        int nextSeq = requirementRepository.findMaxSequenceNumberByProjectId(projectId) + 1;
 
         Requirement requirement = Requirement.builder()
                 .project(project)
                 .rawText(request.getRawText())
                 .type(type)
+                .sequenceNumber(nextSeq)
                 .build();
 
         return RequirementResponse.from(requirementRepository.save(requirement));
@@ -61,6 +63,12 @@ public class RequirementService {
         requirement.setVersion(requirement.getVersion() + 1);
 
         return RequirementResponse.from(requirementRepository.save(requirement));
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        Requirement requirement = getRequirementOrThrow(id);
+        requirementRepository.delete(requirement);
     }
 
     private RequirementType parseType(String type) {

@@ -4,6 +4,7 @@ import {
   getProject,
   getRequirements,
   createRequirement,
+  deleteRequirement,
   analyzeRequirement,
   answerQuestion,
   dismissQuestion,
@@ -158,6 +159,25 @@ export default function ProjectDetail() {
       return next;
     }, { replace: true });
     loadAnalyses(reqId);
+  }
+
+  async function handleDeleteRequirement(reqId: number) {
+    if (!confirm("Bu talebi ve tüm analizlerini silmek istediğinizden emin misiniz?")) return;
+    try {
+      await deleteRequirement(reqId);
+      const reqs = await getRequirements(projectId);
+      setRequirements(reqs);
+      if (selectedRequirementId === reqId) {
+        setSelectedRequirementId(null);
+        setSelectedAnalysis(null);
+        setTasks([]);
+        setAnalyses([]);
+      }
+      showToast("Talep silindi.", "success");
+    } catch (e) {
+      showToast("Talep silinemedi.");
+      console.error("Delete failed:", e);
+    }
   }
 
   async function handleScan() {
@@ -527,7 +547,7 @@ export default function ProjectDetail() {
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base">
-                    {req.type === "BUG" ? "Bug" : "Talep"} #{req.id}
+                    {req.type === "BUG" ? "Bug" : "Talep"} #{req.sequenceNumber || req.id}
                   </CardTitle>
                   <div className="flex gap-2">
                     <Badge variant={req.type === "BUG" ? "destructive" : "default"}>
@@ -554,6 +574,14 @@ export default function ProjectDetail() {
                     disabled={!!actionLoading}
                   >
                     {actionLoading === `analyze-${req.id}` ? "Analiz ediliyor..." : "Analiz Et"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleDeleteRequirement(req.id)}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    Sil
                   </Button>
                 </div>
               </CardContent>
@@ -639,6 +667,11 @@ export default function ProjectDetail() {
                   <div>
                     <h4 className="font-medium mb-1">Varsayımlar</h4>
                     <p className="text-sm text-muted-foreground whitespace-pre-wrap">{selectedAnalysis.assumptions}</p>
+                  </div>
+                  <Separator />
+                  <div>
+                    <h4 className="font-medium mb-1">{isBug ? "Severity Nedeni" : "Risk Nedeni"}</h4>
+                    <p className="text-sm text-muted-foreground">{selectedAnalysis.riskReason}</p>
                   </div>
                   <Separator />
                   <div>
@@ -1042,9 +1075,10 @@ export default function ProjectDetail() {
                       </div>
                     </div>
                     <Separator />
-                    <p className="text-sm text-muted-foreground">
-                      Manuel analiz tahmini: {usageSummary.roi.estimatedHoursSaved.toFixed(0)} saat × ${usageSummary.roi.analystHourlyRateUsd}/saat = ${usageSummary.roi.estimatedValueSavedUsd.toLocaleString()}.
-                      ScopeSmith maliyeti: ${usageSummary.totalEstimatedCostUsd.toFixed(2)}.
+                    <p className="text-xs text-muted-foreground">
+                      Tahmini tasarruf: {usageSummary.roi.estimatedHoursSaved.toFixed(0)} saat × ${usageSummary.roi.analystHourlyRateUsd}/saat.
+                      AI maliyeti: ${usageSummary.totalEstimatedCostUsd.toFixed(2)}.
+                      Bu değerler varsayımsaldır, gerçek tasarruf proje karmaşıklığına bağlıdır.
                     </p>
                   </CardContent>
                 </Card>

@@ -37,6 +37,12 @@ public class Requirement {
      * Version number, incremented when the requirement changes.
      * Enables change impact analysis (Feature C).
      */
+    /**
+     * Per-project sequence number (1, 2, 3...).
+     * Unlike the global DB id, this is scoped to the project.
+     */
+    private Integer sequenceNumber;
+
     @Builder.Default
     private Integer version = 1;
 

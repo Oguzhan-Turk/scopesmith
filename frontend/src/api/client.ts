@@ -79,6 +79,8 @@ export const createRequirement = (projectId: number, rawText: string, type?: str
     method: "POST",
     body: JSON.stringify({ rawText, type }),
   });
+export const deleteRequirement = (id: number) =>
+  request<void>(`/requirements/${id}`, { method: "DELETE" });
 export const analyzeRequirement = (id: number) =>
   request<Analysis>(`/requirements/${id}/analyze`, { method: "POST" });
 export const getChangeImpact = (id: number) =>
@@ -229,6 +231,7 @@ export interface Requirement {
   projectId: number;
   rawText: string;
   type: "FEATURE" | "BUG";
+  sequenceNumber: number;
   version: number;
   status: string;
   analysisCount: number;

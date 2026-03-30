@@ -18,7 +18,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/projects")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:5173") // Vite dev server
 public class ProjectController {
 
     private final ProjectService projectService;
