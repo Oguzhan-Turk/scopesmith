@@ -77,7 +77,8 @@ public class JiraService {
             }
 
             try {
-                String jiraKey = createJiraIssue(task, project, type);
+                IntegrationConfigDTO.JiraSettings jiraSettings = projectConfig != null ? projectConfig.getJira() : null;
+                String jiraKey = createJiraIssue(task, project, type, jiraSettings);
                 task.setJiraKey(jiraKey);
                 taskRepository.save(task);
                 created.add(Map.of("taskId", task.getId().toString(), "jiraKey", jiraKey, "status", "created"));
@@ -100,7 +101,8 @@ public class JiraService {
         return result;
     }
 
-    private String createJiraIssue(Task task, String projectKey, String issueType) {
+    private String createJiraIssue(Task task, String projectKey, String issueType,
+                                    IntegrationConfigDTO.JiraSettings jiraSettings) {
         String url = jiraConfig.getUrl() + "/rest/api/3/issue";
 
         Map<String, Object> fields = new LinkedHashMap<>();
@@ -109,12 +111,24 @@ public class JiraService {
         fields.put("issuetype", Map.of("name", issueType));
         fields.put("description", buildAdfDescription(task));
         fields.put("priority", Map.of("name", PRIORITY_MAP.getOrDefault(task.getPriority().name(), "Medium")));
-        // Labels: always include scopesmith + category
+
+        // Labels: always include scopesmith + category label
         List<String> labels = new ArrayList<>(List.of("scopesmith"));
         if (task.getCategory() != null && !task.getCategory().isBlank()) {
             labels.add("category:" + task.getCategory().toLowerCase());
         }
         fields.put("labels", labels);
+
+        // Component mapping: try to map category to Jira Component
+        String categoryMode = jiraSettings != null && jiraSettings.getCategoryMode() != null
+                ? jiraSettings.getCategoryMode() : "BOTH";
+        if (task.getCategory() != null && !task.getCategory().isBlank()
+                && ("COMPONENTS".equals(categoryMode) || "BOTH".equals(categoryMode))) {
+            String componentName = resolveComponentName(task.getCategory(), jiraSettings);
+            if (componentName != null) {
+                fields.put("components", List.of(Map.of("name", componentName)));
+            }
+        }
 
         Map<String, Object> body = Map.of("fields", fields);
 
@@ -187,6 +201,21 @@ public class JiraService {
                 "attrs", Map.of("level", 3),
                 "content", List.of(Map.of("type", "text", "text", text))
         );
+    }
+
+    /**
+     * Resolve ScopeSmith category to Jira Component name.
+     * Uses explicit mapping if configured, otherwise returns category name as-is
+     * (Jira will silently ignore if Component doesn't exist).
+     */
+    private String resolveComponentName(String category, IntegrationConfigDTO.JiraSettings settings) {
+        if (settings != null && settings.getCategoryMapping() != null) {
+            // Explicit mapping configured
+            String mapped = settings.getCategoryMapping().get(category.toUpperCase());
+            if (mapped != null) return mapped;
+        }
+        // Default: use category name with first letter uppercase (e.g., "Backend")
+        return category.substring(0, 1).toUpperCase() + category.substring(1).toLowerCase();
     }
 
     private IntegrationConfigDTO parseIntegrationConfig(String json) {

@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.Map;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -25,6 +27,19 @@ public class IntegrationConfigDTO {
     public static class JiraSettings {
         private String projectKey;
         private String defaultIssueType;
+        /**
+         * How to map categories to Jira: "LABELS_ONLY", "COMPONENTS", "BOTH" (default)
+         * LABELS_ONLY: only add category:xxx labels
+         * COMPONENTS: try to match Jira Components, fall back to labels
+         * BOTH: always add labels + try Components
+         */
+        private String categoryMode; // default "BOTH"
+        /**
+         * Maps ScopeSmith category → Jira Component name.
+         * e.g., {"BACKEND": "Core API", "FRONTEND": "Web UI"}
+         * If null, auto-matches by name.
+         */
+        private Map<String, String> categoryMapping;
     }
 
     @Data

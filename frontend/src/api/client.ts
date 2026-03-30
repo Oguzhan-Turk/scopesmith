@@ -284,7 +284,12 @@ export interface Project {
 }
 
 export interface IntegrationConfig {
-  jira?: { projectKey?: string; defaultIssueType?: string };
+  jira?: {
+    projectKey?: string;
+    defaultIssueType?: string;
+    categoryMode?: "LABELS_ONLY" | "COMPONENTS" | "BOTH";
+    categoryMapping?: Record<string, string>;
+  };
   github?: { repo?: string };
   preferredProvider?: "JIRA" | "GITHUB";
 }

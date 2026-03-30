@@ -1108,6 +1108,23 @@ export default function ProjectDetail() {
                 })}
                 className="w-full px-3 py-2 border rounded-md bg-background text-sm"
               />
+              <div className="flex items-center gap-2 mt-3">
+                <Tooltip side="right" content="LABELS_ONLY: sadece label ekler. COMPONENTS: Jira Component eşleştirmeye çalışır. BOTH: ikisini de yapar.">
+                  <label className="text-sm font-medium cursor-help border-b border-dotted border-muted-foreground">Kategori Modu</label>
+                </Tooltip>
+              </div>
+              <select
+                value={integrationConfig.jira?.categoryMode || "BOTH"}
+                onChange={(e) => setIntegrationConfig({
+                  ...integrationConfig,
+                  jira: { ...integrationConfig.jira, categoryMode: e.target.value as "LABELS_ONLY" | "COMPONENTS" | "BOTH" },
+                })}
+                className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+              >
+                <option value="BOTH">Label + Component (önerilen)</option>
+                <option value="LABELS_ONLY">Sadece Label</option>
+                <option value="COMPONENTS">Sadece Component</option>
+              </select>
             </CardContent>
           </Card>
 
