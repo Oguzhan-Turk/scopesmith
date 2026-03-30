@@ -3,6 +3,7 @@ package com.scopesmith.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scopesmith.config.PromptLoader;
 import com.scopesmith.dto.ProjectContextResult;
+import com.scopesmith.entity.OperationType;
 import com.scopesmith.entity.Project;
 import com.scopesmith.repository.ProjectRepository;
 import lombok.RequiredArgsConstructor;
@@ -98,11 +99,13 @@ public class ProjectContextService {
         long startTime = System.currentTimeMillis();
 
         // 1. Free-text context (human-readable, used in analysis prompts)
-        String context = aiService.chat(promptLoader.load("project-context"), userMessage);
+        String context = aiService.chat(promptLoader.load("project-context"), userMessage,
+                OperationType.PROJECT_CONTEXT, projectId);
 
         // 2. Structured context (queryable, used for precise module/entity matching)
         ProjectContextResult structured = aiService.chatWithStructuredOutput(
-                promptLoader.load("project-context-structured"), userMessage, ProjectContextResult.class);
+                promptLoader.load("project-context-structured"), userMessage, ProjectContextResult.class,
+                OperationType.PROJECT_CONTEXT_STRUCTURED, projectId);
 
         long duration = System.currentTimeMillis() - startTime;
         log.info("Project context generated for #{} in {}ms (text + structured)", projectId, duration);

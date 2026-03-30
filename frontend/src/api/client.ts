@@ -40,6 +40,28 @@ export const scanProject = (id: number, folderPath: string) =>
     body: JSON.stringify({ folderPath }),
   });
 
+// Usage & ROI
+export const getProjectUsage = (projectId: number) =>
+  request<UsageSummary>(`/usage/projects/${projectId}/summary`);
+
+export interface UsageSummary {
+  totalAiCalls: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalTokens: number;
+  totalEstimatedCostUsd: number;
+  totalDurationMs: number;
+  byOperationType: Record<string, { count: number; costUsd: number; avgDurationMs: number }>;
+  roi?: {
+    totalAnalyses: number;
+    estimatedHoursSaved: number;
+    costPerAnalysis: number;
+    analystHourlyRateUsd: number;
+    estimatedValueSavedUsd: number;
+    roiMultiplier: number;
+  };
+}
+
 // Integration Config
 export const getIntegrationConfig = (projectId: number) =>
   request<IntegrationConfig>(`/projects/${projectId}/integration-config`);

@@ -34,11 +34,13 @@ public class TaskBreakdownService {
     public List<TaskResponse> generateTasks(Long analysisId) {
         // Phase 1: Read + validate (short tx)
         String userMessage = readTaskBreakdownData(analysisId);
+        Long projectId = getProjectId(analysisId);
 
         // Phase 2: AI call (no tx — no DB connection held)
         log.info("Generating task breakdown for analysis #{}", analysisId);
         TaskBreakdownResult result = aiService.chatWithStructuredOutput(
-                promptLoader.load("task-breakdown"), userMessage, TaskBreakdownResult.class);
+                promptLoader.load("task-breakdown"), userMessage, TaskBreakdownResult.class,
+                OperationType.TASK_BREAKDOWN, projectId);
         log.info("Task breakdown complete for analysis #{}. {} tasks generated.",
                 analysisId, result.getTasks().size());
 
@@ -52,11 +54,13 @@ public class TaskBreakdownService {
     public List<TaskResponse> refineTasks(Long analysisId, String instruction) {
         // Phase 1: Read current tasks (short tx)
         String userMessage = readRefineData(analysisId, instruction);
+        Long projectId = getProjectId(analysisId);
 
         // Phase 2: AI call (no tx)
         log.info("Refining tasks for analysis #{}", analysisId);
         TaskBreakdownResult result = aiService.chatWithStructuredOutput(
-                promptLoader.load("task-breakdown-refine"), userMessage, TaskBreakdownResult.class);
+                promptLoader.load("task-breakdown-refine"), userMessage, TaskBreakdownResult.class,
+                OperationType.TASK_REFINEMENT, projectId);
         log.info("Task refinement complete for analysis #{}. {} tasks generated.", analysisId, result.getTasks().size());
 
         // Phase 3: Replace tasks (short tx)
@@ -276,6 +280,11 @@ public class TaskBreakdownService {
         } catch (Exception e) {
             return TaskPriority.MEDIUM;
         }
+    }
+
+    @Transactional(readOnly = true)
+    protected Long getProjectId(Long analysisId) {
+        return findAnalysis(analysisId).getRequirement().getProject().getId();
     }
 
     private Analysis findAnalysis(Long analysisId) {

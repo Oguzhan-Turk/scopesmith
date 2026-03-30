@@ -35,8 +35,10 @@ public class RequirementAnalysisService {
                 ? "bug-analysis" : "requirement-analysis";
         log.info("Starting {} analysis for requirement #{}", requirement.getType(), requirementId);
         long startTime = System.currentTimeMillis();
+        Long projectId = requirement.getProject().getId();
         AnalysisResult result = aiService.chatWithStructuredOutput(
-                promptLoader.load(promptName), userMessage, AnalysisResult.class);
+                promptLoader.load(promptName), userMessage, AnalysisResult.class,
+                OperationType.REQUIREMENT_ANALYSIS, projectId);
         long durationMs = System.currentTimeMillis() - startTime;
         log.info("Analysis complete for requirement #{} in {}ms", requirementId, durationMs);
 
@@ -92,7 +94,8 @@ public class RequirementAnalysisService {
                 requirement.getType(), requirement.getId(), previousAnalysis.getId());
         long startTime = System.currentTimeMillis();
         AnalysisResult result = aiService.chatWithStructuredOutput(
-                promptLoader.load(promptName), userMessage, AnalysisResult.class);
+                promptLoader.load(promptName), userMessage, AnalysisResult.class,
+                OperationType.REQUIREMENT_ANALYSIS, requirement.getProject().getId());
         long durationMs = System.currentTimeMillis() - startTime;
         log.info("Re-analysis complete for requirement #{} in {}ms", requirement.getId(), durationMs);
 

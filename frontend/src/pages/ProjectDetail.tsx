@@ -20,6 +20,8 @@ import {
   scanProject,
   getIntegrationConfig,
   updateIntegrationConfig,
+  getProjectUsage,
+  type UsageSummary,
   type Project,
   type IntegrationConfig,
   type Requirement,
@@ -73,6 +75,7 @@ export default function ProjectDetail() {
   const [summaryInstruction, setSummaryInstruction] = useState("");
   const [taskInstruction, setTaskInstruction] = useState("");
   const [integrationConfig, setIntegrationConfig] = useState<IntegrationConfig>({});
+  const [usageSummary, setUsageSummary] = useState<UsageSummary | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -101,14 +104,16 @@ export default function ProjectDetail() {
 
   async function loadProject() {
     try {
-      const [proj, reqs, config] = await Promise.all([
+      const [proj, reqs, config, usage] = await Promise.all([
         getProject(projectId),
         getRequirements(projectId),
         getIntegrationConfig(projectId).catch(() => ({})),
+        getProjectUsage(projectId).catch(() => null),
       ]);
       setProject(proj);
       setRequirements(reqs);
       setIntegrationConfig(config);
+      setUsageSummary(usage);
     } catch (e) {
       showToast("Proje yüklenemedi. Lütfen sayfayı yenileyin.");
       console.error("Failed to load project:", e);
@@ -455,6 +460,7 @@ export default function ProjectDetail() {
             {tasks.length > 0 && <span className="ml-1.5 text-xs opacity-60">({tasks.length})</span>}
           </TabsTrigger>
           <TabsTrigger value="integrations">Entegrasyonlar</TabsTrigger>
+          <TabsTrigger value="usage">Kullanım & ROI</TabsTrigger>
         </TabsList>
 
         {/* REQUIREMENTS TAB */}
@@ -969,7 +975,120 @@ export default function ProjectDetail() {
             {actionLoading === "save-config" ? "Kaydediliyor..." : "Kaydet"}
           </Button>
         </TabsContent>
+
+        {/* USAGE & ROI TAB */}
+        <TabsContent value="usage" className="space-y-6">
+          {!usageSummary || usageSummary.totalAiCalls === 0 ? (
+            <Card className="text-center py-12">
+              <CardContent>
+                <p className="text-muted-foreground">
+                  Henüz AI kullanımı yok. Bir talep analiz ettiğinizde burada maliyet ve ROI bilgileri görünecek.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {/* Summary Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Card>
+                  <CardContent className="pt-6">
+                    <p className="text-2xl font-bold">{usageSummary.totalAiCalls}</p>
+                    <p className="text-xs text-muted-foreground">AI Çağrısı</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <p className="text-2xl font-bold">{usageSummary.totalTokens.toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground">Toplam Token</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <p className="text-2xl font-bold">${usageSummary.totalEstimatedCostUsd.toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground">Toplam Maliyet</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <p className="text-2xl font-bold">{(usageSummary.totalDurationMs / 1000).toFixed(0)}s</p>
+                    <p className="text-xs text-muted-foreground">Toplam AI Süresi</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* ROI Card */}
+              {usageSummary.roi && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">ROI Analizi</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div>
+                        <p className="text-2xl font-bold">{usageSummary.roi.totalAnalyses}</p>
+                        <p className="text-xs text-muted-foreground">Analiz Yapıldı</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold">{usageSummary.roi.estimatedHoursSaved.toFixed(0)} saat</p>
+                        <p className="text-xs text-muted-foreground">Tahmini Tasarruf</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold">${usageSummary.roi.costPerAnalysis.toFixed(3)}</p>
+                        <p className="text-xs text-muted-foreground">Analiz Başına Maliyet</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-primary">{usageSummary.roi.roiMultiplier}x</p>
+                        <p className="text-xs text-muted-foreground">ROI Çarpanı</p>
+                      </div>
+                    </div>
+                    <Separator />
+                    <p className="text-sm text-muted-foreground">
+                      Manuel analiz tahmini: {usageSummary.roi.estimatedHoursSaved.toFixed(0)} saat × ${usageSummary.roi.analystHourlyRateUsd}/saat = ${usageSummary.roi.estimatedValueSavedUsd.toLocaleString()}.
+                      ScopeSmith maliyeti: ${usageSummary.totalEstimatedCostUsd.toFixed(2)}.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Operation Breakdown */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">İşlem Bazlı Dağılım</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {Object.entries(usageSummary.byOperationType).map(([op, data]) => (
+                      <div key={op} className="flex items-center justify-between py-1.5 border-b last:border-0">
+                        <span className="text-sm">{formatOperationType(op)}</span>
+                        <div className="flex gap-4 text-xs text-muted-foreground">
+                          <span>{data.count} çağrı</span>
+                          <span>${data.costUsd.toFixed(3)}</span>
+                          <span>{(data.avgDurationMs / 1000).toFixed(1)}s ort.</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </TabsContent>
       </Tabs>
     </div>
   );
+}
+
+function formatOperationType(op: string): string {
+  const labels: Record<string, string> = {
+    REQUIREMENT_ANALYSIS: "Talep Analizi",
+    TASK_BREAKDOWN: "Task Üretimi",
+    TASK_REFINEMENT: "Task İyileştirme",
+    STAKEHOLDER_SUMMARY: "İş Özeti",
+    SUMMARY_REFINEMENT: "Özet İyileştirme",
+    PROJECT_CONTEXT: "Proje Context",
+    PROJECT_CONTEXT_STRUCTURED: "Yapısal Context",
+    CHANGE_IMPACT: "Değişiklik Etkisi",
+    HEALTH_CHECK: "Sağlık Kontrolü",
+  };
+  return labels[op] || op;
 }

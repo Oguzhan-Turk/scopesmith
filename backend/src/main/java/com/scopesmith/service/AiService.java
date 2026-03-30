@@ -1,38 +1,27 @@
 package com.scopesmith.service;
 
+import com.scopesmith.entity.OperationType;
+
 /**
  * Abstraction for AI interactions.
  * Business logic depends on this interface, not on any specific AI provider.
- * <p>
- * Why an interface? (Dependency Inversion Principle)
- * - Our analysis logic shouldn't know or care whether Claude, GPT, or a local model runs behind.
- * - Testing: we can mock this without hitting a real API.
- * - Future: swap providers by changing only the implementation.
  */
 public interface AiService {
 
-    /**
-     * Sends a prompt to the AI and returns the text response.
-     *
-     * @param systemPrompt Defines the AI's role and expected output format
-     * @param userMessage  The user's input (raw requirement, project context, etc.)
-     * @return AI's text response
-     */
     String chat(String systemPrompt, String userMessage);
 
     /**
-     * Sends a prompt and maps the response to a Java object.
-     * The AI is expected to return valid JSON matching the target class structure.
-     *
-     * @param systemPrompt Defines the AI's role and expected output format
-     * @param userMessage  The user's input
-     * @param responseType The class to map the response to
-     * @return Parsed response object
+     * Chat with usage tracking — records token usage and cost.
      */
+    String chat(String systemPrompt, String userMessage, OperationType operationType, Long projectId);
+
     <T> T chatWithStructuredOutput(String systemPrompt, String userMessage, Class<T> responseType);
 
     /**
-     * Simple health check — verifies the AI provider is reachable.
+     * Structured output with usage tracking.
      */
+    <T> T chatWithStructuredOutput(String systemPrompt, String userMessage, Class<T> responseType,
+                                    OperationType operationType, Long projectId);
+
     String healthCheck();
 }

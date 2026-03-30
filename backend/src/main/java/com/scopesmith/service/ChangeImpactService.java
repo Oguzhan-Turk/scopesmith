@@ -3,6 +3,7 @@ package com.scopesmith.service;
 import com.scopesmith.config.PromptLoader;
 import com.scopesmith.dto.ChangeImpactResult;
 import com.scopesmith.entity.Analysis;
+import com.scopesmith.entity.OperationType;
 import com.scopesmith.entity.Requirement;
 import com.scopesmith.entity.Task;
 import com.scopesmith.repository.AnalysisRepository;
@@ -62,7 +63,8 @@ public class ChangeImpactService {
                 requirementId, latestAnalysis.getRequirementVersion(), requirement.getVersion());
 
         ChangeImpactResult result = aiService.chatWithStructuredOutput(
-                promptLoader.load("change-impact"), userMessage, ChangeImpactResult.class);
+                promptLoader.load("change-impact"), userMessage, ChangeImpactResult.class,
+                OperationType.CHANGE_IMPACT, requirement.getProject().getId());
 
         log.info("Change impact analysis complete for requirement #{}", requirementId);
         return result;

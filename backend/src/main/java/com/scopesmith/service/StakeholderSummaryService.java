@@ -2,6 +2,7 @@ package com.scopesmith.service;
 
 import com.scopesmith.config.PromptLoader;
 import com.scopesmith.entity.Analysis;
+import com.scopesmith.entity.OperationType;
 import com.scopesmith.entity.QuestionStatus;
 import com.scopesmith.entity.Task;
 import com.scopesmith.repository.AnalysisRepository;
@@ -27,10 +28,12 @@ public class StakeholderSummaryService {
     public String generateSummary(Long analysisId) {
         // Phase 1: Read data (short tx)
         String userMessage = readSummaryData(analysisId);
+        Long projectId = getProjectId(analysisId);
 
         // Phase 2: AI call (no tx — no DB connection held)
         log.info("Generating stakeholder summary for analysis #{}", analysisId);
-        String summary = aiService.chat(promptLoader.load("stakeholder-summary"), userMessage);
+        String summary = aiService.chat(promptLoader.load("stakeholder-summary"), userMessage,
+                OperationType.STAKEHOLDER_SUMMARY, projectId);
         log.info("Stakeholder summary generated for analysis #{}", analysisId);
 
         // Phase 3: Save result (short tx)
@@ -51,8 +54,11 @@ public class StakeholderSummaryService {
                 + "\n\n## Refinement Instruction\n" + instruction;
 
         // Phase 2: AI call (no tx)
+        Long projectId = getProjectId(analysisId);
+
         log.info("Refining stakeholder summary for analysis #{}", analysisId);
-        String refined = aiService.chat(promptLoader.load("stakeholder-summary-refine"), userMessage);
+        String refined = aiService.chat(promptLoader.load("stakeholder-summary-refine"), userMessage,
+                OperationType.SUMMARY_REFINEMENT, projectId);
         log.info("Stakeholder summary refined for analysis #{}", analysisId);
 
         // Phase 3: Save result (short tx)
@@ -81,6 +87,11 @@ public class StakeholderSummaryService {
         Analysis analysis = findAnalysis(analysisId);
         analysis.setPoSummary(summary);
         analysisRepository.save(analysis);
+    }
+
+    @Transactional(readOnly = true)
+    protected Long getProjectId(Long analysisId) {
+        return findAnalysis(analysisId).getRequirement().getProject().getId();
     }
 
     private Analysis findAnalysis(Long analysisId) {
