@@ -19,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -91,6 +92,24 @@ public class AnalysisController {
             @RequestBody(required = false) Map<String, String> request) {
         String repo = request != null ? request.get("repo") : null;
         return gitHubService.syncTasksToGitHub(id, repo);
+    }
+
+    @PostMapping("/{id}/sync/verify")
+    public Map<String, Object> verifySyncStatus(@PathVariable Long id) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        try {
+            Map<String, Object> jiraResult = jiraService.verifySyncStatus(id);
+            result.put("jira", jiraResult);
+        } catch (Exception e) {
+            result.put("jira", Map.of("error", e.getMessage()));
+        }
+        try {
+            Map<String, Object> githubResult = gitHubService.verifySyncStatus(id);
+            result.put("github", githubResult);
+        } catch (Exception e) {
+            result.put("github", Map.of("error", e.getMessage()));
+        }
+        return result;
     }
 
     @GetMapping("/{id}/export/jira-csv")

@@ -101,6 +101,50 @@ public class JiraService {
         return result;
     }
 
+    /**
+     * Verify sync status — check if Jira issues still exist and are open.
+     * Clears jiraKey for deleted/resolved issues.
+     */
+    @Transactional
+    public Map<String, Object> verifySyncStatus(Long analysisId) {
+        List<Task> tasks = taskRepository.findByAnalysisId(analysisId);
+        List<Task> syncedTasks = tasks.stream()
+                .filter(t -> t.getJiraKey() != null && !t.getJiraKey().startsWith("#"))
+                .toList();
+
+        if (syncedTasks.isEmpty()) {
+            return Map.of("checked", 0, "cleared", 0);
+        }
+
+        int cleared = 0;
+        for (Task task : syncedTasks) {
+            try {
+                String url = jiraConfig.getUrl() + "/rest/api/3/issue/" + task.getJiraKey();
+                HttpHeaders headers = new HttpHeaders();
+                headers.setBasicAuth(jiraConfig.getEmail(), jiraConfig.getApiToken(), StandardCharsets.UTF_8);
+
+                ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+                Map fields = (Map) response.getBody().get("fields");
+                Map status = (Map) fields.get("status");
+                String statusCategory = (String) ((Map) status.get("statusCategory")).get("key");
+
+                if ("done".equals(statusCategory)) {
+                    task.setJiraKey(null);
+                    taskRepository.save(task);
+                    cleared++;
+                    log.info("Cleared sync for task #{} — Jira issue {} is done", task.getId(), task.getJiraKey());
+                }
+            } catch (Exception e) {
+                task.setJiraKey(null);
+                taskRepository.save(task);
+                cleared++;
+                log.info("Cleared sync for task #{} — Jira issue not accessible: {}", task.getId(), e.getMessage());
+            }
+        }
+
+        return Map.of("checked", syncedTasks.size(), "cleared", cleared, "stillSynced", syncedTasks.size() - cleared);
+    }
+
     private String createJiraIssue(Task task, String projectKey, String issueType,
                                     IntegrationConfigDTO.JiraSettings jiraSettings) {
         String url = jiraConfig.getUrl() + "/rest/api/3/issue";

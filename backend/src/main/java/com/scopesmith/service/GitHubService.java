@@ -93,6 +93,60 @@ public class GitHubService {
         return result;
     }
 
+    /**
+     * Verify sync status — check if GitHub issues still exist and are open.
+     * Clears jiraKey for closed/deleted issues.
+     */
+    @Transactional
+    public Map<String, Object> verifySyncStatus(Long analysisId) {
+        List<Task> tasks = taskRepository.findByAnalysisId(analysisId);
+        List<Task> syncedTasks = tasks.stream()
+                .filter(t -> t.getJiraKey() != null && t.getJiraKey().startsWith("#"))
+                .toList();
+
+        if (syncedTasks.isEmpty()) {
+            return Map.of("checked", 0, "cleared", 0);
+        }
+
+        Analysis analysis = analysisRepository.findById(analysisId)
+                .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Analysis not found"));
+
+        IntegrationConfigDTO config = parseIntegrationConfig(analysis.getRequirement().getProject().getIntegrationConfig());
+        String repo = firstNonBlank(
+                config != null && config.getGithub() != null ? config.getGithub().getRepo() : null,
+                gitHubConfig.getRepo()
+        );
+
+        int cleared = 0;
+        for (Task task : syncedTasks) {
+            String issueNumber = task.getJiraKey().replace("#", "");
+            try {
+                String url = "https://api.github.com/repos/" + repo + "/issues/" + issueNumber;
+                HttpHeaders headers = new HttpHeaders();
+                headers.setBearerAuth(gitHubConfig.getToken());
+                headers.set("Accept", "application/vnd.github+json");
+
+                ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+                String state = (String) response.getBody().get("state");
+
+                if ("closed".equals(state)) {
+                    task.setJiraKey(null);
+                    taskRepository.save(task);
+                    cleared++;
+                    log.info("Cleared sync for task #{} — GitHub issue {} is closed", task.getId(), task.getJiraKey());
+                }
+            } catch (Exception e) {
+                // Issue not found (404) or other error — clear sync
+                task.setJiraKey(null);
+                taskRepository.save(task);
+                cleared++;
+                log.info("Cleared sync for task #{} — GitHub issue not accessible: {}", task.getId(), e.getMessage());
+            }
+        }
+
+        return Map.of("checked", syncedTasks.size(), "cleared", cleared, "stillSynced", syncedTasks.size() - cleared);
+    }
+
     private String createGitHubIssue(Task task, String repo, boolean isBug) {
         String url = "https://api.github.com/repos/" + repo + "/issues";
 

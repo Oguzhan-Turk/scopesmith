@@ -222,6 +222,12 @@ export interface JiraSyncResult {
   errors?: Array<{ taskId: string; title: string; error: string }>;
 }
 
+// Sync Verify
+export const verifySyncStatus = (analysisId: number) =>
+  request<{ jira?: { checked: number; cleared: number }; github?: { checked: number; cleared: number } }>(
+    `/analyses/${analysisId}/sync/verify`, { method: "POST" }
+  );
+
 // Jira Export
 export async function exportJiraCsv(analysisId: number, projectKey: string, issueType: string = "Story") {
   const params = new URLSearchParams({ projectKey, issueType });

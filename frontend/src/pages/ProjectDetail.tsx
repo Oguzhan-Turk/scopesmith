@@ -14,6 +14,7 @@ import {
   refineTasks,
   setSpDecision,
   exportJiraCsv,
+  verifySyncStatus,
   syncToJira,
   syncToGitHub,
   getAnalysesByRequirement,
@@ -370,6 +371,28 @@ export default function ProjectDetail() {
     } catch (e) {
       showToast("SP kararı kaydedilemedi.");
       console.error("SP decision failed:", e);
+    }
+  }
+
+  async function handleVerifySync() {
+    if (!selectedAnalysis) return;
+    setActionLoading("verify-sync");
+    try {
+      const result = await verifySyncStatus(selectedAnalysis.id);
+      const jiraCleared = result.jira?.cleared || 0;
+      const githubCleared = result.github?.cleared || 0;
+      const total = jiraCleared + githubCleared;
+      if (total > 0) {
+        showToast(`${total} task'ın sync durumu güncellendi (kapalı/silinmiş issue'lar temizlendi).`, "success");
+        await loadTasks(selectedAnalysis.id);
+      } else {
+        showToast("Tüm sync'ler güncel.", "info");
+      }
+    } catch (e) {
+      showToast("Sync durumu kontrol edilemedi.");
+      console.error("Verify sync failed:", e);
+    } finally {
+      setActionLoading(null);
     }
   }
 
@@ -917,7 +940,12 @@ export default function ProjectDetail() {
                   return (
                     <div className="flex items-center gap-2">
                       {syncedCount > 0 && (
-                        <span className="text-xs text-muted-foreground">{syncedCount}/{tasks.length} gönderildi</span>
+                        <>
+                          <span className="text-xs text-muted-foreground">{syncedCount}/{tasks.length} gönderildi</span>
+                          <Button size="sm" variant="ghost" onClick={handleVerifySync} disabled={!!actionLoading} className="text-xs h-6 px-2">
+                            {actionLoading === "verify-sync" ? "Kontrol..." : "Durumu Kontrol Et"}
+                          </Button>
+                        </>
                       )}
                       {integrationConfig.jira?.projectKey && (
                         <>
