@@ -64,10 +64,20 @@ public class ProjectContextService {
     private static final long MAX_FILE_SIZE = 50 * 1024;
 
     /**
-     * Maximum total content to send to Claude (100KB).
+     * Maximum total content to send to Claude (150KB).
      * Prevents token explosion on large projects.
      */
-    private static final long MAX_TOTAL_CONTENT = 100 * 1024;
+    private static final long MAX_TOTAL_CONTENT = 150 * 1024;
+
+    /**
+     * Maximum number of files to include in context.
+     */
+    private static final int MAX_FILES = 50;
+
+    /**
+     * Maximum file tree depth to prevent scanning deeply nested directories.
+     */
+    private static final int MAX_TREE_DEPTH = 8;
 
     // Prompt loaded from resources/prompts/project-context.txt via PromptLoader
 
@@ -154,6 +164,11 @@ public class ProjectContextService {
                     if (SKIP_DIRS.contains(dirName) && !dir.equals(root)) {
                         return FileVisitResult.SKIP_SUBTREE;
                     }
+                    // Depth limit
+                    int depth = root.relativize(dir).getNameCount();
+                    if (depth > MAX_TREE_DEPTH) {
+                        return FileVisitResult.SKIP_SUBTREE;
+                    }
                     String relative = root.relativize(dir).toString();
                     if (!relative.isEmpty()) {
                         entries.add(relative + "/");
@@ -163,7 +178,9 @@ public class ProjectContextService {
 
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-                    entries.add(root.relativize(file).toString());
+                    if (entries.size() < 500) { // prevent file tree explosion
+                        entries.add(root.relativize(file).toString());
+                    }
                     return FileVisitResult.CONTINUE;
                 }
             });
@@ -222,8 +239,10 @@ public class ProjectContextService {
                 }
             });
 
-            // Sort and read files
-            for (Path file : filesToRead.stream().sorted().toList()) {
+            // Sort and limit file count, then read
+            List<Path> sortedFiles = filesToRead.stream().sorted().limit(MAX_FILES).toList();
+            log.info("Reading {} key files (of {} found)", sortedFiles.size(), filesToRead.size());
+            for (Path file : sortedFiles) {
                 if (totalSize >= MAX_TOTAL_CONTENT) {
                     content.append("\n--- (content limit reached, remaining files omitted) ---\n");
                     break;
