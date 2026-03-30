@@ -39,6 +39,7 @@ import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/useToast";
+import { useAuth } from "@/hooks/useAuth";
 
 type BadgeVariant = "default" | "secondary" | "destructive";
 
@@ -62,6 +63,7 @@ export default function ProjectDetail() {
   const [searchParams, setSearchParams] = useSearchParams();
   const projectId = Number(id);
   const { showToast } = useToast();
+  const { isAdmin } = useAuth();
 
   const [project, setProject] = useState<Project | null>(null);
   const [requirements, setRequirements] = useState<Requirement[]>([]);
@@ -491,8 +493,8 @@ export default function ProjectDetail() {
             Task'lar
             {tasks.length > 0 && <span className="ml-1.5 text-xs opacity-60">({tasks.length})</span>}
           </TabsTrigger>
-          <TabsTrigger value="integrations">Entegrasyonlar</TabsTrigger>
-          <TabsTrigger value="usage">Kullanım & ROI</TabsTrigger>
+          {isAdmin && <TabsTrigger value="integrations">Entegrasyonlar</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="usage">Kullanım & ROI</TabsTrigger>}
         </TabsList>
 
         {/* REQUIREMENTS TAB */}
@@ -868,28 +870,30 @@ export default function ProjectDetail() {
                   {tasks.length} Task — Toplam{" "}
                   {tasks.reduce((sum, t) => sum + (t.spFinal || t.spSuggestion || 0), 0)} SP
                 </h2>
-                <div className="flex gap-2">
-                  {integrationConfig.jira?.projectKey && (
-                    <>
-                      <Button size="sm" onClick={handleSyncJira} disabled={!!actionLoading}>
-                        {actionLoading === "jira-sync" ? "Gönderiliyor..." : `Jira (${integrationConfig.jira.projectKey})`}
+                {isAdmin && (
+                  <div className="flex gap-2">
+                    {integrationConfig.jira?.projectKey && (
+                      <>
+                        <Button size="sm" onClick={handleSyncJira} disabled={!!actionLoading}>
+                          {actionLoading === "jira-sync" ? "Gönderiliyor..." : `Jira (${integrationConfig.jira.projectKey})`}
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={handleExportCsv} disabled={!!actionLoading}>
+                          {actionLoading === "export" ? "İndiriliyor..." : "CSV"}
+                        </Button>
+                      </>
+                    )}
+                    {integrationConfig.github?.repo && (
+                      <Button size="sm" variant="outline" onClick={handleSyncGitHub} disabled={!!actionLoading}>
+                        {actionLoading === "github-sync" ? "Gönderiliyor..." : "GitHub"}
                       </Button>
-                      <Button size="sm" variant="outline" onClick={handleExportCsv} disabled={!!actionLoading}>
-                        {actionLoading === "export" ? "İndiriliyor..." : "CSV"}
+                    )}
+                    {!integrationConfig.jira?.projectKey && !integrationConfig.github?.repo && (
+                      <Button size="sm" variant="outline" onClick={() => setActiveTab("integrations")}>
+                        Entegrasyon Ayarla
                       </Button>
-                    </>
-                  )}
-                  {integrationConfig.github?.repo && (
-                    <Button size="sm" variant="outline" onClick={handleSyncGitHub} disabled={!!actionLoading}>
-                      {actionLoading === "github-sync" ? "Gönderiliyor..." : "GitHub"}
-                    </Button>
-                  )}
-                  {!integrationConfig.jira?.projectKey && !integrationConfig.github?.repo && (
-                    <Button size="sm" variant="outline" onClick={() => setActiveTab("integrations")}>
-                      Entegrasyon Ayarla
-                    </Button>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
               </div>
               {tasks.map((task) => (
                 <Card key={task.id}>
