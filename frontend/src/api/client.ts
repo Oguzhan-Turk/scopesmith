@@ -45,6 +45,23 @@ export const scanProjectGit = (id: number, gitUrl: string, token?: string) =>
     body: JSON.stringify({ gitUrl, token }),
   });
 
+// Prompts
+export const getPrompts = () => request<PromptItem[]>("/prompts");
+export const getPrompt = (name: string) => request<PromptItem>(`/prompts/${name}`);
+export const updatePrompt = (name: string, content: string) =>
+  request<PromptItem>(`/prompts/${name}`, { method: "PUT", body: JSON.stringify({ content }) });
+export const resetPrompt = (name: string) =>
+  request<PromptItem>(`/prompts/${name}/reset`, { method: "POST" });
+
+export interface PromptItem {
+  id: number;
+  name: string;
+  content: string;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // Usage & ROI
 export const getProjectUsage = (projectId: number) =>
   request<UsageSummary>(`/usage/projects/${projectId}/summary`);

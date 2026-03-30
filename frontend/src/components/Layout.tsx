@@ -20,6 +20,12 @@ export default function Layout() {
             >
               Projeler
             </Link>
+            <Link
+              to="/settings"
+              className={location.pathname === "/settings" ? "text-foreground font-medium" : "hover:text-foreground"}
+            >
+              Ayarlar
+            </Link>
           </nav>
         </div>
       </header>
