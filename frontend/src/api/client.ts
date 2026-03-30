@@ -8,6 +8,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   try {
     const res = await fetch(`${API_BASE}${path}`, {
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       ...options,
       signal: controller.signal,
     });
@@ -44,6 +45,21 @@ export const scanProjectGit = (id: number, gitUrl: string, token?: string) =>
     method: "POST",
     body: JSON.stringify({ gitUrl, token }),
   });
+
+// Auth
+export const login = (username: string, password: string) =>
+  request<AuthUser>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ username, password }),
+    credentials: "include",
+  } as RequestInit);
+export const getMe = () => request<AuthUser>("/auth/me", { credentials: "include" } as RequestInit);
+export const logout = () => request<void>("/auth/logout", { method: "POST", credentials: "include" } as RequestInit);
+
+export interface AuthUser {
+  username: string;
+  role: "ADMIN" | "USER";
+}
 
 // Credentials
 export const getCredentials = () => request<Record<string, string>>("/settings/credentials");

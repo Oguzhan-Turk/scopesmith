@@ -1,7 +1,9 @@
 import { Link, Outlet, useLocation } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Layout() {
   const location = useLocation();
+  const { user, logout, isAdmin } = useAuth();
 
   return (
     <div className="min-h-screen bg-background">
@@ -13,19 +15,29 @@ export default function Layout() {
               AI
             </span>
           </Link>
-          <nav className="flex gap-4 text-sm text-muted-foreground">
+          <nav className="flex items-center gap-4 text-sm text-muted-foreground">
             <Link
               to="/"
               className={location.pathname === "/" ? "text-foreground font-medium" : "hover:text-foreground"}
             >
               Projeler
             </Link>
-            <Link
-              to="/settings"
-              className={location.pathname === "/settings" ? "text-foreground font-medium" : "hover:text-foreground"}
-            >
-              Ayarlar
-            </Link>
+            {isAdmin && (
+              <Link
+                to="/settings"
+                className={location.pathname === "/settings" ? "text-foreground font-medium" : "hover:text-foreground"}
+              >
+                Ayarlar
+              </Link>
+            )}
+            {user && (
+              <button
+                onClick={logout}
+                className="hover:text-foreground"
+              >
+                Çıkış ({user.username})
+              </button>
+            )}
           </nav>
         </div>
       </header>

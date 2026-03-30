@@ -3,20 +3,36 @@ import Layout from "@/components/Layout";
 import Dashboard from "@/pages/Dashboard";
 import ProjectDetail from "@/pages/ProjectDetail";
 import Settings from "@/pages/Settings";
+import Login from "@/pages/Login";
 import { ToastProvider } from "@/hooks/useToast";
+import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { Spinner } from "@/components/ui/spinner";
+
+function AppRoutes() {
+  const { user, loading } = useAuth();
+
+  if (loading) return <Spinner label="Yükleniyor..." />;
+  if (!user) return <Login />;
+
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route element={<Layout />}>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/projects/:id" element={<ProjectDetail />} />
+          <Route path="/settings" element={<Settings />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
+}
 
 export default function App() {
   return (
-    <ToastProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route element={<Layout />}>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/projects/:id" element={<ProjectDetail />} />
-            <Route path="/settings" element={<Settings />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </ToastProvider>
+    <AuthProvider>
+      <ToastProvider>
+        <AppRoutes />
+      </ToastProvider>
+    </AuthProvider>
   );
 }
