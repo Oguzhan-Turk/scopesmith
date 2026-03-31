@@ -69,10 +69,19 @@ public class ProjectAccessService {
      * Admin: null (means all). Others: membership-based list.
      */
     public List<Long> getAccessibleProjectIds() {
-        return getCurrentUser().map(user -> {
-            if (user.getRole() == Role.ADMIN) return (List<Long>) null;
-            return membershipRepository.findProjectIdsByUserId(user.getId());
-        }).orElse(List.of());
+        Optional<AppUser> userOpt = getCurrentUser();
+        if (userOpt.isEmpty()) {
+            // No auth context — check if request has admin role via SecurityContext
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"))) {
+                return null; // Admin bypass
+            }
+            return List.of(); // No user, no access
+        }
+        AppUser user = userOpt.get();
+        if (user.getRole() == Role.ADMIN) return null;
+        return membershipRepository.findProjectIdsByUserId(user.getId());
     }
 
     /**
