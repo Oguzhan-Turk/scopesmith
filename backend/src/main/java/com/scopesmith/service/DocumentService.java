@@ -180,7 +180,7 @@ public class DocumentService {
     private DocumentType parseDocType(String docType) {
         if (docType == null) return DocumentType.OTHER;
         try {
-            return DocumentType.valueOf(docType.toUpperCase());
+            return DocumentType.valueOf(docType.toUpperCase(java.util.Locale.ENGLISH));
         } catch (Exception e) {
             return DocumentType.OTHER;
         }

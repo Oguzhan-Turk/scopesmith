@@ -1498,16 +1498,48 @@ export default function ProjectDetail() {
         <TabsContent value="context" className="space-y-4">
           {/* Context uyarıları */}
           {!project.hasContext && (
-            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm">
-              <span className="font-medium text-amber-700 dark:text-amber-400">Proje context'i henüz oluşturulmadı.</span>
-              <span className="text-muted-foreground ml-1">Aşağıdan kod taraması yaparak AI analizlerinin kalitesini artırabilirsiniz.</span>
-            </div>
+            <Card className="border-dashed border-amber-500/30 bg-amber-500/5">
+              <CardContent className="py-4 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4 text-amber-600"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Context oluşturulmamış</p>
+                  <p className="text-xs text-muted-foreground">Kod taraması yaparak AI analizlerinin kalitesini artırabilirsiniz.</p>
+                </div>
+              </CardContent>
+            </Card>
           )}
           {project.contextStale && (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm">
-              <span className="font-medium text-destructive">Context güncel değil.</span>
-              <span className="text-muted-foreground ml-1">{project.stalenessWarning || "Yeniden tarama yapmanız önerilir."}</span>
-            </div>
+            <Card className="border-amber-500/30 bg-amber-500/5">
+              <CardContent className="py-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4 text-amber-600"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Context güncelliğini yitirdi</p>
+                    <div className="flex items-center gap-3 mt-0.5">
+                      {project.daysSinceLastScan != null && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3 h-3"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                          {project.lastScannedAt ? timeAgo(project.lastScannedAt) : `${project.daysSinceLastScan} gün önce`}
+                        </span>
+                      )}
+                      {project.commitsBehind != null && project.commitsBehind > 0 && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3 h-3"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
+                          {project.commitsBehind} commit geride
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => { if (project.localPath) setScanPath(project.localPath); handleScan(); }}>
+                  Yeniden Tara
+                </Button>
+              </CardContent>
+            </Card>
           )}
 
           {/* Proje Dokümanları */}
@@ -1639,53 +1671,88 @@ export default function ProjectDetail() {
                 }
                 return String(val);
               };
+              // Quick stats from structured data
+              const modules = sc.modules as unknown[] | undefined;
+              const entities = sc.entities as unknown[] | undefined;
+              const endpoints = sc.apiEndpoints as unknown[] | undefined;
+              const techStack = sc.techStack as Record<string, unknown> | undefined;
+
+              const stats = [
+                { label: "Modüller", value: modules?.length || 0, icon: "📦" },
+                { label: "Entity'ler", value: entities?.length || 0, icon: "🗃️" },
+                { label: "Endpoint'ler", value: endpoints?.length || 0, icon: "🔗" },
+                { label: "Framework", value: techStack?.frameworks ? (techStack.frameworks as string[]).length : 0, icon: "⚙️" },
+              ].filter((s) => s.value > 0);
+
               return (
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-base">Yapısal Analiz</CardTitle>
+                    <CardTitle className="text-base">Proje Yapısı</CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {priorityKeys.filter((k) => sc[k]).map((key) => (
-                        <div key={key} className="border-l-2 border-muted-foreground/15 pl-3 space-y-1">
-                          <h5 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                            {fieldLabels[key] || key}
-                          </h5>
-                          <p className="text-sm leading-relaxed">{renderValue(sc[key])}</p>
-                        </div>
-                      ))}
-                    </div>
-                    {otherKeys.length > 0 && (
-                      <details className="mt-4">
-                        <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
-                          Tüm detaylar ({otherKeys.length} alan daha)
-                        </summary>
-                        <div className="mt-3 space-y-3">
-                          {otherKeys.filter((k) => sc[k]).map((key) => (
-                            <div key={key}>
-                              <h5 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                                {fieldLabels[key] || key}
-                              </h5>
-                              <p className="text-sm leading-relaxed">{renderValue(sc[key])}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </details>
+                  <CardContent className="space-y-4">
+                    {/* Quick stats */}
+                    {stats.length > 0 && (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {stats.map((s) => (
+                          <div key={s.label} className="text-center py-2 rounded-lg bg-muted/30">
+                            <p className="text-lg font-bold">{s.value}</p>
+                            <p className="text-xs text-muted-foreground">{s.label}</p>
+                          </div>
+                        ))}
+                      </div>
                     )}
+
+                    {/* Tech Stack — compact pills */}
+                    {techStack && (
+                      <div>
+                        <h5 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Teknoloji Stack</h5>
+                        <div className="flex flex-wrap gap-1.5">
+                          {Object.entries(techStack).flatMap(([_k, v]) =>
+                            Array.isArray(v) ? (v as string[]).map((item) => (
+                              <span key={item} className="px-2 py-0.5 text-xs rounded-full bg-primary/5 border border-primary/10">
+                                {item}
+                              </span>
+                            )) : []
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Detailed breakdown — collapsible */}
+                    <details>
+                      <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground font-medium">
+                        Detaylı yapı bilgisi
+                      </summary>
+                      <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {[...priorityKeys, ...otherKeys].filter((k) => sc[k] && k !== "techStack").map((key) => (
+                          <div key={key} className="border-l-2 border-muted-foreground/15 pl-3 space-y-1">
+                            <h5 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                              {fieldLabels[key] || key}
+                            </h5>
+                            <p className="text-sm leading-relaxed">{renderValue(sc[key])}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
                   </CardContent>
                 </Card>
               );
             } catch { return null; }
           })()}
           {project.techContext && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Context Özeti</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-sm leading-relaxed whitespace-pre-wrap">{project.techContext}</div>
-              </CardContent>
-            </Card>
+            <details className="group">
+              <summary className="flex items-center justify-between cursor-pointer border rounded-xl px-4 py-3 hover:bg-muted/30 transition-colors">
+                <div className="flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4 text-muted-foreground"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  <span className="text-sm font-medium">AI Analiz Raporu</span>
+                </div>
+                <span className="text-xs text-muted-foreground group-open:hidden">Göster</span>
+                <span className="text-xs text-muted-foreground hidden group-open:inline">Gizle</span>
+              </summary>
+              <div className="mt-2 border rounded-xl px-4 py-4">
+                <div className="text-sm leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto">{project.techContext}</div>
+              </div>
+            </details>
           )}
           {!project.structuredContext && !project.techContext && (
             <Card className="border-dashed">

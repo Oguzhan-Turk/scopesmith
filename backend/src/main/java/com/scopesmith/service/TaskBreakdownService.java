@@ -253,7 +253,7 @@ public class TaskBreakdownService {
     }
 
     private String normalizeTitle(String title) {
-        return title == null ? "" : title.toLowerCase().trim();
+        return title == null ? "" : title.toLowerCase(java.util.Locale.ENGLISH).trim();
     }
 
     private Map<String, Task> saveTasks(Analysis analysis, TaskBreakdownResult result) {
@@ -423,7 +423,7 @@ public class TaskBreakdownService {
 
     private TaskPriority parsePriority(String priority) {
         try {
-            return TaskPriority.valueOf(priority.toUpperCase());
+            return TaskPriority.valueOf(priority.toUpperCase(java.util.Locale.ENGLISH));
         } catch (Exception e) {
             return TaskPriority.MEDIUM;
         }

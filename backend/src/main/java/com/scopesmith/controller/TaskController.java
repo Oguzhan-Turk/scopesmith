@@ -36,11 +36,11 @@ public class TaskController {
         if (request.getDescription() != null) task.setDescription(request.getDescription());
         if (request.getAcceptanceCriteria() != null) task.setAcceptanceCriteria(request.getAcceptanceCriteria());
         if (request.getPriority() != null) {
-            try { task.setPriority(com.scopesmith.entity.TaskPriority.valueOf(request.getPriority().toUpperCase())); }
+            try { task.setPriority(com.scopesmith.entity.TaskPriority.valueOf(request.getPriority().toUpperCase(java.util.Locale.ENGLISH))); }
             catch (Exception ignored) {}
         }
         if (request.getCategory() != null) {
-            task.setCategory(request.getCategory().isBlank() ? null : request.getCategory().toUpperCase());
+            task.setCategory(request.getCategory().isBlank() ? null : request.getCategory().toUpperCase(java.util.Locale.ENGLISH));
         }
         if (request.getSpRationale() != null) task.setSpRationale(request.getSpRationale());
 
@@ -74,7 +74,7 @@ public class TaskController {
         if (category == null || category.isBlank()) {
             throw new IllegalArgumentException("category cannot be empty");
         }
-        task.setCategory(category.toUpperCase());
+        task.setCategory(category.toUpperCase(java.util.Locale.ENGLISH));
         return TaskResponse.from(taskRepository.save(task));
     }
 

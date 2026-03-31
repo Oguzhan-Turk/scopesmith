@@ -255,7 +255,7 @@ public class ProjectContextService {
                     // Read entity/model/domain files
                     String extension = getExtension(fileName);
                     if (CODE_EXTENSIONS.contains(extension)) {
-                        String pathStr = file.toString().toLowerCase();
+                        String pathStr = file.toString().toLowerCase(java.util.Locale.ENGLISH);
                         if (pathStr.contains("entity") || pathStr.contains("model") ||
                                 pathStr.contains("domain") || pathStr.contains("controller") ||
                                 pathStr.contains("service") && !pathStr.contains("test")) {

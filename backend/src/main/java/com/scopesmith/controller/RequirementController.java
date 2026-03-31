@@ -67,7 +67,7 @@ public class RequirementController {
     @PostMapping("/requirements/{id}/analyze")
     public AnalysisResponse analyze(@PathVariable Long id,
                                      @RequestParam(required = false) String modelTier) {
-        ModelTier tier = modelTier != null ? ModelTier.valueOf(modelTier.toUpperCase()) : null;
+        ModelTier tier = modelTier != null ? ModelTier.valueOf(modelTier.toUpperCase(java.util.Locale.ENGLISH)) : null;
         return AnalysisResponse.from(analysisService.analyze(id, tier));
     }
 

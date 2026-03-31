@@ -47,7 +47,7 @@ public class ModelProperties {
         if (models == null || modelName == null) return ModelTier.STANDARD;
         for (Map.Entry<String, String> entry : models.entrySet()) {
             if (modelName.contains(entry.getValue()) || entry.getValue().contains(modelName)) {
-                try { return ModelTier.valueOf(entry.getKey().toUpperCase()); }
+                try { return ModelTier.valueOf(entry.getKey().toUpperCase(java.util.Locale.ENGLISH)); }
                 catch (Exception ignored) {}
             }
         }

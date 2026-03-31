@@ -73,7 +73,7 @@ public class AnalysisController {
         try {
             String p = request.get("priority");
             priority = (p != null && !p.isBlank())
-                    ? com.scopesmith.entity.TaskPriority.valueOf(p.toUpperCase())
+                    ? com.scopesmith.entity.TaskPriority.valueOf(p.toUpperCase(java.util.Locale.ENGLISH))
                     : com.scopesmith.entity.TaskPriority.MEDIUM;
         } catch (IllegalArgumentException e) {
             priority = com.scopesmith.entity.TaskPriority.MEDIUM;

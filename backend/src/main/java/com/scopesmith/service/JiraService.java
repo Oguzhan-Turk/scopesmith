@@ -159,7 +159,7 @@ public class JiraService {
         // Labels: always include scopesmith + category label
         List<String> labels = new ArrayList<>(List.of("scopesmith"));
         if (task.getCategory() != null && !task.getCategory().isBlank()) {
-            labels.add("category:" + task.getCategory().toLowerCase());
+            labels.add("category:" + task.getCategory().toLowerCase(java.util.Locale.ENGLISH));
         }
         fields.put("labels", labels);
 
@@ -255,11 +255,11 @@ public class JiraService {
     private String resolveComponentName(String category, IntegrationConfigDTO.JiraSettings settings) {
         if (settings != null && settings.getCategoryMapping() != null) {
             // Explicit mapping configured
-            String mapped = settings.getCategoryMapping().get(category.toUpperCase());
+            String mapped = settings.getCategoryMapping().get(category.toUpperCase(java.util.Locale.ENGLISH));
             if (mapped != null) return mapped;
         }
         // Default: use category name with first letter uppercase (e.g., "Backend")
-        return category.substring(0, 1).toUpperCase() + category.substring(1).toLowerCase();
+        return category.substring(0, 1).toUpperCase(java.util.Locale.ENGLISH) + category.substring(1).toLowerCase(java.util.Locale.ENGLISH);
     }
 
     private IntegrationConfigDTO parseIntegrationConfig(String json) {

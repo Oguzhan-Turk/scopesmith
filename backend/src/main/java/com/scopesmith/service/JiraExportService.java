@@ -82,7 +82,7 @@ public class JiraExportService {
     }
 
     private String mapPriority(String priority) {
-        return switch (priority.toUpperCase()) {
+        return switch (priority.toUpperCase(java.util.Locale.ENGLISH)) {
             case "LOW" -> "Low";
             case "MEDIUM" -> "Medium";
             case "HIGH" -> "High";

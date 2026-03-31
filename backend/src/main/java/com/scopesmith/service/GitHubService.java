@@ -158,7 +158,7 @@ public class GitHubService {
             labels.add(priorityLabel);
         }
         if (task.getCategory() != null && !task.getCategory().isBlank()) {
-            labels.add("category: " + task.getCategory().toLowerCase());
+            labels.add("category: " + task.getCategory().toLowerCase(java.util.Locale.ENGLISH));
         }
 
         Map<String, Object> body = new LinkedHashMap<>();

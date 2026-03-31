@@ -33,6 +33,8 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .cors(cors -> {}) // Uses CorsConfig bean
+                // CSRF disabled: SPA + session auth pattern. CORS origin restriction provides protection.
+                // TODO: [TECH-DEBT] For production, evaluate CookieCsrfTokenRepository for defense-in-depth.
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         // Login endpoint is public

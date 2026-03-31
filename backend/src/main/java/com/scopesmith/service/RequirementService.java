@@ -74,7 +74,7 @@ public class RequirementService {
     private RequirementType parseType(String type) {
         if (type == null || type.isBlank()) return RequirementType.FEATURE;
         try {
-            return RequirementType.valueOf(type.toUpperCase());
+            return RequirementType.valueOf(type.toUpperCase(java.util.Locale.ENGLISH));
         } catch (IllegalArgumentException e) {
             return RequirementType.FEATURE;
         }

@@ -24,6 +24,9 @@ public class EncryptionService {
 
     public EncryptionService(
             @Value("${scopesmith.encryption-key:scopesmith-default-key-change-in-production}") String secret) {
+        if ("scopesmith-default-key-change-in-production".equals(secret)) {
+            log.warn("⚠️  DEFAULT ENCRYPTION KEY IN USE. Set 'scopesmith.encryption-key' for production.");
+        }
         try {
             byte[] keyBytes = MessageDigest.getInstance("SHA-256")
                     .digest(secret.getBytes(StandardCharsets.UTF_8));
