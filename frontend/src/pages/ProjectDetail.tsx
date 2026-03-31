@@ -303,6 +303,13 @@ export default function ProjectDetail() {
   }
 
   function handleAnalyzeWithConfirm(reqId: number, tier?: string) {
+    // Context quality gate — uyar ama engelleme
+    if (!project?.hasContext) {
+      showToast("Proje context'i oluşturulmamış. Context sekmesinden tarama yaparak daha isabetli analiz alabilirsiniz.", "info");
+    } else if (project?.contextStale) {
+      showToast("Proje context'i güncel değil. Sonuçlar yanıltıcı olabilir.", "info");
+    }
+
     const req = requirements.find((r) => r.id === reqId);
     const isReanalyze = req && req.status !== "NEW";
     if (isReanalyze) {
@@ -1668,26 +1675,33 @@ export default function ProjectDetail() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">Feature Önerisi</CardTitle>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={async () => {
-                    setActionLoading("suggest-features");
-                    try {
-                      const result = await suggestFeatures(projectId);
-                      setFeatureSuggestions(result);
-                      showToast(`${result.suggestions.length} öneri üretildi.`, "success");
-                    } catch { showToast("Öneriler üretilemedi."); }
-                    finally { setActionLoading(null); }
-                  }}
-                  disabled={!!actionLoading}
-                >
-                  {actionLoading === "suggest-features" ? "Üretiliyor..." : "AI'a Sor"}
-                </Button>
+                <div className="flex items-center gap-2">
+                  {project.contextStale && (
+                    <span className="text-xs text-amber-600">Context güncel değil</span>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      setActionLoading("suggest-features");
+                      try {
+                        const result = await suggestFeatures(projectId);
+                        setFeatureSuggestions(result);
+                        showToast(`${result.suggestions.length} öneri üretildi.`, "success");
+                      } catch { showToast("Öneriler üretilemedi."); }
+                      finally { setActionLoading(null); }
+                    }}
+                    disabled={!!actionLoading || !project.hasContext}
+                  >
+                    {actionLoading === "suggest-features" ? "Üretiliyor..." : "AI'a Sor"}
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
-              {!featureSuggestions ? (
+              {!project.hasContext ? (
+                <p className="text-sm text-muted-foreground">Feature önerisi için önce proje context'i oluşturulmalı. Yukarıdan kod taraması yapın.</p>
+              ) : !featureSuggestions ? (
                 <p className="text-sm text-muted-foreground">Proje context'ine göre AI'ın önerdiği özellikler burada görünecek.</p>
               ) : (
                 <div className="space-y-3">
