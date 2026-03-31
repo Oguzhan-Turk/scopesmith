@@ -89,12 +89,19 @@ public class InsightService {
         }
 
         long daysSince = ChronoUnit.DAYS.between(project.getLastScannedAt(), LocalDateTime.now());
+        long hoursSince = ChronoUnit.HOURS.between(project.getLastScannedAt(), LocalDateTime.now());
+        long minutesSince = ChronoUnit.MINUTES.between(project.getLastScannedAt(), LocalDateTime.now());
         Integer commitsBehind = getGitCommitDiff(project);
         boolean isStale = daysSince > STALENESS_THRESHOLD_DAYS || (commitsBehind != null && commitsBehind > 10);
 
         String warning = null;
         if (isStale) {
-            warning = String.format("Context %d gün önce tarandı", daysSince);
+            String timeAgo;
+            if (minutesSince < 60) timeAgo = minutesSince + " dakika önce";
+            else if (hoursSince < 24) timeAgo = hoursSince + " saat önce";
+            else timeAgo = daysSince + " gün önce";
+
+            warning = "Context " + timeAgo + " tarandı";
             if (commitsBehind != null && commitsBehind > 0) {
                 warning += String.format(", %d commit geride", commitsBehind);
             }
@@ -124,7 +131,9 @@ public class InsightService {
 
         StringBuilder sb = new StringBuilder();
         sb.append("### Context Staleness Warning\n");
-        sb.append(String.format("Proje context'i %d gün önce tarandı.", daysSince));
+        long hoursSince2 = ChronoUnit.HOURS.between(project.getLastScannedAt(), LocalDateTime.now());
+        String timeLabel = daysSince > 0 ? daysSince + " gün" : hoursSince2 + " saat";
+        sb.append(String.format("Proje context'i %s önce tarandı.", timeLabel));
         if (commitsBehind != null && commitsBehind > 0) {
             sb.append(String.format(" Son taramadan bu yana %d commit yapılmış.", commitsBehind));
         }
