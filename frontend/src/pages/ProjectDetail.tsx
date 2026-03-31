@@ -866,11 +866,9 @@ export default function ProjectDetail() {
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg">{isBug ? "Bug Analizi" : "Teknik Analiz"}</CardTitle>
                     <div className="flex gap-2">
-                      <Tooltip content={selectedAnalysis.riskReason || "Risk bilgisi yok"}>
-                        <Badge variant={riskColor(selectedAnalysis.riskLevel)} className="cursor-help">
-                          {selectedAnalysis.riskLevel === "HIGH" ? "Yüksek Karmaşıklık" : selectedAnalysis.riskLevel === "MEDIUM" ? "Orta Karmaşıklık" : "Düşük Karmaşıklık"}
-                        </Badge>
-                      </Tooltip>
+                      <Badge variant={riskColor(selectedAnalysis.riskLevel)}>
+                        {selectedAnalysis.riskLevel === "HIGH" ? "Yüksek Karmaşıklık" : selectedAnalysis.riskLevel === "MEDIUM" ? "Orta Karmaşıklık" : "Düşük Karmaşıklık"}
+                      </Badge>
                       {selectedAnalysis.durationMs && (
                         <Tooltip content="AI analiz süresi">
                           <Badge variant="outline" className="cursor-help">
@@ -1728,19 +1726,31 @@ export default function ProjectDetail() {
 
         {/* INTEGRATIONS TAB */}
         <TabsContent value="integrations" className="space-y-4">
+          <p className="text-sm text-muted-foreground">Task'ları göndereceğiniz platformu seçin. Bir projede tek platform aktif olabilir.</p>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Jira Card */}
-            <Card>
+            <Card
+              className={`cursor-pointer transition-all ${
+                integrationConfig.jira?.projectKey && !integrationConfig.github?.repo
+                  ? "ring-2 ring-blue-500"
+                  : !integrationConfig.jira?.projectKey && integrationConfig.github?.repo
+                  ? "opacity-50"
+                  : ""
+              }`}
+            >
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-600 text-sm font-bold">J</div>
+                    <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                      <svg className="w-4 h-4 text-blue-600" viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24.013 12.487V1.005A1.005 1.005 0 0 0 23.013 0z"/></svg>
+                    </div>
                     <CardTitle className="text-base">Jira</CardTitle>
                   </div>
                   {integrationConfig.jira?.projectKey ? (
-                    <Badge variant="default" className="text-xs">Bağlı</Badge>
+                    <Badge variant="default" className="text-xs">Aktif</Badge>
                   ) : (
-                    <Badge variant="secondary" className="text-xs">Yapılandırılmamış</Badge>
+                    <Badge variant="secondary" className="text-xs">Pasif</Badge>
                   )}
                 </div>
               </CardHeader>
@@ -1750,7 +1760,7 @@ export default function ProjectDetail() {
                     <label htmlFor="jira-project-key" className="text-xs text-muted-foreground mb-1 block">Proje Key</label>
                     <input id="jira-project-key" type="text" placeholder="SS"
                       value={integrationConfig.jira?.projectKey || ""}
-                      onChange={(e) => setIntegrationConfig({ ...integrationConfig, jira: { ...integrationConfig.jira, projectKey: e.target.value.toUpperCase() } })}
+                      onChange={(e) => setIntegrationConfig({ ...integrationConfig, jira: { ...integrationConfig.jira, projectKey: e.target.value.toUpperCase() }, github: undefined })}
                       className="w-full px-3 py-1.5 border rounded-md bg-background text-sm" />
                   </div>
                   <div>
@@ -1776,17 +1786,27 @@ export default function ProjectDetail() {
             </Card>
 
             {/* GitHub Card */}
-            <Card>
+            <Card
+              className={`cursor-pointer transition-all ${
+                integrationConfig.github?.repo && !integrationConfig.jira?.projectKey
+                  ? "ring-2 ring-foreground/30"
+                  : !integrationConfig.github?.repo && integrationConfig.jira?.projectKey
+                  ? "opacity-50"
+                  : ""
+              }`}
+            >
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-foreground/5 flex items-center justify-center text-sm font-bold">G</div>
+                    <div className="w-8 h-8 rounded-lg bg-foreground/5 flex items-center justify-center">
+                      <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+                    </div>
                     <CardTitle className="text-base">GitHub Issues</CardTitle>
                   </div>
                   {integrationConfig.github?.repo ? (
-                    <Badge variant="default" className="text-xs">Bağlı</Badge>
+                    <Badge variant="default" className="text-xs">Aktif</Badge>
                   ) : (
-                    <Badge variant="secondary" className="text-xs">Yapılandırılmamış</Badge>
+                    <Badge variant="secondary" className="text-xs">Pasif</Badge>
                   )}
                 </div>
               </CardHeader>
@@ -1794,7 +1814,7 @@ export default function ProjectDetail() {
                 <label htmlFor="github-repo" className="text-xs text-muted-foreground mb-1 block">Repository</label>
                 <input id="github-repo" type="text" placeholder="owner/repo"
                   value={integrationConfig.github?.repo || ""}
-                  onChange={(e) => setIntegrationConfig({ ...integrationConfig, github: { repo: e.target.value } })}
+                  onChange={(e) => setIntegrationConfig({ ...integrationConfig, github: { repo: e.target.value }, jira: undefined })}
                   className="w-full px-3 py-1.5 border rounded-md bg-background text-sm" />
               </CardContent>
             </Card>
