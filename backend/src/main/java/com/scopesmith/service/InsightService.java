@@ -98,7 +98,7 @@ public class InsightService {
         if (isStale) {
             String timeAgo;
             if (minutesSince < 60) timeAgo = minutesSince + " dakika önce";
-            else if (hoursSince < 24) timeAgo = hoursSince + " saat önce";
+            else if (hoursSince < 48) timeAgo = hoursSince + " saat önce";
             else timeAgo = daysSince + " gün önce";
 
             warning = "Context " + timeAgo + " tarandı";
@@ -132,7 +132,7 @@ public class InsightService {
         StringBuilder sb = new StringBuilder();
         sb.append("### Context Staleness Warning\n");
         long hoursSince2 = ChronoUnit.HOURS.between(project.getLastScannedAt(), LocalDateTime.now());
-        String timeLabel = daysSince > 0 ? daysSince + " gün" : hoursSince2 + " saat";
+        String timeLabel = hoursSince2 < 48 ? hoursSince2 + " saat" : daysSince + " gün";
         sb.append(String.format("Proje context'i %s önce tarandı.", timeLabel));
         if (commitsBehind != null && commitsBehind > 0) {
             sb.append(String.format(" Son taramadan bu yana %d commit yapılmış.", commitsBehind));
