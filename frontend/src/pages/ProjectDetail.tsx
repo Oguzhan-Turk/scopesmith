@@ -35,7 +35,12 @@ import {
   getRequirementDocuments,
   addRequirementDocument,
   uploadRequirementDocument,
+  suggestSp,
+  refineAnalysis,
+  suggestFeatures,
+  getClaudeCodePrompt,
   type UsageSummary,
+  type FeatureSuggestionResult,
   type Project,
   type IntegrationConfig,
   type Requirement,
@@ -129,6 +134,8 @@ export default function ProjectDetail() {
   const [docMode, setDocMode] = useState<"file" | "paste">("file");
   const [docDialog, setDocDialog] = useState<{ type: "project" } | { type: "requirement"; reqId: number } | null>(null);
   const [reqDocs, setReqDocs] = useState<Record<number, Document[]>>({});
+  const [analysisRefineInput, setAnalysisRefineInput] = useState("");
+  const [featureSuggestions, setFeatureSuggestions] = useState<FeatureSuggestionResult | null>(null);
 
   function toggleTask(id: number) {
     setExpandedTasks((prev) => {
@@ -992,6 +999,33 @@ export default function ProjectDetail() {
                     <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Etkilenen Modüller</h4>
                     <p className="text-sm leading-relaxed">{selectedAnalysis.affectedModules}</p>
                   </div>
+                  <Separator />
+                  <div className="flex gap-2 py-2">
+                    <input
+                      type="text"
+                      placeholder="Analizi nasıl iyileştireyim? (örn: frontend etkisini detaylı analiz et)"
+                      value={analysisRefineInput}
+                      onChange={(e) => setAnalysisRefineInput(e.target.value)}
+                      className="flex-1 px-3 py-1.5 text-sm border rounded-md bg-background"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={async () => {
+                        if (!analysisRefineInput.trim()) return;
+                        setActionLoading("refine-analysis");
+                        try {
+                          const refined = await refineAnalysis(selectedAnalysis!.id, analysisRefineInput);
+                          setSelectedAnalysis(refined);
+                          setAnalysisRefineInput("");
+                          showToast("Analiz güncellendi.", "success");
+                        } catch { showToast("Analiz güncellenemedi."); }
+                        finally { setActionLoading(null); }
+                      }}
+                      disabled={!!actionLoading || !analysisRefineInput.trim()}
+                    >
+                      {actionLoading === "refine-analysis" ? "Güncelleniyor..." : "Analizi Güncelle"}
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
 
@@ -1276,7 +1310,7 @@ export default function ProjectDetail() {
                             <Separator />
                             <div>
                               <h5 className="text-xs font-medium mb-2">SP Kararı</h5>
-                              <div className="flex gap-1.5">
+                              <div className="flex items-center gap-1.5">
                                 {[1, 2, 3, 5, 8, 13].map((sp) => (
                                   <button
                                     key={sp}
@@ -1290,7 +1324,40 @@ export default function ProjectDetail() {
                                     {sp}
                                   </button>
                                 ))}
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="text-xs ml-2"
+                                  disabled={!!actionLoading}
+                                  onClick={async () => {
+                                    setActionLoading(`sp-${task.id}`);
+                                    try {
+                                      const result = await suggestSp(task.id);
+                                      handleSpDecision(task.id, result.spSuggestion);
+                                      showToast(`AI önerisi: ${result.spSuggestion} SP — ${result.spRationale}`, "success");
+                                    } catch { showToast("SP önerisi alınamadı."); }
+                                    finally { setActionLoading(null); }
+                                  }}
+                                >
+                                  {actionLoading === `sp-${task.id}` ? "..." : "AI Öner"}
+                                </Button>
                               </div>
+                            </div>
+                            <div className="flex gap-2 pt-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-xs"
+                                onClick={async () => {
+                                  try {
+                                    const result = await getClaudeCodePrompt(task.id);
+                                    await navigator.clipboard.writeText(result.prompt);
+                                    showToast("Claude Code prompt'u kopyalandı!", "success");
+                                  } catch { showToast("Prompt kopyalanamadı."); }
+                                }}
+                              >
+                                Claude Code Prompt'u Kopyala
+                              </Button>
                             </div>
                           </CardContent>
                         )}
@@ -1595,6 +1662,49 @@ export default function ProjectDetail() {
               </CardContent>
             </Card>
           )}
+
+          {/* Feature Önerisi */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">Feature Önerisi</CardTitle>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    setActionLoading("suggest-features");
+                    try {
+                      const result = await suggestFeatures(projectId);
+                      setFeatureSuggestions(result);
+                      showToast(`${result.suggestions.length} öneri üretildi.`, "success");
+                    } catch { showToast("Öneriler üretilemedi."); }
+                    finally { setActionLoading(null); }
+                  }}
+                  disabled={!!actionLoading}
+                >
+                  {actionLoading === "suggest-features" ? "Üretiliyor..." : "AI'a Sor"}
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {!featureSuggestions ? (
+                <p className="text-sm text-muted-foreground">Proje context'ine göre AI'ın önerdiği özellikler burada görünecek.</p>
+              ) : (
+                <div className="space-y-3">
+                  {featureSuggestions.suggestions.map((s, i) => (
+                    <div key={i} className="border-l-2 border-primary/20 pl-3 py-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">{s.title}</span>
+                        <Badge variant="outline" className="text-xs">{s.category}</Badge>
+                        <Badge variant="secondary" className="text-xs">{s.complexity}</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">{s.description}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* INTEGRATIONS TAB */}
