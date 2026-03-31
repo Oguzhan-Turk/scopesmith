@@ -8,8 +8,10 @@ import com.scopesmith.entity.Analysis;
 import com.scopesmith.entity.Project;
 import com.scopesmith.repository.AnalysisRepository;
 import com.scopesmith.dto.FeatureSuggestionResult;
+import com.scopesmith.entity.ProjectRole;
 import com.scopesmith.service.FeatureSuggestionService;
 import com.scopesmith.service.GitCloneService;
+import com.scopesmith.service.ProjectAccessService;
 import com.scopesmith.service.InsightService;
 import com.scopesmith.service.ProjectContextService;
 import com.scopesmith.service.ProjectService;
@@ -20,6 +22,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/projects")
@@ -31,6 +34,7 @@ public class ProjectController {
     private final GitCloneService gitCloneService;
     private final InsightService insightService;
     private final FeatureSuggestionService featureSuggestionService;
+    private final ProjectAccessService projectAccessService;
     private final AnalysisRepository analysisRepository;
     private final ObjectMapper objectMapper;
 
@@ -178,5 +182,32 @@ public class ProjectController {
     @PostMapping("/{id}/suggest-features")
     public FeatureSuggestionResult suggestFeatures(@PathVariable Long id) {
         return featureSuggestionService.suggestFeatures(id);
+    }
+
+    @PostMapping("/{id}/members")
+    @ResponseStatus(HttpStatus.CREATED)
+    public Map<String, String> addMember(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> request) {
+        String username = request.get("username");
+        String role = request.get("role");
+        if (username == null || username.isBlank()) {
+            throw new IllegalArgumentException("username is required");
+        }
+
+        ProjectRole projectRole;
+        try {
+            projectRole = role != null ? ProjectRole.valueOf(role.toUpperCase(java.util.Locale.ENGLISH)) : ProjectRole.EDITOR;
+        } catch (Exception e) {
+            projectRole = ProjectRole.EDITOR;
+        }
+
+        projectAccessService.addMemberByUsername(username, id, projectRole);
+        return Map.of("status", "added", "username", username, "role", projectRole.name());
+    }
+
+    @GetMapping("/{id}/members")
+    public List<Map<String, String>> getMembers(@PathVariable Long id) {
+        return projectAccessService.getProjectMembers(id);
     }
 }

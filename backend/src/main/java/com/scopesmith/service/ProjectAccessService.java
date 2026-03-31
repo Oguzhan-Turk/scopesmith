@@ -76,6 +76,26 @@ public class ProjectAccessService {
     }
 
     /**
+     * Add member by username — for admin/owner use.
+     */
+    public void addMemberByUsername(String username, Long projectId, ProjectRole role) {
+        AppUser user = appUserRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı: " + username));
+        addMembership(user.getId(), projectId, role);
+    }
+
+    /**
+     * List project members.
+     */
+    public List<java.util.Map<String, String>> getProjectMembers(Long projectId) {
+        return membershipRepository.findByProjectId(projectId).stream()
+                .map(m -> java.util.Map.of(
+                        "username", m.getUser().getUsername(),
+                        "role", m.getRole().name()))
+                .toList();
+    }
+
+    /**
      * Add membership — used when creating projects or inviting users.
      */
     public void addMembership(Long userId, Long projectId, ProjectRole role) {
