@@ -3,8 +3,6 @@ import { Link } from "react-router-dom";
 import { getProjects, createProject, type Project } from "@/api/client";
 import { timeAgo } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -60,9 +58,9 @@ export default function Dashboard() {
     <div>
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Projeler</h1>
-          <p className="text-muted-foreground mt-1">
-            Ham talebi yapılandırılmış analize dönüştürün
+          <h1 className="text-2xl font-bold tracking-tight">Projeler</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Taleplerinizi analiz edin, task'lara dönüştürün
           </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -71,24 +69,32 @@ export default function Dashboard() {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Yeni Proje Oluştur</DialogTitle>
+              <DialogTitle>Yeni Proje</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 pt-4">
-              <input
-                type="text"
-                placeholder="Proje adı"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md bg-background"
-                autoFocus
-              />
-              <textarea
-                placeholder="Açıklama (opsiyonel)"
-                value={newDesc}
-                onChange={(e) => setNewDesc(e.target.value)}
-                rows={3}
-                className="w-full px-3 py-2 border rounded-md bg-background resize-none"
-              />
+            <div className="space-y-4 pt-2">
+              <div>
+                <label htmlFor="proj-name" className="text-sm font-medium mb-1 block">Proje Adı</label>
+                <input
+                  id="proj-name"
+                  type="text"
+                  placeholder="Proje adı"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label htmlFor="proj-desc" className="text-sm font-medium mb-1 block">Açıklama</label>
+                <textarea
+                  id="proj-desc"
+                  placeholder="Opsiyonel"
+                  value={newDesc}
+                  onChange={(e) => setNewDesc(e.target.value)}
+                  rows={2}
+                  className="w-full px-3 py-2 border rounded-md bg-background resize-none text-sm"
+                />
+              </div>
               <Button onClick={handleCreate} disabled={creating || !newName.trim()} className="w-full">
                 {creating ? "Oluşturuluyor..." : "Oluştur"}
               </Button>
@@ -98,58 +104,48 @@ export default function Dashboard() {
       </div>
 
       {projects.length === 0 ? (
-        <Card className="text-center py-16 border-dashed">
-          <CardContent className="flex flex-col items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl" style={{ background: "var(--gradient-brand)" }}>
-              🎯
-            </div>
-            <div>
-              <p className="font-semibold text-foreground mb-1">Henüz proje yok</p>
-              <p className="text-sm text-muted-foreground">İlk projenizi oluşturarak başlayın</p>
-            </div>
-            <Button onClick={() => setDialogOpen(true)}>+ İlk Projenizi Oluşturun</Button>
-          </CardContent>
-        </Card>
+        <div className="text-center py-24 border border-dashed rounded-xl">
+          <div className="w-12 h-12 rounded-xl mx-auto mb-4 flex items-center justify-center text-white text-lg font-bold" style={{ background: "var(--gradient-brand)" }}>
+            S
+          </div>
+          <p className="font-medium mb-1">Henüz proje yok</p>
+          <p className="text-sm text-muted-foreground mb-4">İlk projenizi oluşturarak başlayın</p>
+          <Button onClick={() => setDialogOpen(true)}>+ Proje Oluştur</Button>
+        </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {projects.map((project) => (
-            <Link key={project.id} to={`/projects/${project.id}`}>
-              <Card className="hover:border-primary/40 hover:shadow-md hover:shadow-primary/5 transition-all duration-200 cursor-pointer h-full group">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <CardTitle className="text-lg group-hover:text-primary transition-colors truncate">
-                      {project.name}
-                    </CardTitle>
-                    {project.hasContext ? (
-                      <Badge variant="default" className="shrink-0">Context Hazır</Badge>
-                    ) : (
-                      <Badge variant="secondary" className="shrink-0">Context Yok</Badge>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {project.description && (
-                    <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{project.description}</p>
-                  )}
-                  <div className="flex gap-4 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-primary/60 inline-block" />
-                      {project.requirementCount} talep
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 inline-block" />
-                      {project.documentCount} belge
-                    </span>
-                    {project.lastScannedAt && (
-                      <span>
-                        {timeAgo(project.lastScannedAt)}
+        <div className="border rounded-xl overflow-hidden">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b bg-muted/30">
+                <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">Proje</th>
+                <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden md:table-cell">Açıklama</th>
+                <th className="text-right text-xs font-medium text-muted-foreground px-4 py-3 w-32">Son Aktivite</th>
+              </tr>
+            </thead>
+            <tbody>
+              {projects.map((project) => (
+                <tr key={project.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
+                  <td className="px-4 py-3">
+                    <Link to={`/projects/${project.id}`} className="block">
+                      <span className="text-sm font-medium hover:text-primary transition-colors">{project.name}</span>
+                    </Link>
+                  </td>
+                  <td className="px-4 py-3 hidden md:table-cell">
+                    <Link to={`/projects/${project.id}`} className="block">
+                      <span className="text-sm text-muted-foreground line-clamp-1">{project.description || "—"}</span>
+                    </Link>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Link to={`/projects/${project.id}`} className="block">
+                      <span className="text-xs text-muted-foreground">
+                        {project.lastScannedAt ? timeAgo(project.lastScannedAt) : project.updatedAt ? timeAgo(project.updatedAt) : "—"}
                       </span>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

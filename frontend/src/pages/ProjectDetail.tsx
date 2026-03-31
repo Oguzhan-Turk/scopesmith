@@ -132,6 +132,7 @@ export default function ProjectDetail() {
   const [docForm, setDocForm] = useState({ filename: "", content: "", docType: "OTHER" });
   const [docFile, setDocFile] = useState<File | null>(null);
   const [docMode, setDocMode] = useState<"file" | "paste">("file");
+  const [reqDialogOpen, setReqDialogOpen] = useState(false);
   const [docDialog, setDocDialog] = useState<{ type: "project" } | { type: "requirement"; reqId: number } | null>(null);
   const [reqDocs, setReqDocs] = useState<Record<number, Document[]>>({});
   const [analysisRefineInput, setAnalysisRefineInput] = useState("");
@@ -725,189 +726,112 @@ export default function ProjectDetail() {
         </div>
 
         {/* REQUIREMENTS TAB */}
-        <TabsContent value="requirements" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Yeni Talep Ekle</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setNewRequirementType("FEATURE")}
-                  className={`px-3 py-1.5 text-sm rounded-md border ${
-                    newRequirementType === "FEATURE"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-background hover:bg-muted"
-                  }`}
-                >
-                  Feature
-                </button>
-                <button
-                  onClick={() => setNewRequirementType("BUG")}
-                  className={`px-3 py-1.5 text-sm rounded-md border ${
-                    newRequirementType === "BUG"
-                      ? "bg-destructive text-destructive-foreground"
-                      : "bg-background hover:bg-muted"
-                  }`}
-                >
-                  Bug
-                </button>
-              </div>
-              <Textarea
-                placeholder={newRequirementType === "BUG"
-                  ? "Bug raporunu buraya yapıştırın... (hata açıklaması, ekran görüntüsü notu, kullanıcı şikayeti)"
-                  : "Ham talebi buraya yapıştırın... (e-posta, toplantı notu, Slack mesajı)"}
-                value={newRequirement}
-                onChange={(e) => setNewRequirement(e.target.value)}
-                rows={5}
-              />
-              <Button
-                onClick={handleCreateRequirement}
-                disabled={actionLoading === "create-req" || !newRequirement.trim()}
-              >
-                {actionLoading === "create-req" ? "Ekleniyor..." : newRequirementType === "BUG" ? "Bug Ekle" : "Talep Ekle"}
-              </Button>
-            </CardContent>
-          </Card>
+        <TabsContent value="requirements" className="space-y-4">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">{requirements.length} talep</p>
+            <Button size="sm" onClick={() => setManualTaskDialog(false) /* reuse state for req dialog */ }>
+              <span onClick={(e) => { e.stopPropagation(); setNewRequirement(""); setNewRequirementType("FEATURE"); setConfirmDialog(null); /* open req dialog via state below */ }}>
+              </span>
+            </Button>
+          </div>
 
-          {requirements.length === 0 && (
-            <Card className="text-center py-12">
-              <CardContent>
-                <p className="text-muted-foreground">
-                  Henüz talep eklenmedi. Yukarıdan ilk talebinizi ekleyin.
-                </p>
-              </CardContent>
-            </Card>
-          )}
-
-          {requirements.map((req) => {
-            const isSelected = selectedRequirementId === req.id;
-            const isProcessed = req.status !== "NEW";
-            const statusLabel: Record<string, string> = {
-              NEW: "Yeni", ANALYZED: "Analiz Edildi", CLARIFYING: "Soru Bekleniyor",
-              COMPLETED: "Tamamlandı", RE_ANALYZED: "Yeniden Analiz",
-            };
-
-            // Seçili talep: tam kart
-            if (isSelected) {
-              return (
-                <Card key={req.id} className="ring-2 ring-primary !overflow-visible">
-                  <CardHeader className="pb-3 cursor-pointer" onClick={() => { setSelectedRequirementId(null); setSelectedAnalysis(null); setTasks([]); setAnalyses([]); }}>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <span className="text-muted-foreground text-xs">▾</span>
-                        {req.type === "BUG" ? "Bug" : "Talep"} #{req.sequenceNumber || req.id}
-                      </CardTitle>
-                      <div className="flex gap-2">
-                        <Badge variant={req.type === "BUG" ? "destructive" : "default"}>
-                          {req.type === "BUG" ? "Bug" : "Feature"}
-                        </Badge>
-                        <Badge variant="outline">v{req.version}</Badge>
-                        <Badge variant="secondary">{statusLabel[req.status] || req.status}</Badge>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm whitespace-pre-wrap mb-4">{req.rawText}</p>
-                    <div className="flex items-center gap-2">
-                      <Button size="sm" onClick={() => { setSelectedRequirementId(null); setSelectedAnalysis(null); setTasks([]); setAnalyses([]); }}>
-                        Seçili ✕
-                      </Button>
-                      {isAdmin ? (
-                        <div className="flex items-center">
-                          <Button size="sm" variant="outline" className="rounded-r-none" onClick={() => handleAnalyzeWithConfirm(req.id)} disabled={!!actionLoading}>
-                            {actionLoading === `analyze-${req.id}` ? "Analiz ediliyor..." : isProcessed ? "Yeniden Analiz" : "Analiz Et"}
-                          </Button>
-                          <div className="relative">
+          {requirements.length === 0 ? (
+            <div className="text-center py-16 border border-dashed rounded-xl">
+              <p className="text-sm text-muted-foreground mb-3">Henüz talep eklenmedi</p>
+              <Button variant="outline" onClick={() => setReqDialogOpen(true)}>+ İlk Talebi Ekle</Button>
+            </div>
+          ) : (
+            <div className="border rounded-xl overflow-hidden">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b bg-muted/30">
+                    <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5 w-10">#</th>
+                    <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5 w-16">Tip</th>
+                    <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5">Açıklama</th>
+                    <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5 w-28">Durum</th>
+                    <th className="text-right text-xs font-medium text-muted-foreground px-4 py-2.5 w-20"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {requirements.map((req) => {
+                    const isSelected = selectedRequirementId === req.id;
+                    const statusLabel: Record<string, string> = {
+                      NEW: "Yeni", ANALYZED: "Analiz Edildi", CLARIFYING: "Soru Bekleniyor",
+                      COMPLETED: "Tamamlandı", RE_ANALYZED: "Yeniden Analiz",
+                    };
+                    const statusColor: Record<string, string> = {
+                      NEW: "bg-muted-foreground", ANALYZED: "bg-green-500", CLARIFYING: "bg-amber-500",
+                      COMPLETED: "bg-green-500", RE_ANALYZED: "bg-blue-500",
+                    };
+                    return (
+                      <tr
+                        key={req.id}
+                        className={`border-b last:border-0 cursor-pointer transition-colors group ${
+                          isSelected ? "bg-primary/5" : "hover:bg-muted/30"
+                        }`}
+                        onClick={() => {
+                          if (isSelected) {
+                            setSelectedRequirementId(null); setSelectedAnalysis(null); setTasks([]); setAnalyses([]);
+                          } else {
+                            handleSelectRequirement(req.id);
+                            setActiveTab("detail");
+                          }
+                        }}
+                      >
+                        <td className="px-4 py-2.5 text-sm text-muted-foreground">
+                          {req.sequenceNumber || req.id}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
+                            req.type === "BUG" ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"
+                          }`}>
+                            {req.type === "BUG" ? "Bug" : "Feature"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <span className="text-sm line-clamp-1">{req.rawText}</span>
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`w-1.5 h-1.5 rounded-full ${statusColor[req.status] || "bg-muted-foreground"}`} />
+                            <span className="text-xs text-muted-foreground">{statusLabel[req.status] || req.status}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
-                              className="h-7 w-7 border border-l-0 rounded-r-md bg-background hover:bg-muted text-xs text-muted-foreground"
-                              onClick={() => setTierMenuOpen(tierMenuOpen === req.id ? null : req.id)}
+                              onClick={() => handleAnalyzeWithConfirm(req.id)}
                               disabled={!!actionLoading}
+                              className="text-xs text-primary hover:underline"
                             >
-                              ▾
+                              {actionLoading === `analyze-${req.id}` ? "..." : "Analiz"}
                             </button>
-                            {tierMenuOpen === req.id && (
-                              <div
-                                className="absolute right-0 top-full mt-1 z-50 bg-background border rounded-md shadow-lg p-1 min-w-[150px]"
-                                onMouseLeave={() => setTierMenuOpen(null)}
-                              >
-                                {[
-                                  { value: "LIGHT", label: "Hızlı", cost: "$", desc: "Basit talepler" },
-                                  { value: "STANDARD", label: "Standart", cost: "$$", desc: "Önerilen" },
-                                  { value: "PREMIUM", label: "Detaylı", cost: "$$$", desc: "Kritik talepler" },
-                                ].map((tier) => (
-                                  <button
-                                    key={tier.value}
-                                    className="w-full text-left px-3 py-1.5 text-xs rounded-sm hover:bg-muted flex items-center justify-between"
-                                    onClick={() => { setTierMenuOpen(null); handleAnalyzeWithConfirm(req.id, tier.value); }}
-                                  >
-                                    <span>{tier.label} <span className="text-muted-foreground">{tier.cost}</span></span>
-                                    <span className="text-muted-foreground text-[10px]">{tier.desc}</span>
-                                  </button>
-                                ))}
+                            <button
+                              onClick={() => { setReqMenuOpen(reqMenuOpen === req.id ? null : req.id); }}
+                              className="px-1 text-muted-foreground hover:text-foreground text-sm"
+                            >
+                              ···
+                            </button>
+                            {reqMenuOpen === req.id && (
+                              <div className="absolute right-4 mt-16 z-50 bg-background border rounded-md shadow-lg p-0.5 min-w-[80px]" onMouseLeave={() => setReqMenuOpen(null)}>
+                                <button className="w-full text-left px-2.5 py-1.5 text-xs text-destructive hover:bg-muted rounded-sm" onClick={() => { setReqMenuOpen(null); handleDeleteRequirement(req.id); }}>Sil</button>
                               </div>
                             )}
                           </div>
-                        </div>
-                      ) : (
-                        <Button size="sm" variant="outline" onClick={() => handleAnalyzeWithConfirm(req.id)} disabled={!!actionLoading}>
-                          {actionLoading === `analyze-${req.id}` ? "Analiz ediliyor..." : isProcessed ? "Yeniden Analiz" : "Analiz Et"}
-                        </Button>
-                      )}
-                      <Button size="sm" variant="ghost" onClick={() => { loadReqDocs(req.id); setDocForm({ filename: "", content: "", docType: "OTHER" }); setDocDialog({ type: "requirement", reqId: req.id }); }}>
-                        📎 {(reqDocs[req.id]?.length || 0) > 0 && <span className="ml-1 text-xs">{reqDocs[req.id]?.length}</span>}
-                      </Button>
-                      <div className="relative">
-                        <button onClick={() => setReqMenuOpen(reqMenuOpen === req.id ? null : req.id)} className="px-2 py-1 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted text-sm">···</button>
-                        {reqMenuOpen === req.id && (
-                          <div className="absolute right-0 top-full mt-1 z-50 bg-background border rounded-md shadow-lg p-0.5 min-w-[80px]" onMouseLeave={() => setReqMenuOpen(null)}>
-                            <button className="w-full text-left px-2.5 py-1.5 text-xs text-destructive hover:bg-muted rounded-sm" onClick={() => { setReqMenuOpen(null); handleDeleteRequirement(req.id); }}>Sil</button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            }
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-            // Seçili olmayan: kompakt satır
-            return (
-              <div
-                key={req.id}
-                className="flex items-center justify-between px-4 py-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors group"
-                onClick={() => handleSelectRequirement(req.id)}
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${req.type === "BUG" ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"}`}>
-                    {req.type === "BUG" ? "B" : "F"}
-                  </span>
-                  <span className="text-sm font-medium">#{req.sequenceNumber || req.id}</span>
-                  <span className="text-sm text-muted-foreground truncate">{req.rawText.substring(0, 80)}{req.rawText.length > 80 ? "…" : ""}</span>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <Badge variant="secondary" className="text-xs">{statusLabel[req.status] || req.status}</Badge>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={(e) => { e.stopPropagation(); handleAnalyzeWithConfirm(req.id); }}
-                    disabled={!!actionLoading}
-                  >
-                    {actionLoading === `analyze-${req.id}` ? "..." : isProcessed ? "Yeniden Analiz" : "Analiz Et"}
-                  </Button>
-                  <div className="relative" onClick={(e) => e.stopPropagation()}>
-                    <button onClick={() => setReqMenuOpen(reqMenuOpen === req.id ? null : req.id)} className="px-1.5 py-1 text-muted-foreground hover:text-foreground rounded text-sm opacity-0 group-hover:opacity-100 transition-opacity">···</button>
-                    {reqMenuOpen === req.id && (
-                      <div className="absolute right-0 top-full mt-1 z-50 bg-background border rounded-md shadow-lg p-0.5 min-w-[80px]" onMouseLeave={() => setReqMenuOpen(null)}>
-                        <button className="w-full text-left px-2.5 py-1.5 text-xs text-destructive hover:bg-muted rounded-sm" onClick={() => { setReqMenuOpen(null); handleDeleteRequirement(req.id); }}>Sil</button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          {/* Talep ekleme butonu — sağ alt */}
+          <div className="flex justify-end">
+            <Button onClick={() => setReqDialogOpen(true)}>+ Yeni Talep</Button>
+          </div>
         </TabsContent>
 
         {/* WORKSPACE TAB — Analiz + Task'lar + Yönetici Özeti tek akışta */}
@@ -1060,7 +984,7 @@ export default function ProjectDetail() {
                           <div className="flex gap-2">
                             <input
                               type="text"
-                              placeholder="Cevabınızı yazın..."
+                              placeholder="Cevap girin..."
                               value={answers[q.id] || ""}
                               onChange={(e) =>
                                 setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
@@ -1378,7 +1302,7 @@ export default function ProjectDetail() {
                       <div className="flex gap-2">
                         <input
                           type="text"
-                          placeholder="Task iyileştirme talimatı (örn: bu task'ı böl, frontend task'larını ayır)"
+                          placeholder="İyileştirme talimatı girin..."
                           value={taskInstruction}
                           onChange={(e) => setTaskInstruction(e.target.value)}
                           className="flex-1 px-3 py-1.5 text-sm border rounded-md bg-background"
@@ -1552,7 +1476,7 @@ export default function ProjectDetail() {
               {scanMode === "local" ? (
                 <input
                   type="text"
-                  placeholder="Proje klasör yolu (örn: /Users/dev/my-project)"
+                  placeholder="Proje klasör yolu"
                   value={scanPath}
                   onChange={(e) => setScanPath(e.target.value)}
                   className="w-full px-3 py-2 border rounded-md bg-background text-sm"
@@ -1723,104 +1647,83 @@ export default function ProjectDetail() {
 
         {/* INTEGRATIONS TAB */}
         <TabsContent value="integrations" className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Bu projeye özel entegrasyon ayarları. Task'ların aktarılacağı hedefleri belirleyin.
-          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Jira Card */}
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-600 text-sm font-bold">J</div>
+                    <CardTitle className="text-base">Jira</CardTitle>
+                  </div>
+                  {integrationConfig.jira?.projectKey ? (
+                    <Badge variant="default" className="text-xs">Bağlı</Badge>
+                  ) : (
+                    <Badge variant="secondary" className="text-xs">Yapılandırılmamış</Badge>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="jira-project-key" className="text-xs text-muted-foreground mb-1 block">Proje Key</label>
+                    <input id="jira-project-key" type="text" placeholder="SS"
+                      value={integrationConfig.jira?.projectKey || ""}
+                      onChange={(e) => setIntegrationConfig({ ...integrationConfig, jira: { ...integrationConfig.jira, projectKey: e.target.value.toUpperCase() } })}
+                      className="w-full px-3 py-1.5 border rounded-md bg-background text-sm" />
+                  </div>
+                  <div>
+                    <label htmlFor="jira-issue-type" className="text-xs text-muted-foreground mb-1 block">Issue Type</label>
+                    <input id="jira-issue-type" type="text" placeholder="Task"
+                      value={integrationConfig.jira?.defaultIssueType || ""}
+                      onChange={(e) => setIntegrationConfig({ ...integrationConfig, jira: { ...integrationConfig.jira, defaultIssueType: e.target.value } })}
+                      className="w-full px-3 py-1.5 border rounded-md bg-background text-sm" />
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="jira-category-mode" className="text-xs text-muted-foreground mb-1 block">Kategori Modu</label>
+                  <select id="jira-category-mode"
+                    value={integrationConfig.jira?.categoryMode || "BOTH"}
+                    onChange={(e) => setIntegrationConfig({ ...integrationConfig, jira: { ...integrationConfig.jira, categoryMode: e.target.value as "LABELS_ONLY" | "COMPONENTS" | "BOTH" } })}
+                    className="w-full px-3 py-1.5 border rounded-md bg-background text-sm">
+                    <option value="BOTH">Label + Component</option>
+                    <option value="LABELS_ONLY">Sadece Label</option>
+                    <option value="COMPONENTS">Sadece Component</option>
+                  </select>
+                </div>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <CardTitle className="text-base">Jira</CardTitle>
-                {integrationConfig.jira?.projectKey && <Badge variant="default">Aktif</Badge>}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Tooltip side="right" content="Jira'daki issue numaralarının öneki. Örn: SS yazarsanız issue'lar SS-1, SS-2 olarak oluşur.">
-                  <label htmlFor="jira-project-key" className="text-sm font-medium cursor-help border-b border-dotted border-muted-foreground">Proje Key</label>
-                </Tooltip>
-              </div>
-              <input
-                id="jira-project-key"
-                type="text"
-                placeholder="SS"
-                value={integrationConfig.jira?.projectKey || ""}
-                onChange={(e) => setIntegrationConfig({
-                  ...integrationConfig,
-                  jira: { ...integrationConfig.jira, projectKey: e.target.value.toUpperCase() },
-                })}
-                className="w-full px-3 py-2 border rounded-md bg-background text-sm"
-              />
-              <div className="flex items-center gap-2">
-                <Tooltip side="right" content="Feature task'ları için varsayılan tip. Bug raporlarından üretilen task'lar otomatik 'Bug' olarak gönderilir.">
-                  <label htmlFor="jira-issue-type" className="text-sm font-medium cursor-help border-b border-dotted border-muted-foreground">Issue Type</label>
-                </Tooltip>
-              </div>
-              <input
-                id="jira-issue-type"
-                type="text"
-                placeholder="Task"
-                value={integrationConfig.jira?.defaultIssueType || ""}
-                onChange={(e) => setIntegrationConfig({
-                  ...integrationConfig,
-                  jira: { ...integrationConfig.jira, defaultIssueType: e.target.value },
-                })}
-                className="w-full px-3 py-2 border rounded-md bg-background text-sm"
-              />
-              <div className="flex items-center gap-2 mt-3">
-                <Tooltip side="right" content="LABELS_ONLY: sadece label ekler. COMPONENTS: Jira Component eşleştirmeye çalışır. BOTH: ikisini de yapar.">
-                  <label htmlFor="jira-category-mode" className="text-sm font-medium cursor-help border-b border-dotted border-muted-foreground">Kategori Modu</label>
-                </Tooltip>
-              </div>
-              <select
-                id="jira-category-mode"
-                value={integrationConfig.jira?.categoryMode || "BOTH"}
-                onChange={(e) => setIntegrationConfig({
-                  ...integrationConfig,
-                  jira: { ...integrationConfig.jira, categoryMode: e.target.value as "LABELS_ONLY" | "COMPONENTS" | "BOTH" },
-                })}
-                className="w-full px-3 py-2 border rounded-md bg-background text-sm"
-              >
-                <option value="BOTH">Label + Component (önerilen)</option>
-                <option value="LABELS_ONLY">Sadece Label</option>
-                <option value="COMPONENTS">Sadece Component</option>
-              </select>
-            </CardContent>
-          </Card>
+            {/* GitHub Card */}
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-foreground/5 flex items-center justify-center text-sm font-bold">G</div>
+                    <CardTitle className="text-base">GitHub Issues</CardTitle>
+                  </div>
+                  {integrationConfig.github?.repo ? (
+                    <Badge variant="default" className="text-xs">Bağlı</Badge>
+                  ) : (
+                    <Badge variant="secondary" className="text-xs">Yapılandırılmamış</Badge>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                <label htmlFor="github-repo" className="text-xs text-muted-foreground mb-1 block">Repository</label>
+                <input id="github-repo" type="text" placeholder="owner/repo"
+                  value={integrationConfig.github?.repo || ""}
+                  onChange={(e) => setIntegrationConfig({ ...integrationConfig, github: { repo: e.target.value } })}
+                  className="w-full px-3 py-1.5 border rounded-md bg-background text-sm" />
+              </CardContent>
+            </Card>
+          </div>
 
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <CardTitle className="text-base">GitHub Issues</CardTitle>
-                {integrationConfig.github?.repo && <Badge variant="default">Aktif</Badge>}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Tooltip side="right" content="Task'ların GitHub Issue olarak oluşturulacağı repo. Kod repo'sundan farklı olabilir.">
-                  <label htmlFor="github-repo" className="text-sm font-medium cursor-help border-b border-dotted border-muted-foreground">Repository</label>
-                </Tooltip>
-              </div>
-              <input
-                id="github-repo"
-                type="text"
-                placeholder="owner/repo"
-                value={integrationConfig.github?.repo || ""}
-                onChange={(e) => setIntegrationConfig({
-                  ...integrationConfig,
-                  github: { repo: e.target.value },
-                })}
-                className="w-full px-3 py-2 border rounded-md bg-background text-sm"
-              />
-            </CardContent>
-          </Card>
-
-          <Button
-            onClick={handleSaveIntegrationConfig}
-            disabled={actionLoading === "save-config"}
-          >
-            {actionLoading === "save-config" ? "Kaydediliyor..." : "Kaydet"}
-          </Button>
+          <div className="flex justify-end">
+            <Button onClick={handleSaveIntegrationConfig} disabled={actionLoading === "save-config"}>
+              {actionLoading === "save-config" ? "Kaydediliyor..." : "Ayarları Kaydet"}
+            </Button>
+          </div>
         </TabsContent>
 
         {/* USAGE & ROI TAB */}
@@ -1839,19 +1742,28 @@ export default function ProjectDetail() {
                 <Card>
                   <CardContent className="pt-6">
                     <p className="text-2xl font-bold">{usageSummary.totalAiCalls}</p>
-                    <p className="text-xs text-muted-foreground">AI Çağrısı</p>
+                    <p className="text-xs text-muted-foreground mb-2">AI Çağrısı</p>
+                    <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full bg-primary rounded-full" style={{ width: `${Math.min(usageSummary.totalAiCalls * 5, 100)}%` }} />
+                    </div>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardContent className="pt-6">
                     <p className="text-2xl font-bold">{usageSummary.totalTokens.toLocaleString()}</p>
-                    <p className="text-xs text-muted-foreground">Toplam Token</p>
+                    <p className="text-xs text-muted-foreground mb-2">Toplam Token</p>
+                    <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full bg-primary/70 rounded-full" style={{ width: `${Math.min(usageSummary.totalTokens / 5000, 100)}%` }} />
+                    </div>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardContent className="pt-6">
                     <p className="text-2xl font-bold">${usageSummary.totalEstimatedCostUsd.toFixed(2)}</p>
-                    <p className="text-xs text-muted-foreground">Toplam Maliyet</p>
+                    <p className="text-xs text-muted-foreground mb-2">Toplam Maliyet</p>
+                    <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full bg-amber-500 rounded-full" style={{ width: `${Math.min(usageSummary.totalEstimatedCostUsd * 10, 100)}%` }} />
+                    </div>
                   </CardContent>
                 </Card>
                 <Card>
@@ -1882,7 +1794,10 @@ export default function ProjectDetail() {
                       </div>
                       <div>
                         <p className="text-2xl font-bold text-primary">{usageSummary.roi.roiMultiplier}x</p>
-                        <p className="text-xs text-muted-foreground">ROI Çarpanı</p>
+                        <p className="text-xs text-muted-foreground mb-2">ROI Çarpanı</p>
+                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full bg-primary rounded-full" style={{ width: `${Math.min(usageSummary.roi.roiMultiplier * 10, 100)}%` }} />
+                        </div>
                       </div>
                     </div>
                     <Separator />
@@ -2073,6 +1988,58 @@ export default function ProjectDetail() {
           <div className="flex justify-end gap-2 mt-4">
             <Button size="sm" variant="outline" onClick={() => setConfirmDialog(null)}>İptal</Button>
             <Button size="sm" onClick={() => { confirmDialog?.onConfirm(); setConfirmDialog(null); }}>Onayla</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* New Requirement Dialog */}
+      <Dialog open={reqDialogOpen} onOpenChange={setReqDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Yeni Talep</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="flex gap-2">
+              <button
+                onClick={() => setNewRequirementType("FEATURE")}
+                className={`px-3 py-1.5 text-sm rounded-md border ${
+                  newRequirementType === "FEATURE" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"
+                }`}
+              >
+                Feature
+              </button>
+              <button
+                onClick={() => setNewRequirementType("BUG")}
+                className={`px-3 py-1.5 text-sm rounded-md border ${
+                  newRequirementType === "BUG" ? "bg-destructive text-destructive-foreground" : "bg-background hover:bg-muted"
+                }`}
+              >
+                Bug
+              </button>
+            </div>
+            <div>
+              <label htmlFor="req-text" className="text-sm font-medium mb-1 block">Açıklama</label>
+              <Textarea
+                id="req-text"
+                placeholder="Talep açıklaması"
+                value={newRequirement}
+                onChange={(e) => setNewRequirement(e.target.value)}
+                rows={6}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button size="sm" variant="outline" onClick={() => setReqDialogOpen(false)}>İptal</Button>
+              <Button
+                size="sm"
+                onClick={async () => {
+                  await handleCreateRequirement();
+                  setReqDialogOpen(false);
+                }}
+                disabled={actionLoading === "create-req" || !newRequirement.trim()}
+              >
+                {actionLoading === "create-req" ? "Ekleniyor..." : "Ekle"}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
