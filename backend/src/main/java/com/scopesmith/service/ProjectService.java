@@ -3,6 +3,7 @@ package com.scopesmith.service;
 import com.scopesmith.dto.ProjectRequest;
 import com.scopesmith.dto.ProjectResponse;
 import com.scopesmith.entity.Project;
+import com.scopesmith.entity.ProjectRole;
 import com.scopesmith.repository.ProjectRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +17,7 @@ import java.util.List;
 public class ProjectService {
 
     private final ProjectRepository projectRepository;
+    private final ProjectAccessService accessService;
 
     @Transactional
     public ProjectResponse create(ProjectRequest request) {
@@ -25,12 +27,33 @@ public class ProjectService {
                 .repoUrl(request.getRepoUrl())
                 .build();
 
-        return ProjectResponse.from(projectRepository.save(project));
+        Project saved = projectRepository.save(project);
+
+        // Auto-assign OWNER to creator
+        accessService.getCurrentUser().ifPresent(user ->
+                accessService.addMembership(user.getId(), saved.getId(), ProjectRole.OWNER));
+
+        return ProjectResponse.from(saved);
     }
 
+    /**
+     * List projects — admin sees all, users see only their projects.
+     */
     @Transactional(readOnly = true)
     public List<ProjectResponse> findAll() {
-        return projectRepository.findAll().stream()
+        List<Long> accessibleIds = accessService.getAccessibleProjectIds();
+
+        List<Project> projects;
+        if (accessibleIds == null) {
+            // Admin — all projects
+            projects = projectRepository.findAll();
+        } else if (accessibleIds.isEmpty()) {
+            return List.of();
+        } else {
+            projects = projectRepository.findByIdIn(accessibleIds);
+        }
+
+        return projects.stream()
                 .map(ProjectResponse::from)
                 .toList();
     }
