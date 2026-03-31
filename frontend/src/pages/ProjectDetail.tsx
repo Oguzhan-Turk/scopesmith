@@ -1288,7 +1288,29 @@ export default function ProjectDetail() {
                                   </span>
                                 );
                               })()}
-                              <span className="ml-1 border-l pl-2 border-muted">
+                              <span className="ml-1 border-l pl-2 border-muted flex items-center gap-1">
+                                {!task.jiraKey && isAdmin && (integrationConfig.jira?.projectKey || integrationConfig.github?.repo) && (
+                                  <button
+                                    onClick={async () => {
+                                      setActionLoading(`sync-${task.id}`);
+                                      try {
+                                        if (integrationConfig.jira?.projectKey) {
+                                          await syncToJira(selectedAnalysis!.id, integrationConfig.jira.projectKey);
+                                        } else if (integrationConfig.github?.repo) {
+                                          await syncToGitHub(selectedAnalysis!.id, integrationConfig.github.repo);
+                                        }
+                                        await loadTasks(selectedAnalysis!.id);
+                                        showToast("Gönderildi.", "success");
+                                      } catch { showToast("Gönderilemedi."); }
+                                      finally { setActionLoading(null); }
+                                    }}
+                                    disabled={!!actionLoading}
+                                    className="text-muted-foreground hover:text-primary p-1 rounded hover:bg-muted"
+                                    title="Gönder"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => setEditingTask({...task})}
                                   className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-muted"
