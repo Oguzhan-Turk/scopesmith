@@ -32,3 +32,14 @@ Rules:
 
 Return all human-readable text (summary, questions, assumptions, risk reason) in Turkish.
 Keep JSON field names, enum values, and technical terms in English.
+
+IMPORTANT: The "questions" field must be an array of objects, NOT strings.
+Each question object must have:
+- "question": the question text (Turkish)
+- "suggestedAnswer": a suggested answer based on the project context and common patterns (Turkish). If you cannot suggest an answer, set to null.
+
+Example:
+"questions": [
+  {"question": "CSV dosyasındaki hangi sütunlar zorunlu olmalı?", "suggestedAnswer": "Proje yapısına bakıldığında title ve description alanları zorunlu olmalı, priority opsiyonel olabilir."},
+  {"question": "Dosya boyutu limiti ne olmalı?", "suggestedAnswer": null}
+]

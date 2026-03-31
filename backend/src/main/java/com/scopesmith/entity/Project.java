@@ -79,6 +79,13 @@ public class Project {
     private String lastScannedCommitHash;
 
     /**
+     * Contents of project's CLAUDE.md (developer notes, conventions, decisions).
+     * Read during project scan, included verbatim in AI prompts.
+     */
+    @Column(columnDefinition = "TEXT")
+    private String claudeMdContent;
+
+    /**
      * Incremented on each context rescan.
      * Enables tracking which analysis used which context version.
      */

@@ -35,6 +35,22 @@ jira:
   api-token: ${JIRA_API_TOKEN:}
   project-key: ${JIRA_PROJECT_KEY:SS}
 
+scopesmith:
+  models:
+    light: claude-haiku-4-5-20251001
+    standard: claude-sonnet-4-20250514
+    premium: claude-opus-4-6
+  pricing:
+    light:
+      input-per-million: 1.00
+      output-per-million: 5.00
+    standard:
+      input-per-million: 3.00
+      output-per-million: 15.00
+    premium:
+      input-per-million: 5.00
+      output-per-million: 25.00
+
 server:
   port: 8080
 

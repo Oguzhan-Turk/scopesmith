@@ -95,6 +95,10 @@ public class ProjectContextService {
 
         log.info("Scanning local folder for project #{}: {}", projectId, folderPath);
 
+        // Read CLAUDE.md if present (developer notes, conventions)
+        String claudeMd = readClaudeMd(root);
+        project.setClaudeMdContent(claudeMd);
+
         // Build file tree
         String fileTree = buildFileTree(root);
 
@@ -191,6 +195,30 @@ public class ProjectContextService {
         return entries.stream()
                 .sorted()
                 .collect(Collectors.joining("\n"));
+    }
+
+    /**
+     * Read CLAUDE.md from the project root — developer notes, conventions, decisions.
+     * Checks: CLAUDE.md, .claude/CLAUDE.md
+     */
+    private String readClaudeMd(Path root) {
+        for (String candidate : List.of("CLAUDE.md", ".claude/CLAUDE.md")) {
+            Path path = root.resolve(candidate);
+            if (Files.exists(path) && Files.isRegularFile(path)) {
+                try {
+                    String content = Files.readString(path);
+                    if (content.length() > MAX_FILE_SIZE) {
+                        content = content.substring(0, (int) MAX_FILE_SIZE);
+                        log.warn("CLAUDE.md truncated to {}KB for project at {}", MAX_FILE_SIZE / 1024, root);
+                    }
+                    log.info("Found CLAUDE.md ({} chars) at {}", content.length(), path);
+                    return content;
+                } catch (IOException e) {
+                    log.warn("Failed to read CLAUDE.md at {}: {}", path, e.getMessage());
+                }
+            }
+        }
+        return null;
     }
 
     /**

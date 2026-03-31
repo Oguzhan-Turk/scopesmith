@@ -65,9 +65,21 @@ public class Analysis {
     private Integer requirementVersion;
 
     /**
+     * Project context version at the time of analysis.
+     * Used to detect stale analyses when context is updated.
+     */
+    private Integer contextVersion;
+
+    /**
      * How long the AI analysis took, in milliseconds. (ADR-008)
      */
     private Long durationMs;
+
+    /**
+     * Which AI model tier was used for this analysis.
+     */
+    @Enumerated(EnumType.STRING)
+    private ModelTier modelTier;
 
     @Builder.Default
     @OneToMany(mappedBy = "analysis", cascade = CascadeType.ALL, orphanRemoval = true)

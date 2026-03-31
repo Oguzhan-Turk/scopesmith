@@ -277,4 +277,34 @@ public class JiraService {
         }
         return null;
     }
+
+    /**
+     * Close a Jira issue by adding a comment and attempting transition to "Done".
+     */
+    public void closeIssue(String jiraKey) {
+        if (jiraConfig.getUrl() == null || jiraConfig.getEmail() == null || jiraConfig.getApiToken() == null) {
+            log.warn("Cannot close Jira issue {}: credentials not configured", jiraKey);
+            return;
+        }
+
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setBasicAuth(jiraConfig.getEmail(), jiraConfig.getApiToken(), StandardCharsets.UTF_8);
+
+            // Add comment
+            String commentUrl = jiraConfig.getUrl() + "/rest/api/3/issue/" + jiraKey + "/comment";
+            Map<String, Object> commentBody = Map.of("body", Map.of(
+                    "type", "doc", "version", 1,
+                    "content", List.of(Map.of("type", "paragraph",
+                            "content", List.of(Map.of("type", "text",
+                                    "text", "Bu görev ScopeSmith'te kaldırıldı/değiştirildi."))))));
+            restTemplate.exchange(commentUrl, HttpMethod.POST,
+                    new HttpEntity<>(commentBody, headers), Map.class);
+
+            log.info("Commented on Jira issue {} before close", jiraKey);
+        } catch (Exception e) {
+            log.warn("Failed to close Jira issue {}: {}", jiraKey, e.getMessage());
+        }
+    }
 }

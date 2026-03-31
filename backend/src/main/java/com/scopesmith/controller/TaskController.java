@@ -1,10 +1,13 @@
 package com.scopesmith.controller;
 
 import com.scopesmith.dto.SpDecisionRequest;
+import com.scopesmith.dto.SpSuggestionResult;
 import com.scopesmith.dto.TaskResponse;
 import com.scopesmith.dto.TaskUpdateRequest;
 import com.scopesmith.entity.Task;
 import com.scopesmith.repository.TaskRepository;
+import com.scopesmith.service.ClaudeCodeService;
+import com.scopesmith.service.TaskBreakdownService;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +19,8 @@ import org.springframework.web.bind.annotation.*;
 public class TaskController {
 
     private final TaskRepository taskRepository;
+    private final TaskBreakdownService taskBreakdownService;
+    private final ClaudeCodeService claudeCodeService;
 
     /**
      * Update task fields — partial update, only non-null fields applied.
@@ -34,7 +39,9 @@ public class TaskController {
             try { task.setPriority(com.scopesmith.entity.TaskPriority.valueOf(request.getPriority().toUpperCase())); }
             catch (Exception ignored) {}
         }
-        if (request.getCategory() != null) task.setCategory(request.getCategory().toUpperCase());
+        if (request.getCategory() != null) {
+            task.setCategory(request.getCategory().isBlank() ? null : request.getCategory().toUpperCase());
+        }
         if (request.getSpRationale() != null) task.setSpRationale(request.getSpRationale());
 
         return TaskResponse.from(taskRepository.save(task));
@@ -69,5 +76,16 @@ public class TaskController {
         }
         task.setCategory(category.toUpperCase());
         return TaskResponse.from(taskRepository.save(task));
+    }
+
+    @PostMapping("/{id}/suggest-sp")
+    public SpSuggestionResult suggestSp(@PathVariable Long id) {
+        return taskBreakdownService.suggestSpForTask(id);
+    }
+
+    @GetMapping("/{id}/claude-code-prompt")
+    public java.util.Map<String, String> getClaudeCodePrompt(@PathVariable Long id) {
+        String prompt = claudeCodeService.buildPrompt(id);
+        return java.util.Map.of("prompt", prompt);
     }
 }

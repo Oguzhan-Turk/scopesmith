@@ -119,6 +119,9 @@ export default function Settings() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Ayarlar</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Bu ayarlar tüm projelerde geçerlidir. Proje bazlı entegrasyon ayarları için ilgili projenin <strong>Entegrasyonlar</strong> sekmesini kullanın.
+        </p>
       </div>
 
       <Tabs defaultValue="credentials">

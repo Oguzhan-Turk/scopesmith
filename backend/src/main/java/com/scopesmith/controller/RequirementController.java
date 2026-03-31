@@ -5,6 +5,7 @@ import com.scopesmith.dto.ChangeImpactResult;
 import com.scopesmith.dto.RequirementRequest;
 import com.scopesmith.dto.RequirementResponse;
 import com.scopesmith.entity.Analysis;
+import com.scopesmith.entity.ModelTier;
 import com.scopesmith.repository.AnalysisRepository;
 import com.scopesmith.service.ChangeImpactService;
 import com.scopesmith.service.RequirementAnalysisService;
@@ -64,8 +65,10 @@ public class RequirementController {
     }
 
     @PostMapping("/requirements/{id}/analyze")
-    public AnalysisResponse analyze(@PathVariable Long id) {
-        return AnalysisResponse.from(analysisService.analyze(id));
+    public AnalysisResponse analyze(@PathVariable Long id,
+                                     @RequestParam(required = false) String modelTier) {
+        ModelTier tier = modelTier != null ? ModelTier.valueOf(modelTier.toUpperCase()) : null;
+        return AnalysisResponse.from(analysisService.analyze(id, tier));
     }
 
     @PostMapping("/requirements/{id}/change-impact")

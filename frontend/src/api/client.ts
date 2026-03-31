@@ -144,8 +144,10 @@ export const createRequirement = (projectId: number, rawText: string, type?: str
   });
 export const deleteRequirement = (id: number) =>
   request<void>(`/requirements/${id}`, { method: "DELETE" });
-export const analyzeRequirement = (id: number) =>
-  request<Analysis>(`/requirements/${id}/analyze`, { method: "POST" });
+export const analyzeRequirement = (id: number, modelTier?: string) => {
+  const params = modelTier ? `?modelTier=${modelTier}` : "";
+  return request<Analysis>(`/requirements/${id}/analyze${params}`, { method: "POST" });
+};
 export const getChangeImpact = (id: number) =>
   request<ChangeImpact>(`/requirements/${id}/change-impact`, { method: "POST" });
 
@@ -168,6 +170,28 @@ export const setSpDecision = (taskId: number, spFinal: number) =>
     method: "PUT",
     body: JSON.stringify({ spFinal }),
   });
+
+export const suggestSp = (taskId: number) =>
+  request<{ spSuggestion: number; spRationale: string }>(`/tasks/${taskId}/suggest-sp`, { method: "POST" });
+export const getClaudeCodePrompt = (taskId: number) =>
+  request<{ prompt: string }>(`/tasks/${taskId}/claude-code-prompt`);
+export const refineAnalysis = (analysisId: number, instruction: string) =>
+  request<Analysis>(`/analyses/${analysisId}/refine`, {
+    method: "POST",
+    body: JSON.stringify({ instruction }),
+  });
+export const suggestFeatures = (projectId: number) =>
+  request<FeatureSuggestionResult>(`/projects/${projectId}/suggest-features`, { method: "POST" });
+
+export interface FeatureSuggestionResult {
+  suggestions: Array<{
+    title: string;
+    description: string;
+    category: string;
+    complexity: string;
+    rationale: string;
+  }>;
+}
 
 // Analysis retrieval
 export const getAnalysesByRequirement = (requirementId: number) =>
@@ -269,7 +293,7 @@ export async function exportJiraCsv(analysisId: number, projectKey: string, issu
   URL.revokeObjectURL(url);
 }
 
-// Documents
+// Documents — project-level
 export const getDocuments = (projectId: number) =>
   request<Document[]>(`/projects/${projectId}/documents`);
 export const addDocument = (
@@ -277,6 +301,40 @@ export const addDocument = (
   data: { filename: string; content: string; docType?: string }
 ) =>
   request<Document>(`/projects/${projectId}/documents`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+export const deleteDocument = (id: number) =>
+  request<void>(`/documents/${id}`, { method: "DELETE" });
+export const uploadDocument = async (projectId: number, file: File, docType: string): Promise<Document> => {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("docType", docType);
+  const res = await fetch(`/api/v1/projects/${projectId}/documents/upload`, {
+    method: "POST", body: form, credentials: "include",
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+export const uploadRequirementDocument = async (reqId: number, file: File, docType: string): Promise<Document> => {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("docType", docType);
+  const res = await fetch(`/api/v1/requirements/${reqId}/documents/upload`, {
+    method: "POST", body: form, credentials: "include",
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+// Documents — requirement-level
+export const getRequirementDocuments = (requirementId: number) =>
+  request<Document[]>(`/requirements/${requirementId}/documents`);
+export const addRequirementDocument = (
+  requirementId: number,
+  data: { filename: string; content: string; docType?: string }
+) =>
+  request<Document>(`/requirements/${requirementId}/documents`, {
     method: "POST",
     body: JSON.stringify(data),
   });
@@ -342,7 +400,9 @@ export interface Analysis {
   affectedModules: string;
   stakeholderSummary: string | null;
   requirementVersion: number;
+  contextVersion: number | null;
   durationMs: number | null;
+  modelTier: string | null;
   questions: Question[];
   createdAt: string;
 }
@@ -350,6 +410,7 @@ export interface Analysis {
 export interface Question {
   id: number;
   questionText: string;
+  suggestedAnswer: string | null;
   answer: string | null;
   status: string;
 }
@@ -384,8 +445,10 @@ export interface ChangeImpact {
 export interface Document {
   id: number;
   projectId: number;
+  requirementId: number | null;
   filename: string;
   docType: string;
+  summary: string | null;
   contentLength: number;
   createdAt: string;
 }

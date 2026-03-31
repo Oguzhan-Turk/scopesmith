@@ -23,7 +23,7 @@ public class SettingsController {
         for (var entry : credentials.entrySet()) {
             String key = entry.getKey();
             String value = entry.getValue();
-            if (value != null && !value.isBlank() && !value.contains("****")) {
+            if (value != null && !value.isBlank() && !value.contains("••••") && !value.contains("****")) {
                 // Only save if value is not masked (user changed it)
                 credentialService.save(key, value);
             }

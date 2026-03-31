@@ -31,3 +31,8 @@ Rules:
 
 Return all human-readable text (summary, questions, assumptions, risk reason) in Turkish.
 Keep JSON field names, enum values, and technical terms in English.
+
+IMPORTANT: The "questions" field must be an array of objects, NOT strings.
+Each question object must have:
+- "question": the question text (Turkish)
+- "suggestedAnswer": a suggested answer based on context and common patterns (Turkish), or null if no suggestion.

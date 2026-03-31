@@ -21,7 +21,9 @@ public class AnalysisResponse {
     private String affectedModules;
     private String stakeholderSummary;
     private Integer requirementVersion;
+    private Integer contextVersion;
     private Long durationMs;
+    private String modelTier;
     private List<QuestionResponse> questions;
     private LocalDateTime createdAt;
 
@@ -30,6 +32,7 @@ public class AnalysisResponse {
     public static class QuestionResponse {
         private Long id;
         private String questionText;
+        private String suggestedAnswer;
         private String answer;
         private String status;
     }
@@ -39,6 +42,7 @@ public class AnalysisResponse {
                 .map(q -> QuestionResponse.builder()
                         .id(q.getId())
                         .questionText(q.getQuestionText())
+                        .suggestedAnswer(q.getSuggestedAnswer())
                         .answer(q.getAnswer())
                         .status(q.getStatus().name())
                         .build())
@@ -54,7 +58,9 @@ public class AnalysisResponse {
                 .affectedModules(analysis.getAffectedModules())
                 .stakeholderSummary(analysis.getPoSummary())
                 .requirementVersion(analysis.getRequirementVersion())
+                .contextVersion(analysis.getContextVersion())
                 .durationMs(analysis.getDurationMs())
+                .modelTier(analysis.getModelTier() != null ? analysis.getModelTier().name() : null)
                 .questions(questionResponses)
                 .createdAt(analysis.getCreatedAt())
                 .build();

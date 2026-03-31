@@ -31,4 +31,18 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
             "WHERE r.project.id = :projectId " +
             "AND t.spFinal IS NOT NULL")
     long countFinalizedTasksByProjectId(@Param("projectId") Long projectId);
+
+    /**
+     * All finalized tasks across ALL projects — org-level SP calibration.
+     */
+    @Query("SELECT t FROM Task t " +
+            "JOIN FETCH t.analysis a " +
+            "JOIN FETCH a.requirement r " +
+            "JOIN FETCH r.project " +
+            "WHERE t.spFinal IS NOT NULL " +
+            "ORDER BY t.createdAt DESC")
+    List<Task> findAllFinalizedTasks();
+
+    @Query("SELECT COUNT(t) FROM Task t WHERE t.spFinal IS NOT NULL")
+    long countAllFinalizedTasks();
 }

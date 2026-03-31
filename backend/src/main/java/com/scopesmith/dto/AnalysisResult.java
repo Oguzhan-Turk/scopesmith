@@ -18,8 +18,14 @@ public class AnalysisResult {
     private List<String> missingInfo = new ArrayList<>();
     private List<String> contradictions = new ArrayList<>();
     private List<String> assumptions = new ArrayList<>();
-    private List<String> questions = new ArrayList<>();
+    private List<QuestionItem> questions = new ArrayList<>();
     private List<String> affectedModules = new ArrayList<>();
     private String riskLevel = "MEDIUM";
     private String riskReason;
+
+    @Data
+    public static class QuestionItem {
+        private String question;
+        private String suggestedAnswer;
+    }
 }

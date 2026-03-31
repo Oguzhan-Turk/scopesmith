@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getProjects, createProject, type Project } from "@/api/client";
+import { timeAgo } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -141,7 +142,7 @@ export default function Dashboard() {
                     </span>
                     {project.lastScannedAt && (
                       <span>
-                        {new Date(project.lastScannedAt).toLocaleDateString("tr-TR")}
+                        {timeAgo(project.lastScannedAt)}
                       </span>
                     )}
                   </div>

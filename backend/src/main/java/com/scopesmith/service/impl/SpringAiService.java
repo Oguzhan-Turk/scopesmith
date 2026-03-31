@@ -1,11 +1,14 @@
 package com.scopesmith.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.scopesmith.config.ModelProperties;
+import com.scopesmith.entity.ModelTier;
 import com.scopesmith.entity.OperationType;
 import com.scopesmith.service.AiService;
 import com.scopesmith.service.UsageTrackingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.metadata.Usage;
@@ -19,29 +22,42 @@ public class SpringAiService implements AiService {
     private final ChatClient.Builder chatClientBuilder;
     private final UsageTrackingService usageTrackingService;
     private final ObjectMapper objectMapper;
+    private final ModelProperties modelProperties;
 
     @Override
     public String chat(String systemPrompt, String userMessage) {
-        return chat(systemPrompt, userMessage, null, null);
+        return chat(systemPrompt, userMessage, null, null, null);
     }
 
     @Override
     public String chat(String systemPrompt, String userMessage,
                        OperationType operationType, Long projectId) {
-        log.debug("AI request — system: {} chars, user: {} chars", systemPrompt.length(), userMessage.length());
+        return chat(systemPrompt, userMessage, operationType, projectId, null);
+    }
+
+    @Override
+    public String chat(String systemPrompt, String userMessage,
+                       OperationType operationType, Long projectId, ModelTier modelTier) {
+        ModelTier effectiveTier = resolveEffectiveTier(operationType, modelTier);
+        String modelName = modelProperties.getModelName(effectiveTier);
+
+        log.debug("AI request [{}] — model: {}, system: {} chars, user: {} chars",
+                effectiveTier, modelName, systemPrompt.length(), userMessage.length());
 
         long startTime = System.currentTimeMillis();
         ChatResponse chatResponse = chatClientBuilder.build()
                 .prompt()
                 .system(systemPrompt)
                 .user(userMessage)
+                .options(AnthropicChatOptions.builder().model(modelName).build())
                 .call()
                 .chatResponse();
 
         long durationMs = System.currentTimeMillis() - startTime;
         String content = chatResponse.getResult().getOutput().getText();
 
-        log.debug("AI response — {} chars, {}ms", content != null ? content.length() : 0, durationMs);
+        log.debug("AI response [{}] — {} chars, {}ms", effectiveTier,
+                content != null ? content.length() : 0, durationMs);
 
         if (operationType != null) {
             trackUsage(chatResponse, operationType, projectId, durationMs);
@@ -52,18 +68,27 @@ public class SpringAiService implements AiService {
 
     @Override
     public <T> T chatWithStructuredOutput(String systemPrompt, String userMessage, Class<T> responseType) {
-        return chatWithStructuredOutput(systemPrompt, userMessage, responseType, null, null);
+        return chatWithStructuredOutput(systemPrompt, userMessage, responseType, null, null, null);
     }
 
     @Override
     public <T> T chatWithStructuredOutput(String systemPrompt, String userMessage, Class<T> responseType,
                                            OperationType operationType, Long projectId) {
-        log.debug("AI structured request — type: {}, system: {} chars, user: {} chars",
-                responseType.getSimpleName(), systemPrompt.length(), userMessage.length());
+        return chatWithStructuredOutput(systemPrompt, userMessage, responseType, operationType, projectId, null);
+    }
+
+    @Override
+    public <T> T chatWithStructuredOutput(String systemPrompt, String userMessage, Class<T> responseType,
+                                           OperationType operationType, Long projectId, ModelTier modelTier) {
+        ModelTier effectiveTier = resolveEffectiveTier(operationType, modelTier);
+        String modelName = modelProperties.getModelName(effectiveTier);
+
+        log.debug("AI structured request [{}] — model: {}, type: {}, system: {} chars, user: {} chars",
+                effectiveTier, modelName, responseType.getSimpleName(),
+                systemPrompt.length(), userMessage.length());
 
         long startTime = System.currentTimeMillis();
 
-        // Add JSON format instruction to system prompt (since we use chatResponse instead of entity())
         String jsonSystemPrompt = systemPrompt + "\n\nIMPORTANT: Return your response as a valid JSON object only. " +
                 "Do not include any text, markdown, or explanation before or after the JSON. " +
                 "The JSON must match the structure of " + responseType.getSimpleName() + ".";
@@ -72,6 +97,7 @@ public class SpringAiService implements AiService {
                 .prompt()
                 .system(jsonSystemPrompt)
                 .user(userMessage)
+                .options(AnthropicChatOptions.builder().model(modelName).build())
                 .call()
                 .chatResponse();
 
@@ -81,12 +107,12 @@ public class SpringAiService implements AiService {
             trackUsage(chatResponse, operationType, projectId, durationMs);
         }
 
-        // Parse JSON response
         String content = chatResponse.getResult().getOutput().getText();
         try {
             String json = extractJson(content);
             T entity = objectMapper.readValue(json, responseType);
-            log.debug("AI structured response — parsed to {}, {}ms", responseType.getSimpleName(), durationMs);
+            log.debug("AI structured response [{}] — parsed to {}, {}ms",
+                    effectiveTier, responseType.getSimpleName(), durationMs);
             return entity;
         } catch (Exception e) {
             log.error("Failed to parse AI response to {}: {}", responseType.getSimpleName(), e.getMessage());
@@ -100,8 +126,17 @@ public class SpringAiService implements AiService {
         return chat(
                 "You are a helpful assistant.",
                 "Say 'ScopeSmith AI is ready!' in exactly those words.",
-                OperationType.HEALTH_CHECK, null
+                OperationType.HEALTH_CHECK, null, ModelTier.LIGHT
         );
+    }
+
+    /**
+     * Resolve effective tier: explicit override > operation default > STANDARD fallback.
+     */
+    private ModelTier resolveEffectiveTier(OperationType operationType, ModelTier modelTier) {
+        if (modelTier != null) return modelTier;
+        if (operationType != null) return operationType.getDefaultTier();
+        return ModelTier.STANDARD;
     }
 
     /**
@@ -111,7 +146,6 @@ public class SpringAiService implements AiService {
         if (content == null) throw new RuntimeException("AI returned null response");
         String text = content.trim();
 
-        // Remove markdown code block wrapping
         if (text.contains("```")) {
             int start = text.indexOf("```");
             int contentStart = text.indexOf('\n', start);
@@ -121,7 +155,6 @@ public class SpringAiService implements AiService {
             }
         }
 
-        // Find first { or [ — skip any leading text
         int braceIdx = text.indexOf('{');
         int bracketIdx = text.indexOf('[');
         int startIdx = -1;
@@ -129,17 +162,12 @@ public class SpringAiService implements AiService {
         else if (braceIdx >= 0) startIdx = braceIdx;
         else if (bracketIdx >= 0) startIdx = bracketIdx;
 
-        if (startIdx > 0) {
-            text = text.substring(startIdx);
-        }
+        if (startIdx > 0) text = text.substring(startIdx);
 
-        // Find matching closing brace/bracket from the end
         int lastBrace = text.lastIndexOf('}');
         int lastBracket = text.lastIndexOf(']');
         int endIdx = Math.max(lastBrace, lastBracket);
-        if (endIdx > 0 && endIdx < text.length() - 1) {
-            text = text.substring(0, endIdx + 1);
-        }
+        if (endIdx > 0 && endIdx < text.length() - 1) text = text.substring(0, endIdx + 1);
 
         return text;
     }

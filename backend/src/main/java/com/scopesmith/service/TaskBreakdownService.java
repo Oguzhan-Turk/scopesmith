@@ -1,6 +1,7 @@
 package com.scopesmith.service;
 
 import com.scopesmith.config.PromptLoader;
+import com.scopesmith.dto.SpSuggestionResult;
 import com.scopesmith.dto.TaskBreakdownResult;
 import com.scopesmith.dto.TaskRefineResponse;
 import com.scopesmith.dto.TaskResponse;
@@ -23,9 +24,38 @@ public class TaskBreakdownService {
     private final AiService aiService;
     private final AnalysisRepository analysisRepository;
     private final TaskRepository taskRepository;
+    private final DocumentService documentService;
+    private final CodeIntelligenceService codeIntelligenceService;
+    private final JiraService jiraService;
+    private final GitHubService gitHubService;
     private final PromptLoader promptLoader;
 
     private static final long MIN_TASKS_FOR_CALIBRATION = 20;
+
+    /**
+     * Suggest SP for a manual task using LIGHT tier AI.
+     */
+    public SpSuggestionResult suggestSpForTask(Long taskId) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new EntityNotFoundException("Task not found: " + taskId));
+
+        Long projectId = task.getAnalysis().getRequirement().getProject().getId();
+        String techContext = task.getAnalysis().getRequirement().getProject().getTechContext();
+
+        StringBuilder message = new StringBuilder();
+        if (techContext != null) {
+            message.append("## Project Context\n").append(techContext).append("\n\n");
+        }
+        message.append("## Task\n");
+        message.append("Title: ").append(task.getTitle()).append("\n");
+        if (task.getDescription() != null) {
+            message.append("Description: ").append(task.getDescription()).append("\n");
+        }
+
+        return aiService.chatWithStructuredOutput(
+                promptLoader.load("sp-suggestion"), message.toString(), SpSuggestionResult.class,
+                OperationType.SP_SUGGESTION, projectId, ModelTier.LIGHT);
+    }
 
     /**
      * Generate tasks from analysis. AI call is outside the transaction.
@@ -197,6 +227,24 @@ public class TaskBreakdownService {
                 .map(Task::getJiraKey)
                 .toList();
 
+        // Auto-close orphaned issues
+        if (!orphanedIssues.isEmpty()) {
+            String repo = null;
+            try { repo = analysis.getRequirement().getProject().getIntegrationConfig(); } catch (Exception ignored) {}
+            for (String issueKey : orphanedIssues) {
+                try {
+                    if (issueKey.startsWith("#")) {
+                        gitHubService.closeIssue(repo, issueKey);
+                    } else {
+                        jiraService.closeIssue(issueKey);
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to auto-close orphaned issue {}: {}", issueKey, e.getMessage());
+                }
+            }
+            log.info("Auto-closed {} orphaned issues: {}", orphanedIssues.size(), orphanedIssues);
+        }
+
         return TaskRefineResponse.builder()
                 .tasks(analysis.getTasks().stream().map(TaskResponse::from).toList())
                 .preservedIssues(preservedIssues)
@@ -247,6 +295,28 @@ public class TaskBreakdownService {
             message.append("\n\n");
         }
 
+        // CLAUDE.md content
+        String claudeMd = requirement.getProject().getClaudeMdContent();
+        if (claudeMd != null && !claudeMd.isBlank()) {
+            message.append("## Project Developer Notes (CLAUDE.md)\n");
+            message.append(claudeMd);
+            message.append("\n\n");
+        }
+
+        // Document context
+        String docContext = documentService.getProjectDocumentContext(requirement.getProject().getId());
+        if (docContext != null) {
+            message.append("## Project Documents\n");
+            message.append(docContext);
+            message.append("\n\n");
+        }
+        String reqDocContext = documentService.getRequirementDocumentContext(requirement.getId());
+        if (reqDocContext != null) {
+            message.append("## Requirement-Specific Documents\n");
+            message.append(reqDocContext);
+            message.append("\n\n");
+        }
+
         // Original requirement
         message.append("## Original Requirement\n");
         message.append(requirement.getRawText());
@@ -274,6 +344,16 @@ public class TaskBreakdownService {
             message.append("## Affected Modules\n");
             message.append(analysis.getAffectedModules());
             message.append("\n\n");
+
+            // Code intelligence — local regex parsing + git analysis (token-free)
+            String projectPath = requirement.getProject().getLocalPath();
+            if (projectPath != null) {
+                List<String> modules = List.of(analysis.getAffectedModules().split(",\\s*"));
+                String codeAnalysis = codeIntelligenceService.analyzeModules(projectPath, modules);
+                if (codeAnalysis != null) {
+                    message.append(codeAnalysis).append("\n");
+                }
+            }
         }
 
         // Q&A if available
@@ -291,12 +371,11 @@ public class TaskBreakdownService {
             }
         }
 
-        // Historical task data for Learning SP (ADR-003)
-        Long projectId = requirement.getProject().getId();
-        long finalizedCount = taskRepository.countFinalizedTasksByProjectId(projectId);
+        // Historical task data for Learning SP — org-level calibration (ADR-003)
+        long finalizedCount = taskRepository.countAllFinalizedTasks();
 
         if (finalizedCount > 0) {
-            List<Task> historicalTasks = taskRepository.findFinalizedTasksByProjectId(projectId);
+            List<Task> historicalTasks = taskRepository.findAllFinalizedTasks();
 
             message.append("## Historical Task Data (Learning SP)\n");
 
@@ -333,8 +412,8 @@ public class TaskBreakdownService {
             );
             message.append("\n");
 
-            log.info("Learning SP: {} historical tasks included for project #{} (calibration: {})",
-                    finalizedCount, projectId, finalizedCount >= MIN_TASKS_FOR_CALIBRATION ? "active" : "insufficient data");
+            log.info("Learning SP: {} org-level historical tasks included (calibration: {})",
+                    finalizedCount, finalizedCount >= MIN_TASKS_FOR_CALIBRATION ? "active" : "insufficient data");
         }
 
         message.append("Break this down into development tasks with story point estimates.");

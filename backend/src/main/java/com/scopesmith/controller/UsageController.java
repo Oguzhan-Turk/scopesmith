@@ -23,7 +23,7 @@ public class UsageController {
     public Map<String, Object> getProjectSummary(
             @PathVariable Long projectId,
             @RequestParam(defaultValue = "1.5") double hoursPerAnalysis,
-            @RequestParam(defaultValue = "50.0") double hourlyRate) {
+            @RequestParam(defaultValue = "25.0") double hourlyRate) {
         // Use entity-level aggregation instead of raw query to avoid cast issues
         List<UsageRecord> records = usageRecordRepository.findByProjectIdOrderByCreatedAtDesc(projectId);
 

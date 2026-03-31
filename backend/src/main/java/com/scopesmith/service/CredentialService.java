@@ -1,5 +1,6 @@
 package com.scopesmith.service;
 
+import com.scopesmith.config.EncryptionService;
 import com.scopesmith.entity.Credential;
 import com.scopesmith.repository.CredentialRepository;
 import lombok.RequiredArgsConstructor;
@@ -11,8 +12,9 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Manages credentials stored in the database.
- * DB credentials take priority over .env values.
+ * Manages credentials stored encrypted in the database.
+ * Values are encrypted at rest, decrypted on read.
+ * Frontend always receives masked values.
  */
 @Service
 @RequiredArgsConstructor
@@ -20,17 +22,19 @@ import java.util.Optional;
 public class CredentialService {
 
     private final CredentialRepository credentialRepository;
+    private final EncryptionService encryptionService;
 
     public Optional<String> get(String key) {
-        return credentialRepository.findByKey(key).map(Credential::getValue);
+        return credentialRepository.findByKey(key)
+                .map(c -> encryptionService.decrypt(c.getValue()));
     }
 
     public void save(String key, String value) {
         Credential credential = credentialRepository.findByKey(key)
                 .orElse(Credential.builder().key(key).build());
-        credential.setValue(value);
+        credential.setValue(encryptionService.encrypt(value));
         credentialRepository.save(credential);
-        log.info("Credential saved: {}", key);
+        log.info("Credential saved (encrypted): {}", key);
     }
 
     public void delete(String key) {
@@ -39,29 +43,31 @@ public class CredentialService {
 
     /**
      * Returns all credentials with values masked for display.
+     * Decrypts first to get actual length for proper masking.
      */
     public Map<String, String> getAllMasked() {
         Map<String, String> result = new LinkedHashMap<>();
         for (Credential c : credentialRepository.findAll()) {
-            String masked = maskValue(c.getValue());
-            result.put(c.getKey(), masked);
+            String decrypted = encryptionService.decrypt(c.getValue());
+            result.put(c.getKey(), maskValue(decrypted));
         }
         return result;
     }
 
     /**
-     * Returns all credentials with actual values (for internal use by config beans).
+     * Returns all credentials with actual (decrypted) values.
+     * For internal use by integration services only.
      */
     public Map<String, String> getAll() {
         Map<String, String> result = new LinkedHashMap<>();
         for (Credential c : credentialRepository.findAll()) {
-            result.put(c.getKey(), c.getValue());
+            result.put(c.getKey(), encryptionService.decrypt(c.getValue()));
         }
         return result;
     }
 
     private String maskValue(String value) {
-        if (value == null || value.length() < 8) return "****";
-        return value.substring(0, 4) + "****" + value.substring(value.length() - 4);
+        if (value == null || value.length() < 8) return "••••••••";
+        return value.substring(0, 4) + "••••" + value.substring(value.length() - 4);
     }
 }

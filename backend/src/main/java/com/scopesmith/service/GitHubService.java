@@ -273,4 +273,37 @@ public class GitHubService {
         }
         return null;
     }
+
+    /**
+     * Close a GitHub issue with a comment.
+     */
+    public void closeIssue(String repo, String issueRef) {
+        String token = gitHubConfig.getToken();
+        String targetRepo = firstNonBlank(repo, gitHubConfig.getRepo());
+        if (token == null || token.isBlank() || targetRepo == null) {
+            log.warn("Cannot close GitHub issue {}: credentials not configured", issueRef);
+            return;
+        }
+
+        try {
+            String number = issueRef.replace("#", "");
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(token);
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            // Add comment
+            String commentUrl = "https://api.github.com/repos/" + targetRepo + "/issues/" + number + "/comments";
+            restTemplate.exchange(commentUrl, HttpMethod.POST,
+                    new HttpEntity<>(Map.of("body", "Bu görev ScopeSmith'te kaldırıldı/değiştirildi."), headers), Map.class);
+
+            // Close issue
+            String closeUrl = "https://api.github.com/repos/" + targetRepo + "/issues/" + number;
+            restTemplate.exchange(closeUrl, HttpMethod.PATCH,
+                    new HttpEntity<>(Map.of("state", "closed"), headers), Map.class);
+
+            log.info("Closed GitHub issue {} on {}", issueRef, targetRepo);
+        } catch (Exception e) {
+            log.warn("Failed to close GitHub issue {}: {}", issueRef, e.getMessage());
+        }
+    }
 }

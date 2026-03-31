@@ -7,6 +7,8 @@ import com.scopesmith.dto.TaskResponse;
 import com.scopesmith.entity.Analysis;
 import com.scopesmith.entity.Project;
 import com.scopesmith.repository.AnalysisRepository;
+import com.scopesmith.dto.FeatureSuggestionResult;
+import com.scopesmith.service.FeatureSuggestionService;
 import com.scopesmith.service.GitCloneService;
 import com.scopesmith.service.InsightService;
 import com.scopesmith.service.ProjectContextService;
@@ -28,6 +30,7 @@ public class ProjectController {
     private final ProjectContextService contextService;
     private final GitCloneService gitCloneService;
     private final InsightService insightService;
+    private final FeatureSuggestionService featureSuggestionService;
     private final AnalysisRepository analysisRepository;
     private final ObjectMapper objectMapper;
 
@@ -170,5 +173,10 @@ public class ProjectController {
                 gitCloneService.cleanup(clonedDir);
             }
         }
+    }
+
+    @PostMapping("/{id}/suggest-features")
+    public FeatureSuggestionResult suggestFeatures(@PathVariable Long id) {
+        return featureSuggestionService.suggestFeatures(id);
     }
 }

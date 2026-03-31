@@ -7,7 +7,10 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @RestController
@@ -17,6 +20,8 @@ public class DocumentController {
 
     private final DocumentService documentService;
 
+    // ── Project-level documents ──
+
     @PostMapping("/projects/{projectId}/documents")
     @ResponseStatus(HttpStatus.CREATED)
     public DocumentResponse addDocument(
@@ -25,10 +30,55 @@ public class DocumentController {
         return documentService.addDocument(projectId, request);
     }
 
+    @PostMapping("/projects/{projectId}/documents/upload")
+    @ResponseStatus(HttpStatus.CREATED)
+    public DocumentResponse uploadDocument(
+            @PathVariable Long projectId,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "docType", required = false, defaultValue = "OTHER") String docType) throws IOException {
+        String content = new String(file.getBytes(), StandardCharsets.UTF_8);
+        DocumentRequest request = new DocumentRequest();
+        request.setFilename(file.getOriginalFilename());
+        request.setContent(content);
+        request.setDocType(docType);
+        return documentService.addDocument(projectId, request);
+    }
+
     @GetMapping("/projects/{projectId}/documents")
     public List<DocumentResponse> findByProject(@PathVariable Long projectId) {
         return documentService.findByProject(projectId);
     }
+
+    // ── Requirement-level documents ──
+
+    @PostMapping("/requirements/{requirementId}/documents")
+    @ResponseStatus(HttpStatus.CREATED)
+    public DocumentResponse addRequirementDocument(
+            @PathVariable Long requirementId,
+            @Valid @RequestBody DocumentRequest request) {
+        return documentService.addRequirementDocument(requirementId, request);
+    }
+
+    @PostMapping("/requirements/{requirementId}/documents/upload")
+    @ResponseStatus(HttpStatus.CREATED)
+    public DocumentResponse uploadRequirementDocument(
+            @PathVariable Long requirementId,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "docType", required = false, defaultValue = "OTHER") String docType) throws IOException {
+        String content = new String(file.getBytes(), StandardCharsets.UTF_8);
+        DocumentRequest request = new DocumentRequest();
+        request.setFilename(file.getOriginalFilename());
+        request.setContent(content);
+        request.setDocType(docType);
+        return documentService.addRequirementDocument(requirementId, request);
+    }
+
+    @GetMapping("/requirements/{requirementId}/documents")
+    public List<DocumentResponse> findByRequirement(@PathVariable Long requirementId) {
+        return documentService.findByRequirement(requirementId);
+    }
+
+    // ── Delete (works for both project and requirement docs) ──
 
     @DeleteMapping("/documents/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)

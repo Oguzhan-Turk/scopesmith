@@ -30,6 +30,13 @@ public class Question {
     private String questionText;
 
     /**
+     * AI-suggested answer based on project context.
+     * Helps the user by providing a starting point.
+     */
+    @Column(columnDefinition = "TEXT")
+    private String suggestedAnswer;
+
+    /**
      * Answer provided by user/PO.
      * Null means the question is still open.
      */

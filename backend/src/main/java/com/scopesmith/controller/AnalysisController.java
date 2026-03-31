@@ -10,6 +10,7 @@ import com.scopesmith.repository.TaskRepository;
 import com.scopesmith.service.GitHubService;
 import com.scopesmith.service.JiraExportService;
 import com.scopesmith.service.JiraService;
+import com.scopesmith.service.RequirementAnalysisService;
 import com.scopesmith.service.StakeholderSummaryService;
 import com.scopesmith.service.TaskBreakdownService;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,7 @@ import java.util.Map;
 public class AnalysisController {
 
     private final TaskBreakdownService taskBreakdownService;
+    private final RequirementAnalysisService requirementAnalysisService;
     private final StakeholderSummaryService stakeholderSummaryService;
     private final GitHubService gitHubService;
     private final JiraExportService jiraExportService;
@@ -95,6 +97,15 @@ public class AnalysisController {
             @RequestBody Map<String, String> request) {
         String instruction = extractInstruction(request);
         return taskBreakdownService.refineTasks(id, instruction);
+    }
+
+    @PostMapping("/{id}/refine")
+    public AnalysisResponse refineAnalysis(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> request) {
+        String instruction = extractInstruction(request);
+        Analysis refined = requirementAnalysisService.refineAnalysis(id, instruction);
+        return AnalysisResponse.from(refined);
     }
 
     @PostMapping("/{id}/stakeholder-summary")
