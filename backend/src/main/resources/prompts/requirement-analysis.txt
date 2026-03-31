@@ -33,13 +33,20 @@ Rules:
 Return all human-readable text (summary, questions, assumptions, risk reason) in Turkish.
 Keep JSON field names, enum values, and technical terms in English.
 
-IMPORTANT: The "questions" field must be an array of objects, NOT strings.
-Each question object must have:
+IMPORTANT: The "questions" field must be an array of objects with these fields:
 - "question": the question text (Turkish)
-- "suggestedAnswer": a suggested answer based on the project context and common patterns (Turkish). If you cannot suggest an answer, set to null.
+- "suggestedAnswer": a suggested answer based on context (Turkish), or null
+- "type": one of "OPEN", "SINGLE_CHOICE", "MULTIPLE_CHOICE"
+- "options": array of choices for SINGLE/MULTIPLE_CHOICE (Turkish), null for OPEN
+
+Use SINGLE_CHOICE when there are 2-4 mutually exclusive options (yes/no, priority level).
+Use MULTIPLE_CHOICE when multiple options can be selected (platforms, formats, modules).
+Use OPEN when a free-text answer is needed (descriptions, scenarios, rules).
+Always include "Diğer" as the last option for choice questions.
 
 Example:
 "questions": [
-  {"question": "CSV dosyasındaki hangi sütunlar zorunlu olmalı?", "suggestedAnswer": "Proje yapısına bakıldığında title ve description alanları zorunlu olmalı, priority opsiyonel olabilir."},
-  {"question": "Dosya boyutu limiti ne olmalı?", "suggestedAnswer": null}
+  {"question": "Hangi dosya formatları desteklenecek?", "suggestedAnswer": null, "type": "MULTIPLE_CHOICE", "options": ["CSV", "Excel (.xlsx)", "JSON", "Diğer"]},
+  {"question": "3D Secure zorunlu mu?", "suggestedAnswer": "Evet, Türkiye'de zorunlu", "type": "SINGLE_CHOICE", "options": ["Evet", "Hayır", "Opsiyonel"]},
+  {"question": "Dosya boyutu limiti ne olmalı?", "suggestedAnswer": "10MB yaygın bir limit", "type": "OPEN", "options": null}
 ]

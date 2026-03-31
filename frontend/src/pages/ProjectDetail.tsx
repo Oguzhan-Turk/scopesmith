@@ -834,7 +834,7 @@ export default function ProjectDetail() {
           </div>
         </TabsContent>
 
-        {/* WORKSPACE TAB — Analiz + Task'lar + Yönetici Özeti tek akışta */}
+        {/* WORKSPACE TAB — Analiz + Task'lar + Talep Açıklaması tek akışta */}
         <TabsContent value="detail" className="space-y-6">
           {!selectedRequirementId ? (
             <Card className="text-center py-16">
@@ -964,70 +964,121 @@ export default function ProjectDetail() {
               {selectedAnalysis.questions.length > 0 && (
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">
-                      Sorular ({selectedAnalysis.questions.filter((q) => q.status === "OPEN").length} açık)
-                    </CardTitle>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg">Açık Noktalar</CardTitle>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          {selectedAnalysis.questions.filter((q) => q.status === "OPEN").length} / {selectedAnalysis.questions.length} açık
+                        </span>
+                        <div className="h-1.5 w-20 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-primary rounded-full transition-all"
+                            style={{ width: `${((selectedAnalysis.questions.length - selectedAnalysis.questions.filter((q) => q.status === "OPEN").length) / selectedAnalysis.questions.length) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    {selectedAnalysis.questions.map((q) => (
-                      <div key={q.id} className="border rounded-lg p-4">
-                        <p className="text-sm font-medium mb-2">{q.questionText}</p>
-                        {q.suggestedAnswer && q.status === "OPEN" && (
-                          <button
-                            className="text-xs text-primary hover:underline mb-2 text-left"
-                            onClick={() => setAnswers((prev) => ({ ...prev, [q.id]: q.suggestedAnswer! }))}
-                          >
-                            AI önerisi: <span className="italic text-muted-foreground">{q.suggestedAnswer}</span>
-                          </button>
-                        )}
-                        {q.status === "OPEN" ? (
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              placeholder="Cevap girin..."
-                              value={answers[q.id] || ""}
-                              onChange={(e) =>
-                                setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
-                              }
-                              className="flex-1 px-3 py-1.5 text-sm border rounded-md bg-background"
-                            />
-                            <Button
-                              size="sm"
-                              onClick={() => handleAnswer(q.id)}
-                              disabled={actionLoading === `answer-${q.id}`}
-                            >
-                              Cevapla
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleDismiss(q.id)}
-                              disabled={actionLoading === `dismiss-${q.id}`}
-                            >
-                              Geçersiz
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <Badge variant={q.status === "ANSWERED" ? "default" : "secondary"}>
-                              {q.status === "ANSWERED" ? "Cevaplandı" : "Geçersiz"}
-                            </Badge>
-                            {q.answer && (
-                              <span className="text-sm text-muted-foreground">{q.answer}</span>
+                  <CardContent className="space-y-3">
+                    {selectedAnalysis.questions.map((q, idx) => (
+                      <div key={q.id} className={`rounded-lg border p-4 ${q.status === "OPEN" ? "bg-background" : "bg-muted/30"}`}>
+                        <div className="flex items-start gap-3">
+                          <span className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                            q.status === "OPEN" ? "bg-primary/10 text-primary" : "bg-green-500/10 text-green-600"
+                          }`}>
+                            {q.status === "OPEN" ? idx + 1 : "✓"}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium mb-2">{q.questionText}</p>
+
+                            {q.status === "OPEN" ? (
+                              <div className="space-y-2">
+                                {/* AI Öneri */}
+                                {q.suggestedAnswer && (
+                                  <button
+                                    className="text-xs text-primary/80 hover:text-primary text-left block"
+                                    onClick={() => setAnswers((prev) => ({ ...prev, [q.id]: q.suggestedAnswer! }))}
+                                  >
+                                    💡 <span className="italic">{q.suggestedAnswer}</span>
+                                  </button>
+                                )}
+
+                                {/* Şıklı soru */}
+                                {q.options && q.options.length > 0 && (q.questionType === "MULTIPLE_CHOICE" || q.questionType === "SINGLE_CHOICE") ? (
+                                  <div className="space-y-2">
+                                    <div className="flex flex-wrap gap-2">
+                                      {q.options.map((opt) => {
+                                        const currentAnswer = answers[q.id] || "";
+                                        const selected = currentAnswer.split(", ").includes(opt);
+                                        return (
+                                          <button
+                                            key={opt}
+                                            className={`px-3 py-1.5 text-xs rounded-md border transition-colors ${
+                                              selected ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"
+                                            }`}
+                                            onClick={() => {
+                                              if (q.questionType === "SINGLE_CHOICE") {
+                                                setAnswers((prev) => ({ ...prev, [q.id]: opt }));
+                                              } else {
+                                                const parts = currentAnswer ? currentAnswer.split(", ").filter(Boolean) : [];
+                                                const next = selected ? parts.filter((p) => p !== opt) : [...parts, opt];
+                                                setAnswers((prev) => ({ ...prev, [q.id]: next.join(", ") }));
+                                              }
+                                            }}
+                                          >
+                                            {opt}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <Button size="sm" onClick={() => handleAnswer(q.id)} disabled={actionLoading === `answer-${q.id}` || !(answers[q.id] || "").trim()}>
+                                        {actionLoading === `answer-${q.id}` ? "..." : "Onayla"}
+                                      </Button>
+                                      <Button size="sm" variant="ghost" onClick={() => handleDismiss(q.id)} disabled={actionLoading === `dismiss-${q.id}`}>
+                                        Atla
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  /* Açık uçlu soru */
+                                  <div className="flex gap-2">
+                                    <input
+                                      type="text"
+                                      placeholder="Cevap girin..."
+                                      value={answers[q.id] || ""}
+                                      onChange={(e) => setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))}
+                                      className="flex-1 px-3 py-1.5 text-sm border rounded-md bg-background"
+                                    />
+                                    <Button size="sm" onClick={() => handleAnswer(q.id)} disabled={actionLoading === `answer-${q.id}` || !(answers[q.id] || "").trim()}>
+                                      {actionLoading === `answer-${q.id}` ? "..." : "Onayla"}
+                                    </Button>
+                                    <Button size="sm" variant="ghost" onClick={() => handleDismiss(q.id)} disabled={actionLoading === `dismiss-${q.id}`}>
+                                      Atla
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-sm text-muted-foreground">
+                                  {q.status === "ANSWERED" ? q.answer : "Atlandı"}
+                                </span>
+                              </div>
                             )}
                           </div>
-                        )}
+                        </div>
                       </div>
                     ))}
                   </CardContent>
                 </Card>
               )}
 
-              {/* Yönetici Özeti section */}
+              {/* Talep Açıklaması section */}
               {selectedAnalysis.stakeholderSummary ? (
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">Yönetici Özeti</CardTitle>
+                    <CardTitle className="text-lg">Talep Açıklaması</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="border-l-2 border-primary/30 pl-4 py-2">
@@ -1063,7 +1114,7 @@ export default function ProjectDetail() {
                       onClick={handleStakeholderSummary}
                       disabled={!!actionLoading}
                     >
-                      {actionLoading === "summary" ? "Hazırlanıyor..." : "Yönetici Özeti Üret"}
+                      {actionLoading === "summary" ? "Hazırlanıyor..." : "Talep Açıklaması Üret"}
                     </Button>
                   </CardContent>
                 </Card>
@@ -1114,7 +1165,7 @@ export default function ProjectDetail() {
                     );
                   })() : null}
                   <Button variant="outline" onClick={() => setManualTaskDialog(true)} disabled={!!actionLoading}>
-                    + Manuel Task
+                    + Task Ekle
                   </Button>
                   {isAdmin && tasks.length > 0 && (() => {
                     const syncedCount = tasks.filter((t) => t.jiraKey).length;
@@ -1742,28 +1793,19 @@ export default function ProjectDetail() {
                 <Card>
                   <CardContent className="pt-6">
                     <p className="text-2xl font-bold">{usageSummary.totalAiCalls}</p>
-                    <p className="text-xs text-muted-foreground mb-2">AI Çağrısı</p>
-                    <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full bg-primary rounded-full" style={{ width: `${Math.min(usageSummary.totalAiCalls * 5, 100)}%` }} />
-                    </div>
+                    <p className="text-xs text-muted-foreground">AI Çağrısı</p>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardContent className="pt-6">
                     <p className="text-2xl font-bold">{usageSummary.totalTokens.toLocaleString()}</p>
-                    <p className="text-xs text-muted-foreground mb-2">Toplam Token</p>
-                    <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full bg-primary/70 rounded-full" style={{ width: `${Math.min(usageSummary.totalTokens / 5000, 100)}%` }} />
-                    </div>
+                    <p className="text-xs text-muted-foreground">Toplam Token</p>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardContent className="pt-6">
                     <p className="text-2xl font-bold">${usageSummary.totalEstimatedCostUsd.toFixed(2)}</p>
-                    <p className="text-xs text-muted-foreground mb-2">Toplam Maliyet</p>
-                    <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full bg-amber-500 rounded-full" style={{ width: `${Math.min(usageSummary.totalEstimatedCostUsd * 10, 100)}%` }} />
-                    </div>
+                    <p className="text-xs text-muted-foreground">Toplam Maliyet</p>
                   </CardContent>
                 </Card>
                 <Card>
@@ -1794,10 +1836,7 @@ export default function ProjectDetail() {
                       </div>
                       <div>
                         <p className="text-2xl font-bold text-primary">{usageSummary.roi.roiMultiplier}x</p>
-                        <p className="text-xs text-muted-foreground mb-2">ROI Çarpanı</p>
-                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                          <div className="h-full bg-primary rounded-full" style={{ width: `${Math.min(usageSummary.roi.roiMultiplier * 10, 100)}%` }} />
-                        </div>
+                        <p className="text-xs text-muted-foreground">ROI Çarpanı</p>
                       </div>
                     </div>
                     <Separator />
@@ -1911,7 +1950,7 @@ export default function ProjectDetail() {
       <Dialog open={manualTaskDialog} onOpenChange={(open) => { if (!open) setManualTaskDialog(false); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Manuel Task Ekle</DialogTitle>
+            <DialogTitle>Task Ekle</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 pt-2">
             <div>
@@ -2166,7 +2205,7 @@ function formatOperationType(op: string): string {
     REQUIREMENT_ANALYSIS: "Talep Analizi",
     TASK_BREAKDOWN: "Task Üretimi",
     TASK_REFINEMENT: "Task İyileştirme",
-    STAKEHOLDER_SUMMARY: "Yönetici Özeti",
+    STAKEHOLDER_SUMMARY: "Talep Açıklaması",
     SUMMARY_REFINEMENT: "Özet İyileştirme",
     PROJECT_CONTEXT: "Proje Context",
     PROJECT_CONTEXT_STRUCTURED: "Yapısal Context",

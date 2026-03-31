@@ -77,10 +77,17 @@ public class RequirementAnalysisService {
 
         List<AnalysisResult.QuestionItem> questions = result.getQuestions() != null ? result.getQuestions() : List.of();
         for (AnalysisResult.QuestionItem qi : questions) {
+            String optionsJson = null;
+            if (qi.getOptions() != null && !qi.getOptions().isEmpty()) {
+                try { optionsJson = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(qi.getOptions()); }
+                catch (Exception ignored) {}
+            }
             Question question = Question.builder()
                     .analysis(savedAnalysis)
                     .questionText(qi.getQuestion())
                     .suggestedAnswer(qi.getSuggestedAnswer())
+                    .questionType(qi.getType() != null ? qi.getType() : "OPEN")
+                    .options(optionsJson)
                     .build();
             savedAnalysis.getQuestions().add(question);
         }

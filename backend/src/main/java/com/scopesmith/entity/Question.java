@@ -31,10 +31,22 @@ public class Question {
 
     /**
      * AI-suggested answer based on project context.
-     * Helps the user by providing a starting point.
      */
     @Column(columnDefinition = "TEXT")
     private String suggestedAnswer;
+
+    /**
+     * Question type: OPEN, SINGLE_CHOICE, MULTIPLE_CHOICE
+     */
+    @Builder.Default
+    private String questionType = "OPEN";
+
+    /**
+     * Choices for SINGLE/MULTIPLE_CHOICE questions.
+     * Stored as JSON array string: ["CSV","Excel","JSON"]
+     */
+    @Column(columnDefinition = "TEXT")
+    private String options;
 
     /**
      * Answer provided by user/PO.

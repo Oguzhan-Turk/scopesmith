@@ -33,6 +33,8 @@ public class AnalysisResponse {
         private Long id;
         private String questionText;
         private String suggestedAnswer;
+        private String questionType;
+        private List<String> options;
         private String answer;
         private String status;
     }
@@ -43,6 +45,8 @@ public class AnalysisResponse {
                         .id(q.getId())
                         .questionText(q.getQuestionText())
                         .suggestedAnswer(q.getSuggestedAnswer())
+                        .questionType(q.getQuestionType())
+                        .options(parseOptions(q.getOptions()))
                         .answer(q.getAnswer())
                         .status(q.getStatus().name())
                         .build())
@@ -64,5 +68,15 @@ public class AnalysisResponse {
                 .questions(questionResponses)
                 .createdAt(analysis.getCreatedAt())
                 .build();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<String> parseOptions(String optionsJson) {
+        if (optionsJson == null || optionsJson.isBlank()) return null;
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper().readValue(optionsJson, List.class);
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

@@ -32,7 +32,11 @@ Rules:
 Return all human-readable text (summary, questions, assumptions, risk reason) in Turkish.
 Keep JSON field names, enum values, and technical terms in English.
 
-IMPORTANT: The "questions" field must be an array of objects, NOT strings.
-Each question object must have:
+IMPORTANT: The "questions" field must be an array of objects with these fields:
 - "question": the question text (Turkish)
-- "suggestedAnswer": a suggested answer based on context and common patterns (Turkish), or null if no suggestion.
+- "suggestedAnswer": a suggested answer based on context (Turkish), or null
+- "type": one of "OPEN", "SINGLE_CHOICE", "MULTIPLE_CHOICE"
+- "options": array of choices for SINGLE/MULTIPLE_CHOICE (Turkish), null for OPEN
+
+Use SINGLE_CHOICE for yes/no or limited options. Use MULTIPLE_CHOICE for multi-select. Use OPEN for free-text.
+Always include "Diğer" as the last option for choice questions.

@@ -411,6 +411,8 @@ export interface Question {
   id: number;
   questionText: string;
   suggestedAnswer: string | null;
+  questionType: string | null; // OPEN, SINGLE_CHOICE, MULTIPLE_CHOICE
+  options: string[] | null;
   answer: string | null;
   status: string;
 }

@@ -27,5 +27,7 @@ public class AnalysisResult {
     public static class QuestionItem {
         private String question;
         private String suggestedAnswer;
+        private String type = "OPEN"; // OPEN, SINGLE_CHOICE, MULTIPLE_CHOICE
+        private List<String> options; // choices for SINGLE/MULTIPLE_CHOICE
     }
 }
