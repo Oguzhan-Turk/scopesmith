@@ -170,16 +170,20 @@ export default function ContextTab({
       {/* Kod Tarama */}
       {(() => {
         const hasSource = scanMode === "git" ? !!gitUrl.trim() : !!scanPath.trim();
-        const sourceLabel = scanMode === "git" ? gitUrl : scanPath;
+        const raw = scanMode === "git" ? gitUrl.trim() : scanPath.trim();
+        // Kısa isim: git → "owner/repo", local → "klasör adı"
+        const shortName = scanMode === "git"
+          ? raw.replace(/\.git$/, "").split("/").slice(-2).join("/")
+          : raw.split("/").filter(Boolean).pop() || raw;
         return (
           <div className="flex items-center justify-between rounded-lg border px-4 py-3">
             <div className="flex items-center gap-3 min-w-0">
               <Code className="w-4 h-4 text-muted-foreground flex-shrink-0" />
               {hasSource ? (
                 <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{sourceLabel}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {project.lastScannedAt ? `Son tarama: ${timeAgo(project.lastScannedAt)}` : "Henuz taranmadi"}
+                  <p className="text-sm font-medium">{shortName}</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {project.lastScannedAt ? `Son tarama: ${timeAgo(project.lastScannedAt)}` : "Henüz taranmadı"}
                   </p>
                 </div>
               ) : (
