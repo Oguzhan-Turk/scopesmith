@@ -3,9 +3,9 @@ spring:
     name: ScopeSmith
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/scopesmith
-    username: scopesmith
-    password: scopesmith_dev
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/scopesmith}
+    username: ${DB_USERNAME:scopesmith}
+    password: ${DB_PASSWORD:scopesmith_dev}
     driver-class-name: org.postgresql.Driver
 
   jpa:
