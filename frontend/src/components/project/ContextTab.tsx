@@ -9,6 +9,36 @@ import type { ContextTabProps } from "./types";
 
 interface StatItem { key: string; label: string; value: number; items: string[]; }
 
+const PREVIEW_COUNT = 4;
+
+function ObservationList({ label, items }: { label: string; items: string[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const visible = expanded ? items : items.slice(0, PREVIEW_COUNT);
+  const hidden = items.length - PREVIEW_COUNT;
+
+  return (
+    <div className="space-y-2">
+      <h5 className="text-xs font-semibold text-muted-foreground">{label}</h5>
+      <ul className="space-y-1.5">
+        {visible.map((item, i) => (
+          <li key={i} className="flex items-start gap-2 text-sm">
+            <span className="mt-1.5 w-1 h-1 rounded-full bg-muted-foreground/40 flex-shrink-0" />
+            <span className="leading-relaxed">{item}</span>
+          </li>
+        ))}
+      </ul>
+      {items.length > PREVIEW_COUNT && (
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+        >
+          {expanded ? "Daha az göster" : `+ ${hidden} daha`}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function StatGrid({ stats }: { stats: StatItem[] }) {
   const [active, setActive] = useState<string | null>(null);
   const activestat = stats.find((s) => s.key === active);
@@ -260,13 +290,27 @@ export default function ContextTab({
 
                 {/* Önemli gözlemler ve diğer alanlar */}
                 {remainingKeys.length > 0 && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-                    {remainingKeys.map((key) => (
-                      <div key={key} className="border-l-2 border-muted-foreground/15 pl-3 space-y-1">
-                        <h5 className="text-xs font-semibold text-muted-foreground">{fieldLabels[key] || key}</h5>
-                        <p className="text-sm leading-relaxed">{renderValue(sc[key])}</p>
-                      </div>
-                    ))}
+                  <div className="space-y-4 pt-1">
+                    {remainingKeys.map((key) => {
+                      const val = sc[key];
+                      const isObservations = Array.isArray(val) && val.length > 0 && typeof val[0] === "string";
+                      if (isObservations) {
+                        const items = val as string[];
+                        return (
+                          <ObservationList
+                            key={key}
+                            label={fieldLabels[key] || key}
+                            items={items}
+                          />
+                        );
+                      }
+                      return (
+                        <div key={key} className="border-l-2 border-muted-foreground/15 pl-3 space-y-1">
+                          <h5 className="text-xs font-semibold text-muted-foreground">{fieldLabels[key] || key}</h5>
+                          <p className="text-sm leading-relaxed">{renderValue(val)}</p>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>
