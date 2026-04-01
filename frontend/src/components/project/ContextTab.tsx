@@ -212,6 +212,8 @@ export default function ContextTab({
           const endpoints = sc.apiEndpoints as unknown[] | undefined;
           const techStack = sc.techStack as Record<string, unknown> | undefined;
           const frameworks = techStack?.frameworks as string[] | undefined;
+          const externalIntegrations = sc.externalIntegrations as string[] | undefined;
+          const architecturePattern = sc.architecturePattern as string | undefined;
 
           const toNames = (arr: unknown[] | undefined): string[] => {
             if (!arr || arr.length === 0) return [];
@@ -222,13 +224,15 @@ export default function ContextTab({
           };
 
           const stats = [
-            { key: "modules",    label: "Modüller",     value: modules?.length   || 0, items: toNames(modules) },
-            { key: "entities",   label: "Entity'ler",   value: entities?.length  || 0, items: toNames(entities) },
-            { key: "endpoints",  label: "Endpoint'ler", value: endpoints?.length || 0, items: toNames(endpoints) },
-            { key: "frameworks", label: "Framework",    value: frameworks?.length|| 0, items: frameworks || [] },
+            { key: "modules",      label: "Modüller",        value: modules?.length            || 0, items: toNames(modules) },
+            { key: "entities",     label: "Entity'ler",      value: entities?.length           || 0, items: toNames(entities) },
+            { key: "endpoints",    label: "Endpoint'ler",    value: endpoints?.length          || 0, items: toNames(endpoints) },
+            { key: "frameworks",   label: "Framework",       value: frameworks?.length         || 0, items: frameworks || [] },
+            { key: "integrations", label: "Dış Entegrasyon", value: externalIntegrations?.length || 0, items: externalIntegrations || [] },
           ].filter((s) => s.value > 0);
 
-          const statCoveredKeys = new Set(["modules", "entities", "apiEndpoints", "techStack"]);
+          // stat grid + architecturePattern + architectureDescription hariç alanlar
+          const statCoveredKeys = new Set(["modules", "entities", "apiEndpoints", "techStack", "externalIntegrations", "architecturePattern", "architectureDescription"]);
           const remainingKeys = [...priorityKeys, ...otherKeys].filter(
             (k) => sc[k] && !statCoveredKeys.has(k)
           );
@@ -242,6 +246,16 @@ export default function ContextTab({
                 {/* Stat kartları */}
                 {stats.length > 0 && (
                   <StatGrid stats={stats} />
+                )}
+
+                {/* Mimari Desen — tek değer, etiket olarak */}
+                {architecturePattern && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Mimari</span>
+                    <span className="px-2 py-0.5 text-xs rounded-md bg-muted/50 border font-medium">
+                      {architecturePattern}
+                    </span>
+                  </div>
                 )}
 
                 {/* Önemli gözlemler ve diğer alanlar */}
