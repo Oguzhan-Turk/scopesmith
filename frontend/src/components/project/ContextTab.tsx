@@ -15,7 +15,7 @@ function StatGrid({ stats }: { stats: StatItem[] }) {
 
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+      <div className={`grid gap-2 grid-cols-2 ${stats.length <= 4 ? "md:grid-cols-4" : "md:grid-cols-5"}`}>
         {stats.map((s) => {
           const isActive = active === s.key;
           return (
