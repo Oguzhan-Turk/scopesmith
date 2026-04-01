@@ -28,7 +28,8 @@ export default function DetailTab({
   setActionLoading,
   showToast,
 }: DetailTabProps) {
-  // "Diğer" seçeneği için serbest metin girişi — key: question id
+  // "Diğer" seçeneği: aktiflik (Set) + yazılan metin (Record)
+  const [digerActive, setDigerActive] = useState<Set<number>>(new Set());
   const [digerInputs, setDigerInputs] = useState<Record<number, string>>({});
   const [analysisRefineInput, setAnalysisRefineInput] = useState("");
 
@@ -201,27 +202,53 @@ export default function DetailTab({
 
                         {q.options && q.options.length > 0 && (q.questionType === "MULTIPLE_CHOICE" || q.questionType === "SINGLE_CHOICE") ? (
                           <div className="space-y-2">
+                            {q.questionType === "MULTIPLE_CHOICE" && (
+                              <p className="text-xs text-muted-foreground">Birden fazla seçilebilir</p>
+                            )}
                             <div className="flex flex-wrap gap-2">
                               {q.options.map((opt) => {
-                                const currentAnswer = answers[q.id] || "";
                                 const isDiger = opt === "Diğer";
-                                const digerSelected = isDiger && currentAnswer.split(", ").includes("Diğer");
-                                const selected = currentAnswer.split(", ").includes(opt);
+                                const currentAnswer = answers[q.id] || "";
+                                // "Diğer" chip: aktiflik ayrı Set'te takip edilir
+                                const selected = isDiger
+                                  ? digerActive.has(q.id)
+                                  : currentAnswer.split(", ").includes(opt);
                                 return (
                                   <button
                                     key={opt}
                                     className={`px-3 py-1.5 text-xs rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                                      selected || digerSelected ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"
+                                      selected ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"
                                     }`}
                                     onClick={() => {
-                                      if (q.questionType === "SINGLE_CHOICE") {
-                                        setAnswers((prev) => ({ ...prev, [q.id]: opt }));
-                                        if (!isDiger) setDigerInputs((prev) => ({ ...prev, [q.id]: "" }));
+                                      if (isDiger) {
+                                        // "Diğer" toggle
+                                        const nowActive = !digerActive.has(q.id);
+                                        setDigerActive((prev) => {
+                                          const next = new Set(prev);
+                                          nowActive ? next.add(q.id) : next.delete(q.id);
+                                          return next;
+                                        });
+                                        if (!nowActive) {
+                                          // Deselect: temizle
+                                          setDigerInputs((prev) => ({ ...prev, [q.id]: "" }));
+                                          if (q.questionType === "SINGLE_CHOICE") {
+                                            setAnswers((prev) => ({ ...prev, [q.id]: "" }));
+                                          }
+                                          // MULTIPLE: diğer seçimler kalır
+                                        }
                                       } else {
-                                        const parts = currentAnswer ? currentAnswer.split(", ").filter(Boolean) : [];
-                                        const next = selected ? parts.filter((p) => p !== opt) : [...parts, opt];
-                                        setAnswers((prev) => ({ ...prev, [q.id]: next.join(", ") }));
-                                        if (isDiger && selected) setDigerInputs((prev) => ({ ...prev, [q.id]: "" }));
+                                        // Normal seçenek
+                                        if (q.questionType === "SINGLE_CHOICE") {
+                                          setAnswers((prev) => ({ ...prev, [q.id]: opt }));
+                                          // Diğer'i kapat
+                                          setDigerActive((prev) => { const next = new Set(prev); next.delete(q.id); return next; });
+                                          setDigerInputs((prev) => ({ ...prev, [q.id]: "" }));
+                                        } else {
+                                          const parts = currentAnswer ? currentAnswer.split(", ").filter(Boolean) : [];
+                                          const isSelected = parts.includes(opt);
+                                          const next = isSelected ? parts.filter((p) => p !== opt) : [...parts, opt];
+                                          setAnswers((prev) => ({ ...prev, [q.id]: next.join(", ") }));
+                                        }
                                       }
                                     }}
                                   >
@@ -231,8 +258,8 @@ export default function DetailTab({
                               })}
                             </div>
 
-                            {/* "Diğer" seçiliyse serbest metin alanı */}
-                            {(answers[q.id] || "").split(", ").includes("Diğer") && (
+                            {/* "Diğer" aktifse serbest metin */}
+                            {digerActive.has(q.id) && (
                               <input
                                 type="text"
                                 autoFocus
@@ -241,17 +268,36 @@ export default function DetailTab({
                                 onChange={(e) => {
                                   const text = e.target.value;
                                   setDigerInputs((prev) => ({ ...prev, [q.id]: text }));
-                                  // Cevaba "Diğer" yerine yazılan metni yansıt
-                                  const parts = (answers[q.id] || "").split(", ").filter((p) => p !== "Diğer" && p !== (digerInputs[q.id] || ""));
-                                  const next = text.trim() ? [...parts, text] : [...parts, "Diğer"];
-                                  setAnswers((prev) => ({ ...prev, [q.id]: next.join(", ") }));
                                 }}
                                 className="w-full px-3 py-1.5 text-sm border rounded-md bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                               />
                             )}
 
                             <div className="flex gap-2">
-                              <Button size="sm" onClick={() => handleAnswer(q.id)} disabled={actionLoading === `answer-${q.id}` || !(answers[q.id] || "").replace("Diğer", "").trim()}>
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  // Cevabı oluştur: seçili seçenekler + "Diğer" metni
+                                  let finalAnswer = answers[q.id] || "";
+                                  if (digerActive.has(q.id) && digerInputs[q.id]?.trim()) {
+                                    if (q.questionType === "SINGLE_CHOICE") {
+                                      finalAnswer = digerInputs[q.id].trim();
+                                    } else {
+                                      const parts = finalAnswer ? finalAnswer.split(", ").filter(Boolean) : [];
+                                      finalAnswer = [...parts, digerInputs[q.id].trim()].join(", ");
+                                    }
+                                    setAnswers((prev) => ({ ...prev, [q.id]: finalAnswer }));
+                                  }
+                                  handleAnswer(q.id);
+                                }}
+                                disabled={
+                                  actionLoading === `answer-${q.id}` ||
+                                  (
+                                    !(answers[q.id] || "").trim() &&
+                                    !(digerActive.has(q.id) && (digerInputs[q.id] || "").trim())
+                                  )
+                                }
+                              >
                                 {actionLoading === `answer-${q.id}` ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : "Onayla"}
                               </Button>
                               <Button size="sm" variant="ghost" onClick={() => handleDismiss(q.id)} disabled={actionLoading === `dismiss-${q.id}`}>
