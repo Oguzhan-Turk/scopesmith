@@ -32,7 +32,7 @@ export default function Layout() {
               S
             </div>
             <span className="text-lg font-bold tracking-tight">ScopeSmith</span>
-            <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-medium border border-primary/20">
+            <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full font-medium border border-border">
               AI
             </span>
           </Link>

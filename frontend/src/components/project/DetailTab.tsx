@@ -91,11 +91,8 @@ export default function DetailTab({
                   PREMIUM: "Detayli model (Opus)",
                 }[selectedAnalysis.modelTier] || selectedAnalysis.modelTier}>
                   <Badge
-                    variant={selectedAnalysis.modelTier === "PREMIUM" ? "default" : "outline"}
-                    className={`cursor-help ${
-                      selectedAnalysis.modelTier === "LIGHT" ? "border-success text-success" :
-                      selectedAnalysis.modelTier === "PREMIUM" ? "bg-primary" : ""
-                    }`}
+                    variant="outline"
+                    className="cursor-help text-muted-foreground border-border"
                   >
                     {selectedAnalysis.modelTier === "LIGHT" ? "Haiku" :
                      selectedAnalysis.modelTier === "PREMIUM" ? "Opus" : "Sonnet"}
@@ -107,7 +104,7 @@ export default function DetailTab({
         </CardHeader>
         <CardContent className="space-y-0">
           <div className="border-l-2 border-primary/30 pl-4 py-3">
-            <h4 className="text-sm font-semibold text-primary mb-1.5">Ozet</h4>
+            <h4 className="text-sm font-semibold text-muted-foreground mb-1.5">Ozet</h4>
             <p className="text-sm leading-relaxed whitespace-pre-wrap">{selectedAnalysis.structuredSummary}</p>
           </div>
           <Separator />
@@ -116,8 +113,8 @@ export default function DetailTab({
             <p className="text-sm leading-relaxed whitespace-pre-wrap">{selectedAnalysis.assumptions}</p>
           </div>
           <Separator />
-          <div className="border-l-2 border-destructive/30 pl-4 py-3">
-            <h4 className="text-sm font-semibold text-destructive mb-1.5">{isBug ? "Severity Nedeni" : "Karmasiklik Nedeni"}</h4>
+          <div className="border-l-2 border-muted-foreground/20 pl-4 py-3">
+            <h4 className="text-sm font-semibold text-muted-foreground mb-1.5">{isBug ? "Severity Nedeni" : "Karmasiklik Nedeni"}</h4>
             <p className="text-sm leading-relaxed">{selectedAnalysis.riskReason}</p>
           </div>
           <Separator />
@@ -192,7 +189,7 @@ export default function DetailTab({
                       <div className="space-y-2">
                         {q.suggestedAnswer && (
                           <button
-                            className="flex items-start gap-1.5 text-xs text-primary/80 hover:text-primary text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                            className="flex items-start gap-1.5 text-xs text-muted-foreground hover:text-foreground text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
                             onClick={() => setAnswers((prev) => ({ ...prev, [q.id]: q.suggestedAnswer! }))}
                           >
                             <Lightbulb className="w-3 h-3 mt-0.5 flex-shrink-0" />

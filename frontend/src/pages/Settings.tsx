@@ -180,7 +180,7 @@ export default function Settings() {
             {saving ? "Kaydediliyor..." : "Kaydet"}
           </Button>
           {message && (
-            <p className={`text-sm ${message.type === "success" ? "text-primary" : "text-destructive"}`}>
+            <p className={`text-sm ${message.type === "success" ? "text-foreground" : "text-destructive"}`}>
               {message.text}
             </p>
           )}
@@ -200,7 +200,7 @@ export default function Settings() {
                   onClick={() => selectPrompt(p)}
                   className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                     selected?.id === p.id
-                      ? "bg-primary text-primary-foreground"
+                      ? "bg-muted border border-border font-medium text-foreground"
                       : "hover:bg-muted"
                   }`}
                 >
@@ -237,7 +237,7 @@ export default function Settings() {
                       className="font-mono text-sm"
                     />
                     {message && (
-                      <p className={`text-sm mt-2 ${message.type === "success" ? "text-primary" : "text-destructive"}`}>
+                      <p className={`text-sm mt-2 ${message.type === "success" ? "text-foreground" : "text-destructive"}`}>
                         {message.text}
                       </p>
                     )}

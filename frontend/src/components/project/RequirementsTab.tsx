@@ -65,7 +65,7 @@ export default function RequirementsTab({
                     </td>
                     <td className="px-4 py-3">
                       <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
-                        req.type === "BUG" ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"
+                        req.type === "BUG" ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground border border-border"
                       }`}>
                         {req.type === "BUG" ? "Bug" : "Feature"}
                       </span>
@@ -84,7 +84,7 @@ export default function RequirementsTab({
                         <button
                           onClick={() => handleAnalyzeWithConfirm(req.id)}
                           disabled={!!actionLoading}
-                          className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-1.5 py-0.5 disabled:opacity-50"
+                          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-1.5 py-0.5 disabled:opacity-50"
                           aria-label="Analiz et"
                         >
                           <Zap className="w-3 h-3" />

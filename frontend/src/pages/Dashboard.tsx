@@ -127,7 +127,7 @@ export default function Dashboard() {
                 <tr key={project.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
                   <td className="px-4 py-3">
                     <Link to={`/projects/${project.id}`} className="block">
-                      <span className="text-sm font-medium hover:text-primary transition-colors">{project.name}</span>
+                      <span className="text-sm font-medium hover:text-foreground transition-colors">{project.name}</span>
                     </Link>
                   </td>
                   <td className="px-4 py-3 hidden md:table-cell">

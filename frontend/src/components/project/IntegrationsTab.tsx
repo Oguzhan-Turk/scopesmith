@@ -48,8 +48,8 @@ export default function IntegrationsTab({
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Code className="w-4 h-4 text-primary" />
+                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
+                  <Code className="w-4 h-4 text-muted-foreground" />
                 </div>
                 <CardTitle className="text-base">Proje Kaynagi</CardTitle>
               </div>
@@ -140,7 +140,7 @@ export default function IntegrationsTab({
           <Card
             className={`cursor-pointer transition-all ${
               integrationConfig.jira?.projectKey && !integrationConfig.github?.repo
-                ? "ring-2 ring-info"
+                ? "ring-2 ring-primary/50"
                 : !integrationConfig.jira?.projectKey && integrationConfig.github?.repo
                 ? "opacity-50"
                 : ""
@@ -149,8 +149,8 @@ export default function IntegrationsTab({
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                    <svg className="w-4 h-4 text-blue-600" viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24.013 12.487V1.005A1.005 1.005 0 0 0 23.013 0z"/></svg>
+                  <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
+                    <svg className="w-4 h-4 text-muted-foreground" viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24.013 12.487V1.005A1.005 1.005 0 0 0 23.013 0z"/></svg>
                   </div>
                   <CardTitle className="text-base">Jira</CardTitle>
                 </div>
@@ -196,7 +196,7 @@ export default function IntegrationsTab({
           <Card
             className={`cursor-pointer transition-all ${
               integrationConfig.github?.repo && !integrationConfig.jira?.projectKey
-                ? "ring-2 ring-foreground/30"
+                ? "ring-2 ring-primary/50"
                 : !integrationConfig.github?.repo && integrationConfig.jira?.projectKey
                 ? "opacity-50"
                 : ""
