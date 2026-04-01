@@ -1,3 +1,4 @@
+import { ArrowLeft, Send, Pencil, ChevronDown, ChevronRight, Sparkles, Copy, RefreshCw, Plus, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -37,23 +38,23 @@ export default function TasksTab({
 }: TasksTabProps) {
   if (!selectedRequirementId) {
     return (
-      <Card className="text-center py-16">
-        <CardContent className="space-y-3">
-          <p className="text-muted-foreground">Task'lari görmek için önce bir talep seçin.</p>
-          <Button variant="outline" onClick={() => setActiveTab("requirements")}>← Talepler'e Git</Button>
-        </CardContent>
-      </Card>
+      <div className="text-center py-12 border border-dashed rounded-lg">
+        <p className="text-sm text-muted-foreground mb-4">Task'lari gormek icin once bir talep secin.</p>
+        <Button variant="outline" size="sm" onClick={() => setActiveTab("requirements")}>
+          <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />Talepler'e Git
+        </Button>
+      </div>
     );
   }
 
   if (!selectedAnalysis) {
     return (
-      <Card className="text-center py-16">
-        <CardContent className="space-y-3">
-          <p className="text-muted-foreground">Bu talep henüz analiz edilmedi.</p>
-          <Button variant="outline" onClick={() => setActiveTab("requirements")}>← Talepler'e Dön ve Analiz Et</Button>
-        </CardContent>
-      </Card>
+      <div className="text-center py-12 border border-dashed rounded-lg">
+        <p className="text-sm text-muted-foreground mb-4">Bu talep henuz analiz edilmedi.</p>
+        <Button variant="outline" size="sm" onClick={() => setActiveTab("requirements")}>
+          <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />Talepler'e Don ve Analiz Et
+        </Button>
+      </div>
     );
   }
 
@@ -68,7 +69,7 @@ export default function TasksTab({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">
+        <h2 className="text-base font-semibold">
           Task'lar
           {tasks.length > 0 && (
             <span className="ml-2 text-base font-normal text-muted-foreground">
@@ -90,8 +91,8 @@ export default function TasksTab({
               </Tooltip>
             );
           })() : null}
-          <Button variant="outline" onClick={() => setManualTaskDialog(true)} disabled={!!actionLoading}>
-            + Task Ekle
+          <Button variant="outline" size="sm" onClick={() => setManualTaskDialog(true)} disabled={!!actionLoading}>
+            <Plus className="w-3.5 h-3.5 mr-1" />Task Ekle
           </Button>
           {isAdmin && tasks.length > 0 && (
             <>
@@ -142,7 +143,7 @@ export default function TasksTab({
               )}
               {!integrationConfig.jira?.projectKey && !integrationConfig.github?.repo && (
                 <Button size="sm" variant="outline" onClick={() => setActiveTab("integrations")}>
-                  Entegrasyon Ayarla
+                  <Settings2 className="w-3.5 h-3.5 mr-1" />Entegrasyon Ayarla
                 </Button>
               )}
             </>
@@ -170,7 +171,7 @@ export default function TasksTab({
                     onClick={() => toggleTask(task.id)}
                   >
                     <CardTitle className="text-base flex items-center gap-2 min-w-0 mr-3">
-                      <span className="text-muted-foreground text-xs flex-shrink-0">{isExpanded ? "▾" : "▸"}</span>
+                      {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />}
                       <span className="truncate">{task.title}</span>
                     </CardTitle>
                     <div className="flex items-center gap-1.5 self-center" onClick={(e) => e.stopPropagation()}>
@@ -221,17 +222,18 @@ export default function TasksTab({
                               finally { setActionLoading(null); }
                             }}
                             disabled={!!actionLoading}
-                            className="text-muted-foreground hover:text-primary p-1 rounded hover:bg-muted"
-                            title="Gönder"
+                            className="text-muted-foreground hover:text-primary p-1 rounded hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            aria-label="Gonder"
                           >
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                            <Send className="h-3.5 w-3.5" />
                           </button>
                         )}
                         <button
                           onClick={() => setEditingTask({...task})}
-                          className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-muted"
+                          className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          aria-label="Task duzenle"
                         >
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                          <Pencil className="h-3.5 w-3.5" />
                         </button>
                       </span>
                     </div>
@@ -263,7 +265,7 @@ export default function TasksTab({
                           <button
                             key={sp}
                             onClick={() => handleSpDecision(task.id, sp)}
-                            className={`px-2.5 py-1 text-xs rounded-md border ${
+                            className={`px-2.5 py-1 text-xs rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                               task.spFinal === sp
                                 ? "bg-primary text-primary-foreground"
                                 : "bg-background hover:bg-muted"
@@ -287,7 +289,7 @@ export default function TasksTab({
                             finally { setActionLoading(null); }
                           }}
                         >
-                          {actionLoading === `sp-${task.id}` ? "..." : "AI Öner"}
+                          {actionLoading === `sp-${task.id}` ? <RefreshCw className="w-3 h-3 animate-spin" /> : <><Sparkles className="w-3 h-3 mr-1" />AI Oner</>}
                         </Button>
                       </div>
                     </div>
@@ -304,7 +306,7 @@ export default function TasksTab({
                           } catch { showToast("Prompt kopyalanamadı."); }
                         }}
                       >
-                        Claude Code Prompt'u Kopyala
+                        <Copy className="w-3.5 h-3.5 mr-1.5" />Claude Code Kopyala
                       </Button>
                     </div>
                   </CardContent>
@@ -358,7 +360,7 @@ export default function TasksTab({
       {taskGroups.filter((g) => g.analysisId !== selectedAnalysis?.id).length > 0 && (
         <>
           <Separator />
-          <h3 className="text-lg font-semibold">Geçmiş Task Grupları</h3>
+          <h3 className="text-sm font-semibold text-muted-foreground">Gecmis Task Gruplari</h3>
           {taskGroups
             .filter((g) => g.analysisId !== selectedAnalysis?.id)
             .map((group) => (

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ArrowLeft, Check, Lightbulb, FileText, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -31,48 +32,42 @@ export default function DetailTab({
 
   if (!selectedRequirementId) {
     return (
-      <Card className="text-center py-16">
-        <CardContent className="space-y-3">
-          <p className="text-muted-foreground">
-            Analiz ve task üretmek için önce bir talep seçin.
-          </p>
-          <Button variant="outline" onClick={() => setActiveTab("requirements")}>
-            ← Talepler'e Git
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="text-center py-12 border border-dashed rounded-lg">
+        <p className="text-sm text-muted-foreground mb-4">Analiz ve task uretmek icin once bir talep secin.</p>
+        <Button variant="outline" size="sm" onClick={() => setActiveTab("requirements")}>
+          <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
+          Talepler'e Git
+        </Button>
+      </div>
     );
   }
 
   if (!selectedAnalysis) {
     return (
-      <Card className="text-center py-16">
-        <CardContent className="space-y-3">
-          <p className="text-muted-foreground">
-            Bu talep henüz analiz edilmedi.
-          </p>
-          <Button variant="outline" onClick={() => setActiveTab("requirements")}>
-            ← Talepler'e Dön ve Analiz Et
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="text-center py-12 border border-dashed rounded-lg">
+        <p className="text-sm text-muted-foreground mb-4">Bu talep henuz analiz edilmedi.</p>
+        <Button variant="outline" size="sm" onClick={() => setActiveTab("requirements")}>
+          <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
+          Talepler'e Don ve Analiz Et
+        </Button>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Analysis Summary */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">{isBug ? "Bug Analizi" : "Teknik Analiz"}</CardTitle>
-            <div className="flex gap-2">
+            <CardTitle className="text-base">{isBug ? "Bug Analizi" : "Teknik Analiz"}</CardTitle>
+            <div className="flex gap-1.5">
               <Badge variant={riskColor(selectedAnalysis.riskLevel)}>
-                {selectedAnalysis.riskLevel === "HIGH" ? "Yüksek Karmaşıklık" : selectedAnalysis.riskLevel === "MEDIUM" ? "Orta Karmaşıklık" : "Düşük Karmaşıklık"}
+                {selectedAnalysis.riskLevel === "HIGH" ? "Yuksek" : selectedAnalysis.riskLevel === "MEDIUM" ? "Orta" : "Dusuk"}
               </Badge>
               {selectedAnalysis.durationMs && (
-                <Tooltip content="AI analiz süresi">
-                  <Badge variant="outline" className="cursor-help">
+                <Tooltip content="AI analiz suresi">
+                  <Badge variant="outline" className="cursor-help tabular-nums">
                     {(selectedAnalysis.durationMs / 1000).toFixed(1)}s
                   </Badge>
                 </Tooltip>
@@ -80,29 +75,27 @@ export default function DetailTab({
               {selectedAnalysis.contextVersion != null && (
                 <Tooltip content={
                   selectedAnalysis.contextVersion < (project.contextVersion ?? 0)
-                    ? `Context v${selectedAnalysis.contextVersion} ile analiz edildi (güncel: v${project.contextVersion})`
-                    : `Güncel context ile analiz edildi (v${selectedAnalysis.contextVersion})`
+                    ? `Context v${selectedAnalysis.contextVersion} ile analiz edildi (guncel: v${project.contextVersion})`
+                    : `Guncel context (v${selectedAnalysis.contextVersion})`
                 }>
-                  <Badge variant="outline" className="cursor-help text-xs">
-                    Cv{selectedAnalysis.contextVersion}
-                  </Badge>
+                  <Badge variant="outline" className="cursor-help">Cv{selectedAnalysis.contextVersion}</Badge>
                 </Tooltip>
               )}
               {selectedAnalysis.modelTier && (
                 <Tooltip content={{
-                  LIGHT: "Hızlı model (Haiku) — düşük maliyet",
-                  STANDARD: "Standart model (Sonnet) — dengeli",
-                  PREMIUM: "Detaylı model (Opus) — en yüksek kalite",
+                  LIGHT: "Hizli model (Haiku)",
+                  STANDARD: "Standart model (Sonnet)",
+                  PREMIUM: "Detayli model (Opus)",
                 }[selectedAnalysis.modelTier] || selectedAnalysis.modelTier}>
                   <Badge
                     variant={selectedAnalysis.modelTier === "PREMIUM" ? "default" : "outline"}
-                    className={`cursor-help text-xs ${
+                    className={`cursor-help ${
                       selectedAnalysis.modelTier === "LIGHT" ? "border-success text-success" :
                       selectedAnalysis.modelTier === "PREMIUM" ? "bg-primary" : ""
                     }`}
                   >
-                    {selectedAnalysis.modelTier === "LIGHT" ? "⚡ Haiku" :
-                     selectedAnalysis.modelTier === "PREMIUM" ? "🔬 Opus" : "Sonnet"}
+                    {selectedAnalysis.modelTier === "LIGHT" ? "Haiku" :
+                     selectedAnalysis.modelTier === "PREMIUM" ? "Opus" : "Sonnet"}
                   </Badge>
                 </Tooltip>
               )}
@@ -111,32 +104,32 @@ export default function DetailTab({
         </CardHeader>
         <CardContent className="space-y-0">
           <div className="border-l-2 border-primary/30 pl-4 py-3">
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-primary mb-1.5">Özet</h4>
+            <h4 className="text-sm font-semibold text-primary mb-1.5">Ozet</h4>
             <p className="text-sm leading-relaxed whitespace-pre-wrap">{selectedAnalysis.structuredSummary}</p>
           </div>
           <Separator />
           <div className="border-l-2 border-muted-foreground/20 pl-4 py-3">
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Varsayımlar</h4>
+            <h4 className="text-sm font-semibold text-muted-foreground mb-1.5">Varsayimlar</h4>
             <p className="text-sm leading-relaxed whitespace-pre-wrap">{selectedAnalysis.assumptions}</p>
           </div>
           <Separator />
           <div className="border-l-2 border-destructive/30 pl-4 py-3">
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-destructive mb-1.5">{isBug ? "Severity Nedeni" : "Karmaşıklık Nedeni"}</h4>
+            <h4 className="text-sm font-semibold text-destructive mb-1.5">{isBug ? "Severity Nedeni" : "Karmasiklik Nedeni"}</h4>
             <p className="text-sm leading-relaxed">{selectedAnalysis.riskReason}</p>
           </div>
           <Separator />
           <div className="border-l-2 border-muted-foreground/20 pl-4 py-3">
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Etkilenen Modüller</h4>
+            <h4 className="text-sm font-semibold text-muted-foreground mb-1.5">Etkilenen Moduller</h4>
             <p className="text-sm leading-relaxed">{selectedAnalysis.affectedModules}</p>
           </div>
           <Separator />
-          <div className="flex gap-2 py-2">
+          <div className="flex gap-2 pt-3">
             <input
               type="text"
-              placeholder="Analizi nasıl iyileştireyim? (örn: frontend etkisini detaylı analiz et)"
+              placeholder="Analizi nasil iyilestireyim?"
               value={analysisRefineInput}
               onChange={(e) => setAnalysisRefineInput(e.target.value)}
-              className="flex-1 px-3 py-1.5 text-sm border rounded-md bg-background"
+              className="flex-1 px-3 py-1.5 text-sm border rounded-md bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
             <Button
               size="sm"
@@ -147,13 +140,15 @@ export default function DetailTab({
                   const refined = await refineAnalysis(selectedAnalysis!.id, analysisRefineInput);
                   setSelectedAnalysis(refined);
                   setAnalysisRefineInput("");
-                  showToast("Analiz güncellendi.", "success");
-                } catch { showToast("Analiz güncellenemedi."); }
+                  showToast("Analiz guncellendi.", "success");
+                } catch { showToast("Analiz guncellenemedi."); }
                 finally { setActionLoading(null); }
               }}
               disabled={!!actionLoading || !analysisRefineInput.trim()}
             >
-              {actionLoading === "refine-analysis" ? "Güncelleniyor..." : "Analizi Güncelle"}
+              {actionLoading === "refine-analysis" ? (
+                <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />Guncelleniyor</>
+              ) : "Guncelle"}
             </Button>
           </div>
         </CardContent>
@@ -164,10 +159,10 @@ export default function DetailTab({
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">Açık Noktalar</CardTitle>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">
-                  {selectedAnalysis.questions.filter((q) => q.status === "OPEN").length} / {selectedAnalysis.questions.length} açık
+              <CardTitle className="text-base">Acik Noktalar</CardTitle>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-muted-foreground tabular-nums">
+                  {selectedAnalysis.questions.filter((q) => q.status === "OPEN").length}/{selectedAnalysis.questions.length}
                 </span>
                 <div className="h-1.5 w-20 bg-muted rounded-full overflow-hidden">
                   <div
@@ -180,29 +175,28 @@ export default function DetailTab({
           </CardHeader>
           <CardContent className="space-y-3">
             {selectedAnalysis.questions.map((q, idx) => (
-              <div key={q.id} className={`rounded-lg border p-4 ${q.status === "OPEN" ? "bg-background" : "bg-muted/30"}`}>
+              <div key={q.id} className={`rounded-lg border p-4 ${q.status === "OPEN" ? "bg-background" : "bg-muted/20"}`}>
                 <div className="flex items-start gap-3">
                   <span className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
-                    q.status === "OPEN" ? "bg-primary/10 text-primary" : "bg-green-500/10 text-green-600"
+                    q.status === "OPEN" ? "bg-primary/10 text-primary" : "bg-success/10 text-success"
                   }`}>
-                    {q.status === "OPEN" ? idx + 1 : "✓"}
+                    {q.status === "OPEN" ? idx + 1 : <Check className="w-3 h-3" />}
                   </span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium mb-2">{q.questionText}</p>
 
                     {q.status === "OPEN" ? (
                       <div className="space-y-2">
-                        {/* AI Öneri */}
                         {q.suggestedAnswer && (
                           <button
-                            className="text-xs text-primary/80 hover:text-primary text-left block"
+                            className="flex items-start gap-1.5 text-xs text-primary/80 hover:text-primary text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
                             onClick={() => setAnswers((prev) => ({ ...prev, [q.id]: q.suggestedAnswer! }))}
                           >
-                            💡 <span className="italic">{q.suggestedAnswer}</span>
+                            <Lightbulb className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                            <span className="italic">{q.suggestedAnswer}</span>
                           </button>
                         )}
 
-                        {/* Şıklı soru */}
                         {q.options && q.options.length > 0 && (q.questionType === "MULTIPLE_CHOICE" || q.questionType === "SINGLE_CHOICE") ? (
                           <div className="space-y-2">
                             <div className="flex flex-wrap gap-2">
@@ -212,7 +206,7 @@ export default function DetailTab({
                                 return (
                                   <button
                                     key={opt}
-                                    className={`px-3 py-1.5 text-xs rounded-md border transition-colors ${
+                                    className={`px-3 py-1.5 text-xs rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                                       selected ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"
                                     }`}
                                     onClick={() => {
@@ -240,14 +234,13 @@ export default function DetailTab({
                             </div>
                           </div>
                         ) : (
-                          /* Açık uçlu soru */
                           <div className="flex gap-2">
                             <input
                               type="text"
                               placeholder="Cevap girin..."
                               value={answers[q.id] || ""}
                               onChange={(e) => setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))}
-                              className="flex-1 px-3 py-1.5 text-sm border rounded-md bg-background"
+                              className="flex-1 px-3 py-1.5 text-sm border rounded-md bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             />
                             <Button size="sm" onClick={() => handleAnswer(q.id)} disabled={actionLoading === `answer-${q.id}` || !(answers[q.id] || "").trim()}>
                               {actionLoading === `answer-${q.id}` ? "..." : "Onayla"}
@@ -259,11 +252,9 @@ export default function DetailTab({
                         )}
                       </div>
                     ) : (
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-sm text-muted-foreground">
-                          {q.status === "ANSWERED" ? q.answer : "Atlandı"}
-                        </span>
-                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {q.status === "ANSWERED" ? q.answer : "Atlandi"}
+                      </p>
                     )}
                   </div>
                 </div>
@@ -273,50 +264,52 @@ export default function DetailTab({
         </Card>
       )}
 
-      {/* Talep Açıklaması section */}
+      {/* Stakeholder Summary */}
       {selectedAnalysis.stakeholderSummary ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Talep Açıklaması</CardTitle>
+            <div className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-muted-foreground" />
+              <CardTitle className="text-base">Talep Aciklamasi</CardTitle>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="border-l-2 border-primary/30 pl-4 py-2">
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-primary mb-1.5">Paylaşım Metni</h4>
-              <div className="text-sm leading-relaxed whitespace-pre-wrap">{selectedAnalysis.stakeholderSummary}</div>
-            </div>
+            <div className="text-sm leading-relaxed whitespace-pre-wrap">{selectedAnalysis.stakeholderSummary}</div>
             <Separator />
             <div className="flex gap-2">
               <input
                 type="text"
-                placeholder="Özeti nasıl değiştireyim? (örn: daha kısa olsun, riskleri vurgula, teknik detay ekle)"
+                placeholder="Ozeti nasil degistireyim?"
                 value={summaryInstruction}
                 onChange={(e) => setSummaryInstruction(e.target.value)}
-                className="flex-1 px-3 py-1.5 text-sm border rounded-md bg-background"
+                className="flex-1 px-3 py-1.5 text-sm border rounded-md bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />
               <Button
                 size="sm"
                 onClick={handleRefineSummary}
                 disabled={!!actionLoading || !summaryInstruction.trim()}
               >
-                {actionLoading === "refine-summary" ? "İyileştiriliyor..." : "Özeti Güncelle"}
+                {actionLoading === "refine-summary" ? (
+                  <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />Iyilestiriliyor</>
+                ) : "Guncelle"}
               </Button>
             </div>
           </CardContent>
         </Card>
       ) : (
-        <Card className="border-dashed">
-          <CardContent className="py-6 flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">İş özeti henüz üretilmedi.</p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleStakeholderSummary}
-              disabled={!!actionLoading}
-            >
-              {actionLoading === "summary" ? "Hazırlanıyor..." : "Talep Açıklaması Üret"}
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="flex items-center justify-between rounded-lg border border-dashed px-4 py-4">
+          <p className="text-sm text-muted-foreground">Is ozeti henuz uretilmedi.</p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleStakeholderSummary}
+            disabled={!!actionLoading}
+          >
+            {actionLoading === "summary" ? (
+              <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />Hazirlaniyor</>
+            ) : "Talep Aciklamasi Uret"}
+          </Button>
+        </div>
       )}
     </div>
   );

@@ -118,7 +118,7 @@ export default function Settings() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Ayarlar</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Ayarlar</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Bu ayarlar tüm projelerde geçerlidir. Proje bazlı entegrasyon ayarları için ilgili projenin <strong>Entegrasyonlar</strong> sekmesini kullanın.
         </p>
@@ -149,7 +149,7 @@ export default function Settings() {
                     placeholder={CREDENTIAL_LABELS[key].placeholder}
                     value={credentialEdits[key] || ""}
                     onChange={(e) => setCredentialEdits({ ...credentialEdits, [key]: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                    className="w-full px-3 py-2 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   />
                 </div>
               ))}
@@ -169,7 +169,7 @@ export default function Settings() {
                     placeholder={CREDENTIAL_LABELS[key].placeholder}
                     value={credentialEdits[key] || ""}
                     onChange={(e) => setCredentialEdits({ ...credentialEdits, [key]: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                    className="w-full px-3 py-2 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   />
                 </div>
               ))}
@@ -198,7 +198,7 @@ export default function Settings() {
                 <button
                   key={p.id}
                   onClick={() => selectPrompt(p)}
-                  className={`w-full text-left px-3 py-2 rounded-md text-sm ${
+                  className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                     selected?.id === p.id
                       ? "bg-primary text-primary-foreground"
                       : "hover:bg-muted"

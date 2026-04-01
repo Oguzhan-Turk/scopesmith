@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { Plus } from "lucide-react";
 import { getProjects, createProject, type Project } from "@/api/client";
 import { timeAgo } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -62,7 +63,9 @@ export default function Dashboard() {
             Taleplerinizi analiz edin, task'lara dönüştürün
           </p>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>+ Yeni Proje</Button>
+        <Button size="sm" onClick={() => setDialogOpen(true)}>
+          <Plus className="w-3.5 h-3.5 mr-1.5" />Yeni Proje
+        </Button>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogContent>
             <DialogHeader>
@@ -77,7 +80,7 @@ export default function Dashboard() {
                   placeholder="Proje adı"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                  className="w-full px-3 py-2 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   autoFocus
                 />
               </div>
@@ -89,7 +92,7 @@ export default function Dashboard() {
                   value={newDesc}
                   onChange={(e) => setNewDesc(e.target.value)}
                   rows={2}
-                  className="w-full px-3 py-2 border rounded-md bg-background resize-none text-sm"
+                  className="w-full px-3 py-2 border rounded-md bg-background resize-none text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 />
               </div>
               <Button onClick={handleCreate} disabled={creating || !newName.trim()} className="w-full">
@@ -101,7 +104,7 @@ export default function Dashboard() {
       </div>
 
       {projects.length === 0 ? (
-        <div className="text-center py-24 border border-dashed rounded-xl">
+        <div className="text-center py-16 border border-dashed rounded-lg">
           <div className="w-12 h-12 rounded-xl mx-auto mb-4 flex items-center justify-center text-white text-lg font-bold" style={{ background: "var(--gradient-brand)" }}>
             S
           </div>
@@ -110,13 +113,13 @@ export default function Dashboard() {
           <Button onClick={() => setDialogOpen(true)}>+ Proje Oluştur</Button>
         </div>
       ) : (
-        <div className="border rounded-xl overflow-hidden">
+        <div className="border rounded-lg overflow-hidden">
           <table className="w-full">
             <thead>
-              <tr className="border-b bg-muted/30">
-                <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">Proje</th>
-                <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden md:table-cell">Açıklama</th>
-                <th className="text-right text-xs font-medium text-muted-foreground px-4 py-3 w-32">Son Aktivite</th>
+              <tr className="border-b bg-muted/40">
+                <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">Proje</th>
+                <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3 hidden md:table-cell">Aciklama</th>
+                <th className="text-right text-sm font-medium text-muted-foreground px-4 py-3 w-32">Son Aktivite</th>
               </tr>
             </thead>
             <tbody>

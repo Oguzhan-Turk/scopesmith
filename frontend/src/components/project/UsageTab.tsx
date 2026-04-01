@@ -6,7 +6,7 @@ import type { UsageTabProps } from "./types";
 export default function UsageTab({ usageSummary }: UsageTabProps) {
   if (!usageSummary || usageSummary.totalAiCalls === 0) {
     return (
-      <Card className="text-center py-8">
+      <Card className="text-center py-12 border-dashed">
         <CardContent>
           <p className="text-muted-foreground text-sm">
             Henüz AI kullanımı yok. Bir talep analiz ettiğinizde burada maliyet ve ROI bilgileri görünecek.

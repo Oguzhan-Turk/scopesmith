@@ -32,7 +32,6 @@ import {
   addDocument,
   deleteDocument,
   uploadDocument,
-  getRequirementDocuments,
   addRequirementDocument,
   uploadRequirementDocument,
   type UsageSummary,
@@ -853,7 +852,7 @@ export default function ProjectDetail() {
                   type="text"
                   value={editingTask.title}
                   onChange={(e) => setEditingTask({ ...editingTask, title: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                  className="w-full px-3 py-2 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 />
               </div>
               <div>
@@ -878,7 +877,7 @@ export default function ProjectDetail() {
                   <select
                     value={editingTask.priority}
                     onChange={(e) => setEditingTask({ ...editingTask, priority: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                    className="w-full px-3 py-2 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <option value="LOW">LOW</option>
                     <option value="MEDIUM">MEDIUM</option>
@@ -891,7 +890,7 @@ export default function ProjectDetail() {
                   <select
                     value={editingTask.category || ""}
                     onChange={(e) => setEditingTask({ ...editingTask, category: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                    className="w-full px-3 py-2 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <option value="">—</option>
                     <option value="BACKEND">BACKEND</option>
@@ -927,7 +926,7 @@ export default function ProjectDetail() {
                 type="text"
                 value={manualTaskForm.title}
                 onChange={(e) => setManualTaskForm((f) => ({ ...f, title: e.target.value }))}
-                className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                className="w-full px-3 py-2 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 placeholder="Task başlığı"
                 autoFocus
               />
@@ -938,7 +937,7 @@ export default function ProjectDetail() {
                 id="manual-task-desc"
                 value={manualTaskForm.description}
                 onChange={(e) => setManualTaskForm((f) => ({ ...f, description: e.target.value }))}
-                className="w-full px-3 py-2 border rounded-md bg-background text-sm resize-none"
+                className="w-full px-3 py-2 border rounded-md bg-background text-sm resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 rows={3}
                 placeholder="Opsiyonel"
               />
@@ -950,7 +949,7 @@ export default function ProjectDetail() {
                   id="manual-task-priority"
                   value={manualTaskForm.priority}
                   onChange={(e) => setManualTaskForm((f) => ({ ...f, priority: e.target.value }))}
-                  className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                  className="w-full px-3 py-2 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <option value="LOW">Low</option>
                   <option value="MEDIUM">Medium</option>
@@ -965,7 +964,7 @@ export default function ProjectDetail() {
                   type="text"
                   value={manualTaskForm.category}
                   onChange={(e) => setManualTaskForm((f) => ({ ...f, category: e.target.value }))}
-                  className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                  className="w-full px-3 py-2 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   placeholder="Opsiyonel"
                 />
               </div>
@@ -1008,7 +1007,7 @@ export default function ProjectDetail() {
             <div className="flex gap-2">
               <button
                 onClick={() => setNewRequirementType("FEATURE")}
-                className={`px-3 py-1.5 text-sm rounded-md border ${
+                className={`px-3 py-1.5 text-sm rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                   newRequirementType === "FEATURE" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"
                 }`}
               >
@@ -1016,7 +1015,7 @@ export default function ProjectDetail() {
               </button>
               <button
                 onClick={() => setNewRequirementType("BUG")}
-                className={`px-3 py-1.5 text-sm rounded-md border ${
+                className={`px-3 py-1.5 text-sm rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                   newRequirementType === "BUG" ? "bg-destructive text-destructive-foreground" : "bg-background hover:bg-muted"
                 }`}
               >
@@ -1060,7 +1059,7 @@ export default function ProjectDetail() {
           </DialogHeader>
           {docDialog?.type === "requirement" && (reqDocs[docDialog.reqId]?.length ?? 0) > 0 && (
             <div className="space-y-1.5 mb-3">
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase">Mevcut Belgeler</h4>
+              <h4 className="text-sm font-semibold text-muted-foreground">Mevcut Belgeler</h4>
               {reqDocs[docDialog.reqId]?.map((doc) => (
                 <div key={doc.id} className="flex items-center justify-between text-sm py-1 border-b last:border-0">
                   <div className="flex items-center gap-2">
@@ -1076,13 +1075,13 @@ export default function ProjectDetail() {
             <div className="flex gap-2">
               <button
                 onClick={() => { setDocMode("file"); setDocFile(null); }}
-                className={`px-3 py-1.5 text-sm rounded-md border ${docMode === "file" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
+                className={`px-3 py-1.5 text-sm rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${docMode === "file" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
               >
                 Dosya Yükle
               </button>
               <button
                 onClick={() => setDocMode("paste")}
-                className={`px-3 py-1.5 text-sm rounded-md border ${docMode === "paste" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
+                className={`px-3 py-1.5 text-sm rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${docMode === "paste" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
               >
                 Metin Yapıştır
               </button>
@@ -1093,7 +1092,7 @@ export default function ProjectDetail() {
                 id="doc-type"
                 value={docForm.docType}
                 onChange={(e) => setDocForm((f) => ({ ...f, docType: e.target.value }))}
-                className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                className="w-full px-3 py-2 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <option value="MEETING_NOTES">Toplantı Notu</option>
                 <option value="EMAIL">E-posta</option>
@@ -1124,7 +1123,7 @@ export default function ProjectDetail() {
                     type="text"
                     value={docForm.filename}
                     onChange={(e) => setDocForm((f) => ({ ...f, filename: e.target.value }))}
-                    className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                    className="w-full px-3 py-2 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     placeholder="toplanti-notu-12-mart.md"
                   />
                 </div>
@@ -1139,7 +1138,7 @@ export default function ProjectDetail() {
                     id="doc-content"
                     value={docForm.content}
                     onChange={(e) => setDocForm((f) => ({ ...f, content: e.target.value }))}
-                    className="w-full px-3 py-2 border rounded-md bg-background text-sm resize-none"
+                    className="w-full px-3 py-2 border rounded-md bg-background text-sm resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     rows={6}
                     placeholder="Belge içeriğini yapıştırın..."
                   />

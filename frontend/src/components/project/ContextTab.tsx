@@ -1,3 +1,4 @@
+import { Code, FileText, RefreshCw, Plus, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -56,7 +57,7 @@ export default function ContextTab({
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">Proje Dokümanları</CardTitle>
             <Button size="sm" variant="outline" onClick={() => setDocDialog({ type: "project" })}>
-              + Doküman Ekle
+              <Plus className="w-3.5 h-3.5 mr-1" />Dokuman Ekle
             </Button>
           </div>
         </CardHeader>
@@ -92,7 +93,7 @@ export default function ContextTab({
         return (
           <div className="flex items-center justify-between rounded-lg border px-4 py-3">
             <div className="flex items-center gap-3 min-w-0">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-muted-foreground flex-shrink-0"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+              <Code className="w-4 h-4 text-muted-foreground flex-shrink-0" />
               {hasSource ? (
                 <div className="min-w-0">
                   <p className="text-sm font-medium truncate">{sourceLabel}</p>
@@ -223,7 +224,7 @@ export default function ContextTab({
         <details className="group">
           <summary className="flex items-center justify-between cursor-pointer border rounded-xl px-4 py-3 hover:bg-muted/30 transition-colors">
             <div className="flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4 text-muted-foreground"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <FileText className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm font-medium">AI Analiz Raporu</span>
             </div>
             <span className="text-xs text-muted-foreground group-open:hidden">Göster</span>
@@ -266,7 +267,7 @@ export default function ContextTab({
                 }}
                 disabled={!!actionLoading || !project.hasContext}
               >
-                {actionLoading === "suggest-features" ? "Üretiliyor..." : "AI'a Sor"}
+                {actionLoading === "suggest-features" ? <><RefreshCw className="w-3.5 h-3.5 mr-1 animate-spin" />Uretiliyor</> : <><Sparkles className="w-3.5 h-3.5 mr-1" />AI'a Sor</>}
               </Button>
             </div>
           </div>

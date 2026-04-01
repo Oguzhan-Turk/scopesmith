@@ -60,7 +60,7 @@ export default function Login() {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-3 py-2.5 border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                className="w-full px-3 py-2.5 border rounded-lg bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
                 autoFocus
               />
             </div>
@@ -70,7 +70,7 @@ export default function Login() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2.5 border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                className="w-full px-3 py-2.5 border rounded-lg bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
               />
             </div>
             {error && (

@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from "react";
+import { Code, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -45,7 +46,7 @@ export default function IntegrationsTab({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-primary"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                  <Code className="w-4 h-4 text-primary" />
                 </div>
                 <CardTitle className="text-base">Proje Kaynagi</CardTitle>
               </div>
@@ -92,7 +93,7 @@ export default function IntegrationsTab({
                   placeholder="/Users/username/projects/my-app"
                   value={scanPath}
                   onChange={(e) => setScanPath(e.target.value)}
-                  className="w-full px-3 py-1.5 border rounded-md bg-background text-sm"
+                  className="w-full px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 />
               </div>
             ) : (
@@ -105,7 +106,7 @@ export default function IntegrationsTab({
                     placeholder="https://github.com/owner/repo.git"
                     value={gitUrl}
                     onChange={(e) => setGitUrl(e.target.value)}
-                    className="w-full px-3 py-1.5 border rounded-md bg-background text-sm"
+                    className="w-full px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   />
                 </div>
                 <div>
@@ -116,7 +117,7 @@ export default function IntegrationsTab({
                     placeholder="ghp_..."
                     value={gitToken}
                     onChange={(e) => setGitToken(e.target.value)}
-                    className="w-full px-3 py-1.5 border rounded-md bg-background text-sm"
+                    className="w-full px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   />
                 </div>
               </div>
@@ -164,14 +165,14 @@ export default function IntegrationsTab({
                   <input id="jira-project-key" type="text" placeholder="SS"
                     value={integrationConfig.jira?.projectKey || ""}
                     onChange={(e) => setIntegrationConfig({ ...integrationConfig, jira: { ...integrationConfig.jira, projectKey: e.target.value.toUpperCase() }, github: undefined })}
-                    className="w-full px-3 py-1.5 border rounded-md bg-background text-sm" />
+                    className="w-full px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
                 </div>
                 <div>
                   <label htmlFor="jira-issue-type" className="text-xs text-muted-foreground mb-1 block">Issue Type</label>
                   <input id="jira-issue-type" type="text" placeholder="Task"
                     value={integrationConfig.jira?.defaultIssueType || ""}
                     onChange={(e) => setIntegrationConfig({ ...integrationConfig, jira: { ...integrationConfig.jira, defaultIssueType: e.target.value } })}
-                    className="w-full px-3 py-1.5 border rounded-md bg-background text-sm" />
+                    className="w-full px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
                 </div>
               </div>
               <div>
@@ -179,7 +180,7 @@ export default function IntegrationsTab({
                 <select id="jira-category-mode"
                   value={integrationConfig.jira?.categoryMode || "BOTH"}
                   onChange={(e) => setIntegrationConfig({ ...integrationConfig, jira: { ...integrationConfig.jira, categoryMode: e.target.value as "LABELS_ONLY" | "COMPONENTS" | "BOTH" } })}
-                  className="w-full px-3 py-1.5 border rounded-md bg-background text-sm">
+                  className="w-full px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   <option value="BOTH">Label + Component</option>
                   <option value="LABELS_ONLY">Sadece Label</option>
                   <option value="COMPONENTS">Sadece Component</option>
@@ -218,7 +219,7 @@ export default function IntegrationsTab({
               <input id="github-repo" type="text" placeholder="owner/repo"
                 value={integrationConfig.github?.repo || ""}
                 onChange={(e) => setIntegrationConfig({ ...integrationConfig, github: { repo: e.target.value }, jira: undefined })}
-                className="w-full px-3 py-1.5 border rounded-md bg-background text-sm" />
+                className="w-full px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
             </CardContent>
           </Card>
         </div>
@@ -226,7 +227,7 @@ export default function IntegrationsTab({
 
       <div className="flex justify-end">
         <Button onClick={handleSaveIntegrationConfig} disabled={actionLoading === "save-config"}>
-          {actionLoading === "save-config" ? "Kaydediliyor..." : "Ayarları Kaydet"}
+          {actionLoading === "save-config" ? "Kaydediliyor..." : <><Save className="w-3.5 h-3.5 mr-1.5" />Ayarlari Kaydet</>}
         </Button>
       </div>
     </div>
