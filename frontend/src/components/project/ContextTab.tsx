@@ -244,19 +244,6 @@ export default function ContextTab({
                   <StatGrid stats={stats} />
                 )}
 
-                {/* Teknoloji Stack badge'leri */}
-                {techStack && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {Object.entries(techStack).flatMap(([_k, v]) =>
-                      Array.isArray(v) ? (v as string[]).map((item) => (
-                        <span key={item} className="px-2 py-0.5 text-xs rounded-full bg-primary/5 border border-primary/10">
-                          {item}
-                        </span>
-                      )) : []
-                    )}
-                  </div>
-                )}
-
                 {/* Önemli gözlemler ve diğer alanlar */}
                 {remainingKeys.length > 0 && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
