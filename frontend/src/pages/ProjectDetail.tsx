@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import {
   getProject,
   getRequirements,
@@ -59,6 +59,7 @@ import TasksTab from "@/components/project/TasksTab";
 import ContextTab from "@/components/project/ContextTab";
 import IntegrationsTab from "@/components/project/IntegrationsTab";
 import UsageTab from "@/components/project/UsageTab";
+import DeleteProjectDialog from "@/components/project/DeleteProjectDialog";
 
 const LOADING_LABELS: Record<string, string> = {
   scan: "Proje taranıyor... Bu birkaç dakika sürebilir.",
@@ -71,6 +72,7 @@ const LOADING_LABELS: Record<string, string> = {
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const projectId = Number(id);
   const { showToast } = useToast();
   const { isAdmin } = useAuth();
@@ -108,6 +110,7 @@ export default function ProjectDetail() {
   const [docFile, setDocFile] = useState<File | null>(null);
   const [docMode, setDocMode] = useState<"file" | "paste">("file");
   const [reqDialogOpen, setReqDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [docDialog, setDocDialog] = useState<{ type: "project" } | { type: "requirement"; reqId: number } | null>(null);
   const [reqDocs, setReqDocs] = useState<Record<number, Document[]>>({});
   const [featureSuggestions, setFeatureSuggestions] = useState<FeatureSuggestionResult | null>(null);
@@ -848,6 +851,25 @@ export default function ProjectDetail() {
             gitToken={gitToken}
             setGitToken={setGitToken}
           />
+          {/* Danger zone */}
+          <div className="border border-destructive/30 rounded-lg p-4 space-y-3">
+            <div>
+              <h3 className="text-sm font-semibold text-destructive">Tehlikeli Bölge</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Bu işlemler geri alınamaz.</p>
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Projeyi Sil</p>
+                <p className="text-xs text-muted-foreground">Tüm talepler, analizler ve task'lar kalıcı olarak silinir.</p>
+              </div>
+              <button
+                onClick={() => setDeleteDialogOpen(true)}
+                className="px-3 py-1.5 text-sm rounded-md border border-destructive/40 text-destructive hover:bg-destructive/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                Projeyi Sil
+              </button>
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="usage" className="space-y-4">
@@ -862,6 +884,15 @@ export default function ProjectDetail() {
           />
         </TabsContent>
       </Tabs>
+
+      {/* Delete Project Dialog */}
+      <DeleteProjectDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        projectId={projectId}
+        projectName={project.name}
+        onDeleted={() => navigate("/")}
+      />
 
       {/* Task Edit Dialog */}
       <Dialog open={!!editingTask} onOpenChange={(open) => { if (!open) setEditingTask(null); }}>

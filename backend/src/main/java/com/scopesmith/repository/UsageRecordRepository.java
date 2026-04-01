@@ -28,4 +28,8 @@ public interface UsageRecordRepository extends JpaRepository<UsageRecord, Long> 
     Object[] getGlobalSummary();
 
     long countByProjectIdAndOperationType(Long projectId, OperationType operationType);
+
+    void deleteByProjectId(Long projectId);
+
+    long countByProjectId(Long projectId);
 }

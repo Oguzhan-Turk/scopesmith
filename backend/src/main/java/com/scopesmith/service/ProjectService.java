@@ -4,13 +4,19 @@ import com.scopesmith.dto.ProjectRequest;
 import com.scopesmith.dto.ProjectResponse;
 import com.scopesmith.entity.Project;
 import com.scopesmith.entity.ProjectRole;
+import com.scopesmith.repository.ProjectMembershipRepository;
 import com.scopesmith.repository.ProjectRepository;
+import com.scopesmith.repository.RequirementRepository;
+import com.scopesmith.repository.UsageRecordRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -18,6 +24,9 @@ public class ProjectService {
 
     private final ProjectRepository projectRepository;
     private final ProjectAccessService accessService;
+    private final ProjectMembershipRepository membershipRepository;
+    private final UsageRecordRepository usageRecordRepository;
+    private final RequirementRepository requirementRepository;
 
     @Transactional
     public ProjectResponse create(ProjectRequest request) {
@@ -73,9 +82,34 @@ public class ProjectService {
         return ProjectResponse.from(projectRepository.save(project));
     }
 
-    @Transactional
-    public void delete(Long id) {
+    /**
+     * Returns counts of what would be deleted — shown in the confirmation dialog.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Long> getDeleteSummary(Long id) {
         Project project = getProjectOrThrow(id);
+        long reqCount = requirementRepository.countByProjectId(id);
+        long usageCount = usageRecordRepository.countByProjectId(id);
+        return Map.of(
+            "requirements", reqCount,
+            "documents", (long) project.getDocuments().size(),
+            "aiCalls", usageCount
+        );
+    }
+
+    /**
+     * Hard delete with server-side name confirmation.
+     * Explicit cleanup order: usage_records → memberships → project (cascade handles rest).
+     */
+    @Transactional
+    public void deleteWithConfirmation(Long id, String confirmName) {
+        Project project = getProjectOrThrow(id);
+        if (!project.getName().equals(confirmName)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Proje adı eşleşmiyor. Silme işlemi iptal edildi.");
+        }
+        usageRecordRepository.deleteByProjectId(id);
+        membershipRepository.deleteByProjectId(id);
         projectRepository.delete(project);
     }
 

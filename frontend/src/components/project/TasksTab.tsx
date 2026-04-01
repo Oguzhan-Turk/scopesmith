@@ -354,58 +354,6 @@ export default function TasksTab({
         </>
       )}
 
-      {/* Geçmiş Task Grupları */}
-      {taskGroups.filter((g) => g.analysisId !== selectedAnalysis?.id).length > 0 && (
-        <>
-          <Separator />
-          <h3 className="text-sm font-semibold text-muted-foreground">Gecmis Task Gruplari</h3>
-          {taskGroups
-            .filter((g) => g.analysisId !== selectedAnalysis?.id)
-            .map((group) => (
-              <details key={group.analysisId} className="border rounded-lg">
-                <summary className="px-4 py-3 cursor-pointer hover:bg-muted/50">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Badge variant={group.requirementType === "BUG" ? "destructive" : "default"}>
-                        {group.requirementType === "BUG" ? "Bug" : "Feature"}
-                      </Badge>
-                      <span className="text-sm font-medium">
-                        #{group.requirementSeq || "?"} — {group.requirementText}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline">{group.taskCount} task</Badge>
-                      <Badge variant="outline">{group.totalSp} SP</Badge>
-                    </div>
-                  </div>
-                </summary>
-                <div className="px-4 pb-3 space-y-2">
-                  {group.tasks.map((t) => (
-                    <div key={t.id} className="flex items-center justify-between py-1.5 border-b last:border-0">
-                      <span className="text-sm">{t.title}</span>
-                      <div className="flex gap-2">
-                        <Badge variant="outline">{t.spFinal || t.spSuggestion} SP</Badge>
-                        <Badge variant="secondary">{t.priority}</Badge>
-                        {t.category && <Badge variant="outline" className={categoryColor(t.category)}>{t.category}</Badge>}
-                        {t.jiraKey && <Badge variant="default">{t.jiraKey}</Badge>}
-                      </div>
-                    </div>
-                  ))}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      handleSelectRequirement(group.requirementId);
-                      setActiveTab("detail");
-                    }}
-                  >
-                    Analize Git →
-                  </Button>
-                </div>
-              </details>
-            ))}
-        </>
-      )}
     </div>
   );
 }

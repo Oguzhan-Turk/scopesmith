@@ -66,10 +66,22 @@ public class ProjectController {
         return projectService.update(id, request);
     }
 
+    @GetMapping("/{id}/delete-summary")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+    public Map<String, Long> getDeleteSummary(@PathVariable Long id) {
+        return projectService.getDeleteSummary(id);
+    }
+
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable Long id) {
-        projectService.delete(id);
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+    public void delete(@PathVariable Long id, @RequestBody(required = false) Map<String, String> body) {
+        String confirmName = body != null ? body.get("confirmName") : null;
+        if (confirmName == null || confirmName.isBlank()) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                HttpStatus.BAD_REQUEST, "confirmName zorunludur.");
+        }
+        projectService.deleteWithConfirmation(id, confirmName);
     }
 
     @GetMapping("/{id}/integration-config")

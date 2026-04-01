@@ -75,6 +75,10 @@ Layered architecture: Controller → Service → Repository → Entity
 - **ErrorBoundary:** App root'ta, component crash → kullanıcı dostu hata ekranı
 - **Stale guard:** `loadIdRef` ile hızlı navigasyonda eski response'lar ignore edilir
 
+## Açık Fikirler / Backlog
+
+- **Sprint bazlı tarama stratejisi** — Taramayı on-demand yerine sprint ritüellerine bağla (sprint başı, commit hook, vb.). Gereksiz re-scan önlenir, token yanmaz. Mevcut staleness detection ile entegre olur.
+
 ## Entegrasyonlar
 
 - **Jira Cloud:** Issue oluşturma, CSV export, durum doğrulama, yetim issue kapatma

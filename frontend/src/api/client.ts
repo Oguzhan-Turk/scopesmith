@@ -47,6 +47,10 @@ export const scanProjectGit = (id: number, gitUrl: string, token?: string) =>
   });
 export const getScanStatus = (id: number) =>
   request<{ status: "IDLE" | "SCANNING" | "FAILED"; error: string }>(`/projects/${id}/scan-status`);
+export const getDeleteSummary = (id: number) =>
+  request<{ requirements: number; documents: number; aiCalls: number }>(`/projects/${id}/delete-summary`);
+export const deleteProject = (id: number, confirmName: string) =>
+  request<void>(`/projects/${id}`, { method: "DELETE", body: JSON.stringify({ confirmName }) });
 
 // Auth
 export const login = (username: string, password: string) =>
