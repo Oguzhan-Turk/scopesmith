@@ -160,13 +160,27 @@ export default function ContextTab({
           const entities = sc.entities as unknown[] | undefined;
           const endpoints = sc.apiEndpoints as unknown[] | undefined;
           const techStack = sc.techStack as Record<string, unknown> | undefined;
+          const frameworks = techStack?.frameworks as string[] | undefined;
+
+          const toNames = (arr: unknown[] | undefined): string[] => {
+            if (!arr || arr.length === 0) return [];
+            if (typeof arr[0] === "object" && arr[0] !== null)
+              return (arr as Record<string, unknown>[]).map((item) => String(item.name || item.title || item.path || JSON.stringify(item)));
+            return arr as string[];
+          };
 
           const stats = [
-            { label: "Modüller", value: modules?.length || 0, icon: "📦" },
-            { label: "Entity'ler", value: entities?.length || 0, icon: "🗃️" },
-            { label: "Endpoint'ler", value: endpoints?.length || 0, icon: "🔗" },
-            { label: "Framework", value: techStack?.frameworks ? (techStack.frameworks as string[]).length : 0, icon: "⚙️" },
+            { label: "Modüller",    value: modules?.length  || 0, items: toNames(modules) },
+            { label: "Entity'ler",  value: entities?.length || 0, items: toNames(entities) },
+            { label: "Endpoint'ler",value: endpoints?.length|| 0, items: toNames(endpoints) },
+            { label: "Framework",   value: frameworks?.length||0, items: frameworks || [] },
           ].filter((s) => s.value > 0);
+
+          // Stat kartlarının kapsamadığı alanlar — bunlar altta kalır
+          const statCoveredKeys = new Set(["modules", "entities", "apiEndpoints", "techStack"]);
+          const remainingKeys = [...priorityKeys, ...otherKeys].filter(
+            (k) => sc[k] && !statCoveredKeys.has(k)
+          );
 
           return (
             <Card>
@@ -174,45 +188,58 @@ export default function ContextTab({
                 <CardTitle className="text-base">Proje Yapısı</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* Stat kartları — hover'da detay listesi */}
                 {stats.length > 0 && (
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {stats.map((s) => (
-                      <div key={s.label} className="text-center py-2 rounded-lg bg-muted/30">
-                        <p className="text-lg font-bold">{s.value}</p>
-                        <p className="text-xs text-muted-foreground">{s.label}</p>
+                      <div key={s.label} className="relative group">
+                        <div className="text-center py-2 rounded-lg bg-muted/30 cursor-default select-none">
+                          <p className="text-lg font-bold">{s.value}</p>
+                          <p className="text-xs text-muted-foreground">{s.label}</p>
+                        </div>
+                        {/* Hover tooltip */}
+                        {s.items.length > 0 && (
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50
+                                          w-52 rounded-lg border bg-popover shadow-md p-2
+                                          invisible opacity-0 group-hover:visible group-hover:opacity-100
+                                          transition-opacity duration-150 pointer-events-none">
+                            <p className="text-xs font-semibold text-muted-foreground mb-1.5 px-1">{s.label}</p>
+                            <ul className="max-h-48 overflow-y-auto space-y-0.5">
+                              {s.items.map((item, i) => (
+                                <li key={i} className="text-xs px-1 py-0.5 rounded hover:bg-muted truncate">{item}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
                 )}
+
+                {/* Teknoloji Stack badge'leri */}
                 {techStack && (
-                  <div>
-                    <h5 className="text-sm font-semibold text-muted-foreground mb-2">Teknoloji Stack</h5>
-                    <div className="flex flex-wrap gap-1.5">
-                      {Object.entries(techStack).flatMap(([_k, v]) =>
-                        Array.isArray(v) ? (v as string[]).map((item) => (
-                          <span key={item} className="px-2 py-0.5 text-xs rounded-full bg-primary/5 border border-primary/10">
-                            {item}
-                          </span>
-                        )) : []
-                      )}
-                    </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {Object.entries(techStack).flatMap(([_k, v]) =>
+                      Array.isArray(v) ? (v as string[]).map((item) => (
+                        <span key={item} className="px-2 py-0.5 text-xs rounded-full bg-primary/5 border border-primary/10">
+                          {item}
+                        </span>
+                      )) : []
+                    )}
                   </div>
                 )}
-                <details>
-                  <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground font-medium">
-                    Detaylı yapı bilgisi
-                  </summary>
-                  <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {[...priorityKeys, ...otherKeys].filter((k) => sc[k] && k !== "techStack").map((key) => (
+
+                {/* Önemli gözlemler ve diğer alanlar */}
+                {remainingKeys.length > 0 && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                    {remainingKeys.map((key) => (
                       <div key={key} className="border-l-2 border-muted-foreground/15 pl-3 space-y-1">
-                        <h5 className="text-xs font-semibold text-muted-foreground">
-                          {fieldLabels[key] || key}
-                        </h5>
+                        <h5 className="text-xs font-semibold text-muted-foreground">{fieldLabels[key] || key}</h5>
                         <p className="text-sm leading-relaxed">{renderValue(sc[key])}</p>
                       </div>
                     ))}
                   </div>
-                </details>
+                )}
               </CardContent>
             </Card>
           );
