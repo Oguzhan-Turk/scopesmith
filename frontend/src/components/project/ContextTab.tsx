@@ -243,7 +243,6 @@ export default function ContextTab({
           const techStack = sc.techStack as Record<string, unknown> | undefined;
           const frameworks = techStack?.frameworks as string[] | undefined;
           const externalIntegrations = sc.externalIntegrations as string[] | undefined;
-          const architecturePattern = sc.architecturePattern as string | undefined;
 
           const toNames = (arr: unknown[] | undefined): string[] => {
             if (!arr || arr.length === 0) return [];
@@ -262,9 +261,17 @@ export default function ContextTab({
           ].filter((s) => s.value > 0);
 
           // stat grid + architecturePattern + architectureDescription hariç alanlar
-          const statCoveredKeys = new Set(["modules", "entities", "apiEndpoints", "techStack", "externalIntegrations", "architecturePattern", "architectureDescription"]);
+          // Stat kartlarında gösterilen veya UI'da gösterilmeyecek alanlar
+          // Not: architecturePattern, keyObservations, architectureDescription
+          // AI promptlarına giriyor ama UI'da gösterilmiyor — AI tahmini olduğu için
+          // yanlış güven yaratabilir.
+          const hiddenKeys = new Set([
+            "modules", "entities", "apiEndpoints", "techStack",
+            "externalIntegrations", "architecturePattern",
+            "architectureDescription", "keyObservations",
+          ]);
           const remainingKeys = [...priorityKeys, ...otherKeys].filter(
-            (k) => sc[k] && !statCoveredKeys.has(k)
+            (k) => sc[k] && !hiddenKeys.has(k)
           );
 
           return (
