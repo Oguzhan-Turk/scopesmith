@@ -278,16 +278,6 @@ export default function ContextTab({
                   <StatGrid stats={stats} />
                 )}
 
-                {/* Mimari Desen — tek değer, etiket olarak */}
-                {architecturePattern && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">Mimari</span>
-                    <span className="px-2 py-0.5 text-xs rounded-md bg-muted/50 border font-medium">
-                      {architecturePattern}
-                    </span>
-                  </div>
-                )}
-
                 {/* Önemli gözlemler ve diğer alanlar */}
                 {remainingKeys.length > 0 && (
                   <div className="space-y-4 pt-1">
