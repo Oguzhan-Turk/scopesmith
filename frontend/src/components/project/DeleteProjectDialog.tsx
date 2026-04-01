@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, Trash2 } from "lucide-react";
+import { AlertTriangle, Trash2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/hooks/useToast";
 import { getDeleteSummary, deleteProject } from "@/api/client";
 
 interface DeleteProjectDialogProps {
@@ -19,6 +21,7 @@ export default function DeleteProjectDialog({
   projectName,
   onDeleted,
 }: DeleteProjectDialogProps) {
+  const { showToast } = useToast();
   const [confirmInput, setConfirmInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState<{ requirements: number; documents: number; aiCalls: number } | null>(null);
@@ -41,66 +44,75 @@ export default function DeleteProjectDialog({
       onDeleted();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Silme başarısız oldu.";
-      alert(msg);
+      showToast(msg, "error");
     } finally {
       setLoading(false);
     }
   }
+
+  const rows = [
+    { label: "Talep", value: summary?.requirements },
+    { label: "Belge", value: summary?.documents },
+    { label: "AI işlem kaydı", value: summary?.aiCalls },
+  ];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-destructive">
-            <AlertTriangle className="w-5 h-5" />
+            <AlertTriangle className="w-4 h-4" />
             Projeyi Kalıcı Olarak Sil
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
-          {/* Warning banner */}
-          <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 text-sm text-destructive">
-            Bu işlem <strong>geri alınamaz.</strong> Projeye ait tüm veriler kalıcı olarak silinecek.
+        <div className="space-y-4 pt-1">
+          {/* Silinecekler */}
+          <div className="border rounded-lg divide-y text-sm">
+            <div className="px-3 py-2 bg-muted/40 text-xs font-medium text-muted-foreground">
+              Silinecekler
+            </div>
+            {rows.map(({ label, value }) => (
+              <div key={label} className="flex items-center justify-between px-3 py-2">
+                <span className="text-muted-foreground">{label}</span>
+                <span className="font-medium tabular-nums">
+                  {value !== undefined ? value : "—"}
+                </span>
+              </div>
+            ))}
+            <div className="flex items-center justify-between px-3 py-2">
+              <span className="text-muted-foreground">Task'lar, analizler, entegrasyon ayarları</span>
+              <span className="font-medium">Tümü</span>
+            </div>
           </div>
 
-          {/* What gets deleted */}
+          {/* Jira/GitHub notu */}
+          <p className="text-xs text-muted-foreground">
+            Jira ve GitHub'da oluşturulan issue'lar silinmez. Sadece ScopeSmith'teki bağlantı kaldırılır.
+          </p>
+
+          <Separator />
+
+          {/* İsim onayı */}
           <div className="space-y-1.5">
-            <p className="text-sm font-medium">Silinecekler:</p>
-            <ul className="text-sm text-muted-foreground space-y-1 pl-4">
-              <li>• {summary ? `${summary.requirements} talep` : "Talepler"} ve tüm analizleri</li>
-              <li>• Tüm task'lar ve SP kararları</li>
-              <li>• {summary ? `${summary.documents} belge` : "Belgeler"}</li>
-              <li>• {summary ? `${summary.aiCalls} AI işlem kaydı` : "Kullanım kayıtları"}</li>
-              <li>• Entegrasyon ayarları</li>
-            </ul>
-          </div>
-
-          {/* Jira/GitHub warning */}
-          <div className="bg-muted/50 border rounded-lg p-3 text-xs text-muted-foreground">
-            Jira ve GitHub'da oluşturulmuş issue'lar <strong>silinmez</strong>. Sadece ScopeSmith'teki bağlantı kaldırılır.
-            Dış sistemlerdeki issue'ları manuel yönetmeniz gerekir.
-          </div>
-
-          {/* Name confirmation */}
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium" htmlFor="delete-confirm">
-              Onaylamak için proje adını yazın:{" "}
-              <span className="font-mono text-foreground">{projectName}</span>
+            <label className="text-sm font-medium block" htmlFor="delete-confirm">
+              Onaylamak için proje adını yazın
             </label>
+            <p className="text-xs text-muted-foreground font-mono select-none">{projectName}</p>
             <input
               id="delete-confirm"
               type="text"
               value={confirmInput}
               onChange={(e) => setConfirmInput(e.target.value)}
               className="w-full px-3 py-2 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              placeholder={projectName}
+              placeholder="Proje adını buraya yazın..."
               autoComplete="off"
               autoFocus
             />
           </div>
 
-          {/* Actions */}
-          <div className="flex justify-end gap-2 pt-1">
+          {/* Eylemler */}
+          <div className="flex justify-end gap-2">
             <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} disabled={loading}>
               İptal
             </Button>
@@ -110,8 +122,10 @@ export default function DeleteProjectDialog({
               onClick={handleDelete}
               disabled={!confirmed || loading}
             >
-              <Trash2 className="w-3.5 h-3.5 mr-1.5" />
-              {loading ? "Siliniyor..." : "Projeyi Kalıcı Olarak Sil"}
+              {loading
+                ? <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />Siliniyor</>
+                : <><Trash2 className="w-3.5 h-3.5 mr-1.5" />Kalıcı Olarak Sil</>
+              }
             </Button>
           </div>
         </div>

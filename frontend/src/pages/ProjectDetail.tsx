@@ -852,22 +852,23 @@ export default function ProjectDetail() {
             setGitToken={setGitToken}
           />
           {/* Danger zone */}
-          <div className="border border-destructive/30 rounded-lg p-4 space-y-3">
-            <div>
-              <h3 className="text-sm font-semibold text-destructive">Tehlikeli Bölge</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">Bu işlemler geri alınamaz.</p>
+          <div className="border border-destructive/25 rounded-lg divide-y">
+            <div className="px-4 py-2.5 bg-destructive/5">
+              <p className="text-sm font-semibold text-destructive">Tehlikeli Bölge</p>
             </div>
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="px-4 py-3 flex items-center justify-between gap-4">
+              <div className="min-w-0">
                 <p className="text-sm font-medium">Projeyi Sil</p>
                 <p className="text-xs text-muted-foreground">Tüm talepler, analizler ve task'lar kalıcı olarak silinir.</p>
               </div>
-              <button
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-shrink-0 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
                 onClick={() => setDeleteDialogOpen(true)}
-                className="px-3 py-1.5 text-sm rounded-md border border-destructive/40 text-destructive hover:bg-destructive/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 Projeyi Sil
-              </button>
+              </Button>
             </div>
           </div>
         </TabsContent>
