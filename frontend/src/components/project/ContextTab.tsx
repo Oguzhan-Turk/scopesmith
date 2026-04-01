@@ -1,10 +1,61 @@
-import { Code, FileText, RefreshCw, Plus, Sparkles } from "lucide-react";
+import { useState } from "react";
+import { Code, FileText, RefreshCw, Plus, Sparkles, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { timeAgo } from "@/lib/utils";
 import { suggestFeatures } from "@/api/client";
 import type { ContextTabProps } from "./types";
+
+interface StatItem { key: string; label: string; value: number; items: string[]; }
+
+function StatGrid({ stats }: { stats: StatItem[] }) {
+  const [active, setActive] = useState<string | null>(null);
+  const activestat = stats.find((s) => s.key === active);
+
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        {stats.map((s) => {
+          const isActive = active === s.key;
+          return (
+            <button
+              key={s.key}
+              onClick={() => setActive(isActive ? null : s.key)}
+              className={`text-center py-2.5 px-3 rounded-lg border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                isActive
+                  ? "bg-primary/8 border-primary/30 text-primary"
+                  : "bg-muted/30 border-transparent hover:bg-muted/60"
+              }`}
+            >
+              <p className="text-lg font-bold leading-none">{s.value}</p>
+              <div className="flex items-center justify-center gap-1 mt-1">
+                <p className="text-xs text-muted-foreground">{s.label}</p>
+                {s.items.length > 0 && (
+                  <ChevronDown className={`w-3 h-3 text-muted-foreground transition-transform ${isActive ? "rotate-180" : ""}`} />
+                )}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Seçili stat'ın listesi */}
+      {activestat && activestat.items.length > 0 && (
+        <div className="rounded-lg border bg-muted/20 px-3 py-2.5">
+          <p className="text-xs font-semibold text-muted-foreground mb-2">{activestat.label}</p>
+          <div className="flex flex-wrap gap-1.5">
+            {activestat.items.map((item, i) => (
+              <span key={i} className="px-2 py-0.5 text-xs rounded-md bg-background border">
+                {item}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function ContextTab({
   project,
@@ -165,18 +216,18 @@ export default function ContextTab({
           const toNames = (arr: unknown[] | undefined): string[] => {
             if (!arr || arr.length === 0) return [];
             if (typeof arr[0] === "object" && arr[0] !== null)
-              return (arr as Record<string, unknown>[]).map((item) => String(item.name || item.title || item.path || JSON.stringify(item)));
+              return (arr as Record<string, unknown>[]).map((item) =>
+                String(item.name || item.title || item.path || JSON.stringify(item)));
             return arr as string[];
           };
 
           const stats = [
-            { label: "Modüller",    value: modules?.length  || 0, items: toNames(modules) },
-            { label: "Entity'ler",  value: entities?.length || 0, items: toNames(entities) },
-            { label: "Endpoint'ler",value: endpoints?.length|| 0, items: toNames(endpoints) },
-            { label: "Framework",   value: frameworks?.length||0, items: frameworks || [] },
+            { key: "modules",    label: "Modüller",     value: modules?.length   || 0, items: toNames(modules) },
+            { key: "entities",   label: "Entity'ler",   value: entities?.length  || 0, items: toNames(entities) },
+            { key: "endpoints",  label: "Endpoint'ler", value: endpoints?.length || 0, items: toNames(endpoints) },
+            { key: "frameworks", label: "Framework",    value: frameworks?.length|| 0, items: frameworks || [] },
           ].filter((s) => s.value > 0);
 
-          // Stat kartlarının kapsamadığı alanlar — bunlar altta kalır
           const statCoveredKeys = new Set(["modules", "entities", "apiEndpoints", "techStack"]);
           const remainingKeys = [...priorityKeys, ...otherKeys].filter(
             (k) => sc[k] && !statCoveredKeys.has(k)
@@ -188,32 +239,9 @@ export default function ContextTab({
                 <CardTitle className="text-base">Proje Yapısı</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Stat kartları — hover'da detay listesi */}
+                {/* Stat kartları */}
                 {stats.length > 0 && (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {stats.map((s) => (
-                      <div key={s.label} className="relative group">
-                        <div className="text-center py-2 rounded-lg bg-muted/30 cursor-default select-none">
-                          <p className="text-lg font-bold">{s.value}</p>
-                          <p className="text-xs text-muted-foreground">{s.label}</p>
-                        </div>
-                        {/* Hover tooltip */}
-                        {s.items.length > 0 && (
-                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50
-                                          w-52 rounded-lg border bg-popover shadow-md p-2
-                                          invisible opacity-0 group-hover:visible group-hover:opacity-100
-                                          transition-opacity duration-150 pointer-events-none">
-                            <p className="text-xs font-semibold text-muted-foreground mb-1.5 px-1">{s.label}</p>
-                            <ul className="max-h-48 overflow-y-auto space-y-0.5">
-                              {s.items.map((item, i) => (
-                                <li key={i} className="text-xs px-1 py-0.5 rounded hover:bg-muted truncate">{item}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                  <StatGrid stats={stats} />
                 )}
 
                 {/* Teknoloji Stack badge'leri */}
