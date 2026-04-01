@@ -28,6 +28,8 @@ export default function DetailTab({
   setActionLoading,
   showToast,
 }: DetailTabProps) {
+  // "Diğer" seçeneği için serbest metin girişi — key: question id
+  const [digerInputs, setDigerInputs] = useState<Record<number, string>>({});
   const [analysisRefineInput, setAnalysisRefineInput] = useState("");
 
   if (!selectedRequirementId) {
@@ -202,20 +204,24 @@ export default function DetailTab({
                             <div className="flex flex-wrap gap-2">
                               {q.options.map((opt) => {
                                 const currentAnswer = answers[q.id] || "";
+                                const isDiger = opt === "Diğer";
+                                const digerSelected = isDiger && currentAnswer.split(", ").includes("Diğer");
                                 const selected = currentAnswer.split(", ").includes(opt);
                                 return (
                                   <button
                                     key={opt}
                                     className={`px-3 py-1.5 text-xs rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                                      selected ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"
+                                      selected || digerSelected ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"
                                     }`}
                                     onClick={() => {
                                       if (q.questionType === "SINGLE_CHOICE") {
                                         setAnswers((prev) => ({ ...prev, [q.id]: opt }));
+                                        if (!isDiger) setDigerInputs((prev) => ({ ...prev, [q.id]: "" }));
                                       } else {
                                         const parts = currentAnswer ? currentAnswer.split(", ").filter(Boolean) : [];
                                         const next = selected ? parts.filter((p) => p !== opt) : [...parts, opt];
                                         setAnswers((prev) => ({ ...prev, [q.id]: next.join(", ") }));
+                                        if (isDiger && selected) setDigerInputs((prev) => ({ ...prev, [q.id]: "" }));
                                       }
                                     }}
                                   >
@@ -224,8 +230,28 @@ export default function DetailTab({
                                 );
                               })}
                             </div>
+
+                            {/* "Diğer" seçiliyse serbest metin alanı */}
+                            {(answers[q.id] || "").split(", ").includes("Diğer") && (
+                              <input
+                                type="text"
+                                autoFocus
+                                placeholder="Belirtin..."
+                                value={digerInputs[q.id] || ""}
+                                onChange={(e) => {
+                                  const text = e.target.value;
+                                  setDigerInputs((prev) => ({ ...prev, [q.id]: text }));
+                                  // Cevaba "Diğer" yerine yazılan metni yansıt
+                                  const parts = (answers[q.id] || "").split(", ").filter((p) => p !== "Diğer" && p !== (digerInputs[q.id] || ""));
+                                  const next = text.trim() ? [...parts, text] : [...parts, "Diğer"];
+                                  setAnswers((prev) => ({ ...prev, [q.id]: next.join(", ") }));
+                                }}
+                                className="w-full px-3 py-1.5 text-sm border rounded-md bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              />
+                            )}
+
                             <div className="flex gap-2">
-                              <Button size="sm" onClick={() => handleAnswer(q.id)} disabled={actionLoading === `answer-${q.id}` || !(answers[q.id] || "").trim()}>
+                              <Button size="sm" onClick={() => handleAnswer(q.id)} disabled={actionLoading === `answer-${q.id}` || !(answers[q.id] || "").replace("Diğer", "").trim()}>
                                 {actionLoading === `answer-${q.id}` ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : "Onayla"}
                               </Button>
                               <Button size="sm" variant="ghost" onClick={() => handleDismiss(q.id)} disabled={actionLoading === `dismiss-${q.id}`}>
