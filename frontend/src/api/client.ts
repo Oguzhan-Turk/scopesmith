@@ -36,15 +36,17 @@ export const getProject = (id: number) => request<Project>(`/projects/${id}`);
 export const createProject = (data: { name: string; description?: string }) =>
   request<Project>("/projects", { method: "POST", body: JSON.stringify(data) });
 export const scanProject = (id: number, folderPath: string) =>
-  request<Project>(`/projects/${id}/scan`, {
+  request<{ status: string }>(`/projects/${id}/scan`, {
     method: "POST",
     body: JSON.stringify({ folderPath }),
   });
 export const scanProjectGit = (id: number, gitUrl: string, token?: string) =>
-  request<Project>(`/projects/${id}/scan-git`, {
+  request<{ status: string }>(`/projects/${id}/scan-git`, {
     method: "POST",
     body: JSON.stringify({ gitUrl, token }),
   });
+export const getScanStatus = (id: number) =>
+  request<{ status: "IDLE" | "SCANNING" | "FAILED"; error: string }>(`/projects/${id}/scan-status`);
 
 // Auth
 export const login = (username: string, password: string) =>

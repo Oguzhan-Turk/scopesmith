@@ -25,6 +25,7 @@ import {
   type TaskGroup,
   scanProject,
   scanProjectGit,
+  getScanStatus,
   getIntegrationConfig,
   updateIntegrationConfig,
   getProjectUsage,
@@ -248,22 +249,46 @@ export default function ProjectDetail() {
   }
 
   async function handleScan() {
+    if (scanMode === "git") {
+      if (!gitUrl.trim()) { showToast("Entegrasyonlar sekmesinden Git URL'i ayarlayın.", "info"); return; }
+    } else {
+      if (!scanPath.trim()) { showToast("Entegrasyonlar sekmesinden klasör yolunu ayarlayın.", "info"); return; }
+    }
     setActionLoading("scan");
     try {
-      let updated: Project;
+      // Start async scan — backend returns 202 immediately
       if (scanMode === "git") {
-        if (!gitUrl.trim()) { showToast("Entegrasyonlar sekmesinden Git URL'i ayarlayın.", "info"); return; }
-        updated = await scanProjectGit(projectId, gitUrl.trim(), gitToken.trim() || undefined);
+        await scanProjectGit(projectId, gitUrl.trim(), gitToken.trim() || undefined);
       } else {
-        if (!scanPath.trim()) { showToast("Entegrasyonlar sekmesinden klasör yolunu ayarlayın.", "info"); return; }
-        updated = await scanProject(projectId, scanPath.trim());
+        await scanProject(projectId, scanPath.trim());
       }
+      // Poll for completion every 3 seconds
+      await new Promise<void>((resolve, reject) => {
+        const interval = setInterval(async () => {
+          try {
+            const { status, error } = await getScanStatus(projectId);
+            if (status === "IDLE") {
+              clearInterval(interval);
+              resolve();
+            } else if (status === "FAILED") {
+              clearInterval(interval);
+              reject(new Error(error || "Tarama başarısız oldu."));
+            }
+            // SCANNING → keep polling
+          } catch {
+            clearInterval(interval);
+            reject(new Error("Durum sorgulanamadı."));
+          }
+        }, 3000);
+      });
+      // Scan done — reload project + usage
+      const updated = await getProject(projectId);
       setProject(updated);
-      // Refresh usage after scan (AI tokens consumed)
       getProjectUsage(projectId).then(setUsageSummary).catch(() => {});
       showToast("Proje başarıyla tarandı.", "success");
-    } catch (e) {
-      showToast("Tarama başarısız oldu.");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Tarama başarısız oldu.";
+      showToast(msg);
       console.error("Scan failed:", e);
     } finally {
       setActionLoading(null);
@@ -296,7 +321,7 @@ export default function ProjectDetail() {
     }
 
     const req = requirements.find((r) => r.id === reqId);
-    const isReanalyze = req && req.status !== "NEW";
+    const isReanalyze = req && req.status !== "DRAFT" && req.status !== "ANALYZING";
     if (isReanalyze) {
       setConfirmDialog({
         message: "Yeniden analiz başlatmak üzeresiniz.\n\n• Mevcut analiz sonuçları yeni analizle değiştirilecek\n• Üretilmiş task'lar sıfırlanacak\n• Jira/GitHub'a gönderilmiş issue'lar etkilenmez, ancak bağlantıları kopabilir\n\nDevam etmek istiyor musunuz?",

@@ -15,15 +15,19 @@ import com.scopesmith.service.ProjectAccessService;
 import com.scopesmith.service.InsightService;
 import com.scopesmith.service.ProjectContextService;
 import com.scopesmith.service.ProjectService;
+import com.scopesmith.service.ScanStatusService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/projects")
 @RequiredArgsConstructor
@@ -33,6 +37,7 @@ public class ProjectController {
     private final ProjectContextService contextService;
     private final GitCloneService gitCloneService;
     private final InsightService insightService;
+    private final ScanStatusService scanStatusService;
     private final FeatureSuggestionService featureSuggestionService;
     private final ProjectAccessService projectAccessService;
     private final AnalysisRepository analysisRepository;
@@ -109,7 +114,7 @@ public class ProjectController {
             group.put("analysisId", a.getId());
             group.put("requirementId", a.getRequirement().getId());
             group.put("requirementText", truncate(a.getRequirement().getRawText(), 100));
-            group.put("requirementType", a.getRequirement().getType().name());
+            group.put("requirementType", a.getRequirement().getType() != null ? a.getRequirement().getType().name() : "FEATURE");
             group.put("requirementSeq", a.getRequirement().getSequenceNumber());
             group.put("riskLevel", a.getRiskLevel());
             group.put("createdAt", a.getCreatedAt());
@@ -131,26 +136,48 @@ public class ProjectController {
     }
 
     /**
-     * Scan a local folder to generate project context.
-     * ScopeSmith reads the code, understands the project structure,
-     * and uses this context for all subsequent requirement analyses.
+     * Returns current scan status for a project.
+     */
+    @GetMapping("/{id}/scan-status")
+    public Map<String, String> getScanStatus(@PathVariable Long id) {
+        var state = scanStatusService.getState(id);
+        return Map.of(
+            "status", state.status().name(),
+            "error", state.error() != null ? state.error() : ""
+        );
+    }
+
+    /**
+     * Scan a local folder to generate project context (async — returns 202 immediately).
      */
     @PostMapping("/{id}/scan")
-    public ProjectResponse scanLocalFolder(
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public Map<String, String> scanLocalFolder(
             @PathVariable Long id,
             @RequestBody java.util.Map<String, String> request) {
         String folderPath = request.get("folderPath");
         if (folderPath == null || folderPath.isBlank()) {
             throw new IllegalArgumentException("folderPath is required");
         }
-        return ProjectResponse.from(contextService.scanLocalFolder(id, folderPath));
+        scanStatusService.setScanning(id);
+        CompletableFuture.runAsync(() -> {
+            try {
+                contextService.scanLocalFolder(id, folderPath);
+                scanStatusService.setDone(id);
+            } catch (Exception e) {
+                log.error("Scan failed for project {}: {}", id, e.getMessage());
+                scanStatusService.setFailed(id, e.getMessage());
+            }
+        });
+        return Map.of("status", "SCANNING");
     }
 
     /**
-     * Clone a git repo and scan it for project context.
+     * Clone a git repo and scan it for project context (async — returns 202 immediately).
      */
     @PostMapping("/{id}/scan-git")
-    public ProjectResponse scanGitRepo(
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public Map<String, String> scanGitRepo(
             @PathVariable Long id,
             @RequestBody java.util.Map<String, String> request) {
         String gitUrl = request.get("gitUrl");
@@ -158,25 +185,24 @@ public class ProjectController {
         if (gitUrl == null || gitUrl.isBlank()) {
             throw new IllegalArgumentException("gitUrl is required");
         }
-
-        java.nio.file.Path clonedDir = null;
-        try {
-            clonedDir = gitCloneService.cloneRepo(gitUrl, token);
-
-            // Update project with git URL
-            Project project = projectService.getProjectOrThrow(id);
-            project.setRepoUrl(gitUrl);
-            projectService.save(project);
-
-            // Scan cloned directory using existing context service
-            return ProjectResponse.from(contextService.scanLocalFolder(id, clonedDir.toString()));
-        } catch (java.io.IOException e) {
-            throw new IllegalStateException("Git clone başarısız: " + e.getMessage());
-        } finally {
-            if (clonedDir != null) {
-                gitCloneService.cleanup(clonedDir);
+        scanStatusService.setScanning(id);
+        CompletableFuture.runAsync(() -> {
+            java.nio.file.Path clonedDir = null;
+            try {
+                clonedDir = gitCloneService.cloneRepo(gitUrl, token);
+                Project project = projectService.getProjectOrThrow(id);
+                project.setRepoUrl(gitUrl);
+                projectService.save(project);
+                contextService.scanLocalFolder(id, clonedDir.toString());
+                scanStatusService.setDone(id);
+            } catch (Exception e) {
+                log.error("Git scan failed for project {}: {}", id, e.getMessage());
+                scanStatusService.setFailed(id, e.getMessage());
+            } finally {
+                if (clonedDir != null) gitCloneService.cleanup(clonedDir);
             }
-        }
+        });
+        return Map.of("status", "SCANNING");
     }
 
     @PostMapping("/{id}/suggest-features")
