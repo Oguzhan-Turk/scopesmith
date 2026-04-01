@@ -85,7 +85,7 @@ export default function TasksTab({
               <Tooltip content={blocked ? `${openCount} açık soru var — önce soruları cevaplayın` : ""}>
                 <span>
                   <Button onClick={handleGenerateTasks} disabled={!!actionLoading || blocked}>
-                    {actionLoading === "tasks" ? "Üretiliyor..." : "Task'lara Böl"}
+                    {actionLoading === "tasks" ? <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />Üretiliyor</> : "Task'lara Böl"}
                   </Button>
                 </span>
               </Tooltip>
@@ -107,7 +107,7 @@ export default function TasksTab({
                       <span>/ {tasks.length}</span>
                     </span>
                     <Button size="sm" variant="ghost" onClick={handleVerifySync} disabled={!!actionLoading} className="text-xs h-6 px-2">
-                      {actionLoading === "verify-sync" ? "..." : "Doğrula"}
+                      {actionLoading === "verify-sync" ? <RefreshCw className="w-3 h-3 animate-spin" /> : "Doğrula"}
                     </Button>
                   </>
                 );
@@ -152,13 +152,11 @@ export default function TasksTab({
       </div>
 
       {tasks.length === 0 ? (
-        <Card className="text-center py-8">
-          <CardContent>
-            <p className="text-muted-foreground text-sm">
-              Henüz task üretilmedi. "Task'lara Böl" butonunu kullanın.
-            </p>
-          </CardContent>
-        </Card>
+        <div className="text-center py-12 border border-dashed rounded-lg">
+          <p className="text-sm text-muted-foreground">
+            Henüz task üretilmedi. "Task'lara Böl" butonunu kullanın.
+          </p>
+        </div>
       ) : (
         <>
           {tasks.map((task) => {
@@ -244,13 +242,13 @@ export default function TasksTab({
                     <p className="text-sm text-muted-foreground">{task.description}</p>
                     {task.acceptanceCriteria && (
                       <div>
-                        <h5 className="text-xs font-medium mb-1">Kabul Kriterleri</h5>
+                        <h5 className="text-sm font-medium mb-1">Kabul Kriterleri</h5>
                         <p className="text-xs text-muted-foreground whitespace-pre-wrap">{task.acceptanceCriteria}</p>
                       </div>
                     )}
                     {task.spRationale && (
                       <div>
-                        <h5 className="text-xs font-medium mb-1">SP Gerekçesi</h5>
+                        <h5 className="text-sm font-medium mb-1">SP Gerekçesi</h5>
                         <p className="text-xs text-muted-foreground">{task.spRationale}</p>
                       </div>
                     )}
@@ -259,7 +257,7 @@ export default function TasksTab({
                     )}
                     <Separator />
                     <div>
-                      <h5 className="text-xs font-medium mb-2">SP Kararı</h5>
+                      <h5 className="text-sm font-medium mb-2">SP Kararı</h5>
                       <div className="flex items-center gap-1.5">
                         {[1, 2, 3, 5, 8, 13].map((sp) => (
                           <button
@@ -324,7 +322,7 @@ export default function TasksTab({
                   placeholder="İyileştirme talimatı girin..."
                   value={taskInstruction}
                   onChange={(e) => setTaskInstruction(e.target.value)}
-                  className="flex-1 px-3 py-1.5 text-sm border rounded-md bg-background"
+                  className="flex-1 px-3 py-1.5 text-sm border rounded-md bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 />
                 <Button
                   size="sm"
@@ -345,7 +343,7 @@ export default function TasksTab({
                   <button
                     key={chip}
                     onClick={() => setTaskInstruction(chip)}
-                    className="px-2.5 py-1 text-xs rounded-full border bg-muted hover:bg-muted/80 transition-colors"
+                    className="px-2.5 py-1 text-xs rounded-full border bg-muted hover:bg-muted/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     {chip}
                   </button>

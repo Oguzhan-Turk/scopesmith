@@ -226,7 +226,7 @@ export default function DetailTab({
                             </div>
                             <div className="flex gap-2">
                               <Button size="sm" onClick={() => handleAnswer(q.id)} disabled={actionLoading === `answer-${q.id}` || !(answers[q.id] || "").trim()}>
-                                {actionLoading === `answer-${q.id}` ? "..." : "Onayla"}
+                                {actionLoading === `answer-${q.id}` ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : "Onayla"}
                               </Button>
                               <Button size="sm" variant="ghost" onClick={() => handleDismiss(q.id)} disabled={actionLoading === `dismiss-${q.id}`}>
                                 Atla
@@ -243,7 +243,7 @@ export default function DetailTab({
                               className="flex-1 px-3 py-1.5 text-sm border rounded-md bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             />
                             <Button size="sm" onClick={() => handleAnswer(q.id)} disabled={actionLoading === `answer-${q.id}` || !(answers[q.id] || "").trim()}>
-                              {actionLoading === `answer-${q.id}` ? "..." : "Onayla"}
+                              {actionLoading === `answer-${q.id}` ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : "Onayla"}
                             </Button>
                             <Button size="sm" variant="ghost" onClick={() => handleDismiss(q.id)} disabled={actionLoading === `dismiss-${q.id}`}>
                               Atla

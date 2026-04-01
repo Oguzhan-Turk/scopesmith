@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, MoreHorizontal, Zap } from "lucide-react";
+import { Plus, MoreHorizontal, Zap, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { RequirementsTabProps } from "./types";
 import { statusColor } from "./utils";
@@ -88,7 +88,7 @@ export default function RequirementsTab({
                           aria-label="Analiz et"
                         >
                           <Zap className="w-3 h-3" />
-                          {actionLoading === `analyze-${req.id}` ? "..." : "Analiz"}
+                          {actionLoading === `analyze-${req.id}` ? <RefreshCw className="w-3 h-3 animate-spin" /> : "Analiz"}
                         </button>
                         <button
                           onClick={() => { setReqMenuOpen(reqMenuOpen === req.id ? null : req.id); }}

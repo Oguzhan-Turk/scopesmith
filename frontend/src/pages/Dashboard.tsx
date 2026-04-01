@@ -104,7 +104,7 @@ export default function Dashboard() {
       </div>
 
       {projects.length === 0 ? (
-        <div className="text-center py-16 border border-dashed rounded-lg">
+        <div className="text-center py-12 border border-dashed rounded-lg">
           <div className="w-12 h-12 rounded-xl mx-auto mb-4 flex items-center justify-center text-white text-lg font-bold" style={{ background: "var(--gradient-brand)" }}>
             S
           </div>

@@ -78,7 +78,7 @@ export default function ContextTab({
                       <p className="text-xs text-muted-foreground mt-1 truncate max-w-lg">{doc.summary}</p>
                     )}
                   </div>
-                  <button onClick={() => { if (window.confirm(`"${doc.filename}" belgesini silmek istediğinizden emin misiniz?`)) handleDeleteDocument(doc.id); }} className="text-xs text-destructive hover:underline flex-shrink-0 ml-2">Sil</button>
+                  <button onClick={() => { if (window.confirm(`"${doc.filename}" belgesini silmek istediğinizden emin misiniz?`)) handleDeleteDocument(doc.id); }} className="text-xs text-destructive hover:underline flex-shrink-0 ml-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">Sil</button>
                 </div>
               ))}
             </div>
@@ -104,7 +104,7 @@ export default function ContextTab({
               ) : (
                 <div>
                   <p className="text-sm text-muted-foreground">Kaynak kod yolu ayarlanmadi</p>
-                  <button onClick={() => setActiveTab("integrations")} className="text-xs text-primary hover:underline">
+                  <button onClick={() => setActiveTab("integrations")} className="text-xs text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">
                     Entegrasyonlar'dan ayarla
                   </button>
                 </div>
@@ -118,7 +118,7 @@ export default function ContextTab({
                 onClick={handleScan}
                 disabled={!!actionLoading}
               >
-                {actionLoading === "scan" ? "Taraniyor..." : project.lastScannedAt ? "Yeniden Tara" : "Tara"}
+                {actionLoading === "scan" ? <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />Taraniyor</> : project.lastScannedAt ? "Yeniden Tara" : "Tara"}
               </Button>
             )}
           </div>
@@ -186,7 +186,7 @@ export default function ContextTab({
                 )}
                 {techStack && (
                   <div>
-                    <h5 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Teknoloji Stack</h5>
+                    <h5 className="text-sm font-semibold text-muted-foreground mb-2">Teknoloji Stack</h5>
                     <div className="flex flex-wrap gap-1.5">
                       {Object.entries(techStack).flatMap(([_k, v]) =>
                         Array.isArray(v) ? (v as string[]).map((item) => (
@@ -205,7 +205,7 @@ export default function ContextTab({
                   <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
                     {[...priorityKeys, ...otherKeys].filter((k) => sc[k] && k !== "techStack").map((key) => (
                       <div key={key} className="border-l-2 border-muted-foreground/15 pl-3 space-y-1">
-                        <h5 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                        <h5 className="text-xs font-semibold text-muted-foreground">
                           {fieldLabels[key] || key}
                         </h5>
                         <p className="text-sm leading-relaxed">{renderValue(sc[key])}</p>
