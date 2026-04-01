@@ -94,6 +94,7 @@ export interface IntegrationsTabProps extends ProjectTabProps {
   setGitUrl: (v: string) => void;
   gitToken: string;
   setGitToken: (v: string) => void;
+  onDeleteProject: () => void;
 }
 
 export interface UsageTabProps extends ProjectTabProps {

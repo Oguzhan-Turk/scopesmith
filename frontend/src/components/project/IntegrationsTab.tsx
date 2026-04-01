@@ -1,11 +1,12 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import { Code, Save } from "lucide-react";
+import { Code, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { IntegrationsTabProps } from "./types";
 
 export default function IntegrationsTab({
+  project,
   integrationConfig,
   setIntegrationConfig,
   handleSaveIntegrationConfig,
@@ -18,6 +19,8 @@ export default function IntegrationsTab({
   setGitUrl,
   gitToken,
   setGitToken,
+  isAdmin,
+  onDeleteProject,
 }: IntegrationsTabProps) {
   const hasSource = scanMode === "git" ? !!gitUrl.trim() : !!scanPath.trim();
 
@@ -230,6 +233,27 @@ export default function IntegrationsTab({
           {actionLoading === "save-config" ? "Kaydediliyor..." : <><Save className="w-3.5 h-3.5 mr-1.5" />Ayarlari Kaydet</>}
         </Button>
       </div>
+
+      {/* Projeyi Sil — sadece admin görür */}
+      {isAdmin && (
+        <div className="border border-destructive/25 rounded-lg p-4 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium">Projeyi Sil</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              <span className="font-mono">{project.name}</span> projesi ve tüm talepler, analizler, task'lar kalıcı olarak silinir.
+            </p>
+          </div>
+          <Button
+            variant="destructive"
+            size="sm"
+            className="shrink-0"
+            onClick={onDeleteProject}
+          >
+            <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+            Projeyi Sil
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

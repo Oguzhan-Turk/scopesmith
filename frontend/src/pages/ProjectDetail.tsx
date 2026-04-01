@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import {
   getProject,
   getRequirements,
@@ -57,6 +57,7 @@ import TasksTab from "@/components/project/TasksTab";
 import ContextTab from "@/components/project/ContextTab";
 import IntegrationsTab from "@/components/project/IntegrationsTab";
 import UsageTab from "@/components/project/UsageTab";
+import DeleteProjectDialog from "@/components/project/DeleteProjectDialog";
 
 const LOADING_LABELS: Record<string, string> = {
   scan: "Proje taranıyor... Bu birkaç dakika sürebilir.",
@@ -69,6 +70,7 @@ const LOADING_LABELS: Record<string, string> = {
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const projectId = Number(id);
   const { showToast } = useToast();
   const { isAdmin } = useAuth();
@@ -94,6 +96,7 @@ export default function ProjectDetail() {
   const [confirmDialog, setConfirmDialog] = useState<{ message: string; onConfirm: () => void } | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [usageSummary, setUsageSummary] = useState<UsageSummary | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -838,6 +841,7 @@ export default function ProjectDetail() {
             setGitUrl={setGitUrl}
             gitToken={gitToken}
             setGitToken={setGitToken}
+            onDeleteProject={() => setDeleteDialogOpen(true)}
           />
         </TabsContent>
 
@@ -1012,6 +1016,15 @@ export default function ProjectDetail() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Project Dialog */}
+      <DeleteProjectDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        projectId={projectId}
+        projectName={project.name}
+        onDeleted={() => navigate("/")}
+      />
 
       {/* New Requirement Dialog */}
       <Dialog open={reqDialogOpen} onOpenChange={setReqDialogOpen}>
