@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams, useSearchParams, useNavigate } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import {
   getProject,
   getRequirements,
@@ -21,8 +21,6 @@ import {
   syncToGitHub,
   getAnalysesByRequirement,
   getTasksByAnalysis,
-  getTaskGroups,
-  type TaskGroup,
   scanProject,
   scanProjectGit,
   getScanStatus,
@@ -59,7 +57,6 @@ import TasksTab from "@/components/project/TasksTab";
 import ContextTab from "@/components/project/ContextTab";
 import IntegrationsTab from "@/components/project/IntegrationsTab";
 import UsageTab from "@/components/project/UsageTab";
-import DeleteProjectDialog from "@/components/project/DeleteProjectDialog";
 
 const LOADING_LABELS: Record<string, string> = {
   scan: "Proje taranıyor... Bu birkaç dakika sürebilir.",
@@ -72,7 +69,6 @@ const LOADING_LABELS: Record<string, string> = {
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
   const projectId = Number(id);
   const { showToast } = useToast();
   const { isAdmin } = useAuth();
@@ -97,7 +93,6 @@ export default function ProjectDetail() {
   const [integrationConfig, setIntegrationConfig] = useState<IntegrationConfig>({});
   const [confirmDialog, setConfirmDialog] = useState<{ message: string; onConfirm: () => void } | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [taskGroups, setTaskGroups] = useState<TaskGroup[]>([]);
   const [usageSummary, setUsageSummary] = useState<UsageSummary | null>(null);
 
   const [loading, setLoading] = useState(true);
@@ -110,7 +105,6 @@ export default function ProjectDetail() {
   const [docFile, setDocFile] = useState<File | null>(null);
   const [docMode, setDocMode] = useState<"file" | "paste">("file");
   const [reqDialogOpen, setReqDialogOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [docDialog, setDocDialog] = useState<{ type: "project" } | { type: "requirement"; reqId: number } | null>(null);
   const [reqDocs, setReqDocs] = useState<Record<number, Document[]>>({});
   const [featureSuggestions, setFeatureSuggestions] = useState<FeatureSuggestionResult | null>(null);
@@ -151,12 +145,11 @@ export default function ProjectDetail() {
   async function loadProject() {
     const currentLoadId = ++loadIdRef.current;
     try {
-      const [proj, reqs, config, usage, groups, docs] = await Promise.all([
+      const [proj, reqs, config, usage, docs] = await Promise.all([
         getProject(projectId),
         getRequirements(projectId),
         getIntegrationConfig(projectId).catch(() => ({})),
         getProjectUsage(projectId).catch(() => null),
-        getTaskGroups(projectId).catch(() => []),
         getDocuments(projectId).catch(() => []),
       ]);
       // Stale response guard — discard if user navigated away
@@ -165,7 +158,6 @@ export default function ProjectDetail() {
       setRequirements(reqs);
       setIntegrationConfig(config);
       setUsageSummary(usage);
-      setTaskGroups(groups);
       setDocuments(docs);
       if (!scanFieldsInitialized) {
         if (proj.repoUrl) { setGitUrl(proj.repoUrl); setScanMode("git"); }
@@ -351,8 +343,7 @@ export default function ProjectDetail() {
         return next;
       }, { replace: true });
       showToast("Analiz tamamlandı.", "success");
-      // Refresh task groups + usage after analysis
-      getTaskGroups(projectId).then(setTaskGroups).catch(() => {});
+      // Refresh usage after analysis
       getProjectUsage(projectId).then(setUsageSummary).catch(() => {});
       // Refresh requirements to update status
       getRequirements(projectId).then(setRequirements).catch(() => {});
@@ -404,7 +395,6 @@ export default function ProjectDetail() {
       setActiveTab("tasks");
       showToast(`${generated.length} task üretildi.`, "success");
       getProjectUsage(projectId).then(setUsageSummary).catch(() => {});
-      getTaskGroups(projectId).then(setTaskGroups).catch(() => {});
     } catch (e) {
       showToast("Task üretimi başarısız oldu.");
       console.error("Task generation failed:", e);
@@ -802,8 +792,6 @@ export default function ProjectDetail() {
             setManualTaskDialog={setManualTaskDialog}
             setEditingTask={setEditingTask}
             setConfirmDialog={setConfirmDialog}
-            taskGroups={taskGroups}
-            handleSelectRequirement={handleSelectRequirement}
             setActiveTab={setActiveTab}
             loadTasks={loadTasks}
           />
@@ -851,26 +839,6 @@ export default function ProjectDetail() {
             gitToken={gitToken}
             setGitToken={setGitToken}
           />
-          {/* Danger zone */}
-          <div className="border border-destructive/25 rounded-lg divide-y">
-            <div className="px-4 py-2.5 bg-destructive/5">
-              <p className="text-sm font-semibold text-destructive">Tehlikeli Bölge</p>
-            </div>
-            <div className="px-4 py-3 flex items-center justify-between gap-4">
-              <div className="min-w-0">
-                <p className="text-sm font-medium">Projeyi Sil</p>
-                <p className="text-xs text-muted-foreground">Tüm talepler, analizler ve task'lar kalıcı olarak silinir.</p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-shrink-0 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                onClick={() => setDeleteDialogOpen(true)}
-              >
-                Projeyi Sil
-              </Button>
-            </div>
-          </div>
         </TabsContent>
 
         <TabsContent value="usage" className="space-y-4">
@@ -885,15 +853,6 @@ export default function ProjectDetail() {
           />
         </TabsContent>
       </Tabs>
-
-      {/* Delete Project Dialog */}
-      <DeleteProjectDialog
-        open={deleteDialogOpen}
-        onOpenChange={setDeleteDialogOpen}
-        projectId={projectId}
-        projectName={project.name}
-        onDeleted={() => navigate("/")}
-      />
 
       {/* Task Edit Dialog */}
       <Dialog open={!!editingTask} onOpenChange={(open) => { if (!open) setEditingTask(null); }}>

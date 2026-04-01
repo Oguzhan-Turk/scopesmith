@@ -6,7 +6,6 @@ import type {
   Task,
   Document,
   UsageSummary,
-  TaskGroup,
   FeatureSuggestionResult,
 } from "@/api/client";
 
@@ -65,8 +64,6 @@ export interface TasksTabProps extends ProjectTabProps {
   setManualTaskDialog: (open: boolean) => void;
   setEditingTask: (task: Task | null) => void;
   setConfirmDialog: (d: { message: string; onConfirm: () => void } | null) => void;
-  taskGroups: TaskGroup[];
-  handleSelectRequirement: (reqId: number) => void;
   setActiveTab: (tab: string) => void;
   loadTasks: (analysisId: number) => void;
 }

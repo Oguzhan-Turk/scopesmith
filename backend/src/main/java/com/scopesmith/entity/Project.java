@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.SQLRestriction;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
 
@@ -13,6 +14,7 @@ import java.util.List;
 
 @Entity
 @Table(name = "projects")
+@SQLRestriction("deleted_at IS NULL")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -106,4 +108,8 @@ public class Project {
 
     @UpdateTimestamp
     private LocalDateTime updatedAt;
+
+    /** Soft delete — null means active, non-null means deleted. Restore: SET deleted_at = NULL */
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
 }

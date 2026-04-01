@@ -8,6 +8,7 @@ import com.scopesmith.repository.ProjectMembershipRepository;
 import com.scopesmith.repository.ProjectRepository;
 import com.scopesmith.repository.RequirementRepository;
 import com.scopesmith.repository.UsageRecordRepository;
+import java.time.LocalDateTime;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -98,8 +99,8 @@ public class ProjectService {
     }
 
     /**
-     * Hard delete with server-side name confirmation.
-     * Explicit cleanup order: usage_records → memberships → project (cascade handles rest).
+     * Soft delete — sets deleted_at timestamp, project disappears from all queries.
+     * Restore: UPDATE projects SET deleted_at = NULL WHERE id = ?
      */
     @Transactional
     public void deleteWithConfirmation(Long id, String confirmName) {
@@ -108,9 +109,8 @@ public class ProjectService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "Proje adı eşleşmiyor. Silme işlemi iptal edildi.");
         }
-        usageRecordRepository.deleteByProjectId(id);
-        membershipRepository.deleteByProjectId(id);
-        projectRepository.delete(project);
+        project.setDeletedAt(java.time.LocalDateTime.now());
+        projectRepository.save(project);
     }
 
     @Transactional

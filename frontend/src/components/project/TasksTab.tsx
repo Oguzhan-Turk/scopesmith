@@ -27,8 +27,6 @@ export default function TasksTab({
   setManualTaskDialog,
   setEditingTask,
   setConfirmDialog,
-  taskGroups,
-  handleSelectRequirement,
   setActiveTab,
   loadTasks,
   actionLoading,
