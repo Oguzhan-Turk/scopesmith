@@ -8,7 +8,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 
 export default function Dashboard() {
@@ -63,10 +62,8 @@ export default function Dashboard() {
             Taleplerinizi analiz edin, task'lara dönüştürün
           </p>
         </div>
+        <Button onClick={() => setDialogOpen(true)}>+ Yeni Proje</Button>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger>
-            <Button>+ Yeni Proje</Button>
-          </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Yeni Proje</DialogTitle>

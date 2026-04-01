@@ -22,9 +22,17 @@ public class EncryptionService {
     private static final String ALGORITHM = "AES";
     private final SecretKeySpec keySpec;
 
+    private static final String DEFAULT_KEY = "scopesmith-default-key-change-in-production";
+
     public EncryptionService(
-            @Value("${scopesmith.encryption-key:scopesmith-default-key-change-in-production}") String secret) {
-        if ("scopesmith-default-key-change-in-production".equals(secret)) {
+            @Value("${scopesmith.encryption-key:" + DEFAULT_KEY + "}") String secret,
+            @Value("${spring.profiles.active:default}") String activeProfile) {
+        if (DEFAULT_KEY.equals(secret)) {
+            if (activeProfile.contains("prod")) {
+                throw new IllegalStateException(
+                        "CRITICAL: Default encryption key cannot be used in production. " +
+                        "Set 'scopesmith.encryption-key' environment variable.");
+            }
             log.warn("⚠️  DEFAULT ENCRYPTION KEY IN USE. Set 'scopesmith.encryption-key' for production.");
         }
         try {

@@ -83,7 +83,7 @@ public class ProjectController {
     @PutMapping("/{id}/integration-config")
     public IntegrationConfigDTO updateIntegrationConfig(
             @PathVariable Long id,
-            @RequestBody IntegrationConfigDTO config) {
+            @jakarta.validation.Valid @RequestBody IntegrationConfigDTO config) {
         Project project = projectService.getProjectOrThrow(id);
         try {
             project.setIntegrationConfig(objectMapper.writeValueAsString(config));

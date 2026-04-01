@@ -6,6 +6,7 @@ import com.scopesmith.repository.PromptRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.nio.charset.StandardCharsets;
@@ -32,6 +33,7 @@ public class PromptController {
     }
 
     @PutMapping("/{name}")
+    @PreAuthorize("hasRole('ADMIN')")
     public Prompt update(@PathVariable String name, @RequestBody Map<String, String> request) {
         String content = request.get("content");
         if (content == null || content.isBlank()) {
@@ -50,7 +52,13 @@ public class PromptController {
     }
 
     @PostMapping("/{name}/reset")
+    @PreAuthorize("hasRole('ADMIN')")
     public Prompt resetToDefault(@PathVariable String name) {
+        // Validate name to prevent path traversal — only alphanumeric, hyphens, underscores
+        if (!name.matches("[a-zA-Z0-9_-]+")) {
+            throw new IllegalArgumentException("Invalid prompt name: " + name);
+        }
+
         Prompt prompt = promptRepository.findByName(name)
                 .orElseThrow(() -> new EntityNotFoundException("Prompt not found: " + name));
 

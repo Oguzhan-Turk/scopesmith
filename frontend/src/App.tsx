@@ -7,6 +7,7 @@ import Login from "@/pages/Login";
 import { ToastProvider } from "@/hooks/useToast";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { Spinner } from "@/components/ui/spinner";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 function AppRoutes() {
   const { user, loading } = useAuth();
@@ -29,10 +30,12 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <ToastProvider>
-        <AppRoutes />
-      </ToastProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <ToastProvider>
+          <AppRoutes />
+        </ToastProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

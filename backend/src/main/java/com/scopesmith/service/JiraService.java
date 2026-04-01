@@ -11,23 +11,35 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.*;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class JiraService {
 
     private final JiraConfig jiraConfig;
     private final TaskRepository taskRepository;
     private final AnalysisRepository analysisRepository;
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
+
+    public JiraService(JiraConfig jiraConfig, TaskRepository taskRepository,
+                       AnalysisRepository analysisRepository, RestTemplateBuilder restTemplateBuilder) {
+        this.jiraConfig = jiraConfig;
+        this.taskRepository = taskRepository;
+        this.analysisRepository = analysisRepository;
+        this.restTemplate = restTemplateBuilder
+                .connectTimeout(Duration.ofSeconds(10))
+                .readTimeout(Duration.ofSeconds(30))
+                .build();
+    }
 
     private static final Map<String, String> PRIORITY_MAP = Map.of(
             "LOW", "Low",
@@ -84,7 +96,7 @@ public class JiraService {
                 created.add(Map.of("taskId", task.getId().toString(), "jiraKey", jiraKey, "status", "created"));
                 log.info("Created Jira issue {} for task #{} '{}'", jiraKey, task.getId(), task.getTitle());
             } catch (Exception e) {
-                log.error("Failed to create Jira issue for task #{}: {}", task.getId(), e.getMessage());
+                log.error("Failed to create Jira issue for task #{}: {}", task.getId(), e.getMessage(), e);
                 failed.add(Map.of("taskId", task.getId().toString(), "title", task.getTitle(), "error", e.getMessage()));
             }
         }

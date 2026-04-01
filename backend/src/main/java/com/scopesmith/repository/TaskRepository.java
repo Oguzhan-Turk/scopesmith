@@ -40,7 +40,8 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
             "JOIN FETCH a.requirement r " +
             "JOIN FETCH r.project " +
             "WHERE t.spFinal IS NOT NULL " +
-            "ORDER BY t.createdAt DESC")
+            "ORDER BY t.createdAt DESC " +
+            "LIMIT 50")
     List<Task> findAllFinalizedTasks();
 
     @Query("SELECT COUNT(t) FROM Task t WHERE t.spFinal IS NOT NULL")

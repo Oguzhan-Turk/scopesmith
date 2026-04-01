@@ -4,6 +4,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.*;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.concurrent.TimeUnit;
@@ -23,9 +25,10 @@ public class GitCloneService {
 
         try {
             String cloneUrl = gitUrl;
-            // Inject token for HTTPS private repos
+            // Inject token for HTTPS private repos (URL-encoded to prevent injection)
             if (token != null && !token.isBlank() && gitUrl.startsWith("https://")) {
-                cloneUrl = gitUrl.replace("https://", "https://" + token + "@");
+                String encodedToken = URLEncoder.encode(token, StandardCharsets.UTF_8);
+                cloneUrl = gitUrl.replace("https://", "https://" + encodedToken + "@");
             }
 
             ProcessBuilder pb = new ProcessBuilder(
@@ -33,6 +36,7 @@ public class GitCloneService {
             );
             pb.redirectErrorStream(true);
 
+            // Log without token to prevent credential exposure
             log.info("Cloning repo: {} → {}", gitUrl, tempDir);
             Process process = pb.start();
 

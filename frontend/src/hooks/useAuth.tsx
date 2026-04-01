@@ -16,10 +16,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     getMe()
-      .then(setUser)
-      .catch(() => setUser(null))
-      .finally(() => setLoading(false));
+      .then((u) => { if (!cancelled) setUser(u); })
+      .catch((e) => { if (!cancelled) { console.warn("Auth init failed:", e); setUser(null); } })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
   async function login(username: string, password: string) {
@@ -30,6 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function logout() {
     await apiLogout().catch(() => {});
     setUser(null);
+    window.history.replaceState(null, "", "/");
   }
 
   return (

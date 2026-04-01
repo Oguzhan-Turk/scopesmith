@@ -68,6 +68,13 @@ Layered architecture: Controller → Service → Repository → Entity
 | Settings | Global credential + prompt yönetimi (admin) |
 | Login | Split-panel giriş ekranı |
 
+### Frontend Mimari
+- **Component split:** ProjectDetail.tsx orchestrator, 6 tab component `components/project/` altında
+- **Design tokens:** Semantic renk sistemi index.css'te (status, priority, category, feedback, risk) — light + dark mode
+- **Renk fonksiyonları:** `utils.ts` — `statusColor()`, `priorityColor()`, `categoryColor()` (CSS var tabanlı)
+- **ErrorBoundary:** App root'ta, component crash → kullanıcı dostu hata ekranı
+- **Stale guard:** `loadIdRef` ile hızlı navigasyonda eski response'lar ignore edilir
+
 ## Entegrasyonlar
 
 - **Jira Cloud:** Issue oluşturma, CSV export, durum doğrulama, yetim issue kapatma

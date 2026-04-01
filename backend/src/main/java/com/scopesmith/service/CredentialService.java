@@ -67,7 +67,8 @@ public class CredentialService {
     }
 
     private String maskValue(String value) {
-        if (value == null || value.length() < 8) return "••••••••";
-        return value.substring(0, 4) + "••••" + value.substring(value.length() - 4);
+        if (value == null || value.length() < 4) return "••••••••";
+        // Show first 4 chars + fixed-length mask (prevents credential length leak)
+        return value.substring(0, 4) + "••••••••";
     }
 }

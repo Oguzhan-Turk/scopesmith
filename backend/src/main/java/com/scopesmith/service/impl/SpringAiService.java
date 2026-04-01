@@ -63,6 +63,10 @@ public class SpringAiService implements AiService {
             trackUsage(chatResponse, operationType, projectId, durationMs);
         }
 
+        if (content == null || content.isBlank()) {
+            throw new RuntimeException("AI returned empty response for " + effectiveTier + " tier");
+        }
+
         return content;
     }
 
