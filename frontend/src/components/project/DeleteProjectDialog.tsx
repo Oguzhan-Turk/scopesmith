@@ -24,11 +24,13 @@ export default function DeleteProjectDialog({
   const { showToast } = useToast();
   const [confirmInput, setConfirmInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [finalConfirm, setFinalConfirm] = useState(false);
   const [summary, setSummary] = useState<{ requirements: number; documents: number; aiCalls: number } | null>(null);
 
   useEffect(() => {
     if (open) {
       setConfirmInput("");
+      setFinalConfirm(false);
       setSummary(null);
       getDeleteSummary(projectId).then(setSummary).catch(() => {});
     }
@@ -112,22 +114,43 @@ export default function DeleteProjectDialog({
           </div>
 
           {/* Eylemler */}
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} disabled={loading}>
-              İptal
-            </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={handleDelete}
-              disabled={!confirmed || loading}
-            >
-              {loading
-                ? <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />Siliniyor</>
-                : <><Trash2 className="w-3.5 h-3.5 mr-1.5" />Kalıcı Olarak Sil</>
-              }
-            </Button>
-          </div>
+          {finalConfirm ? (
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-destructive text-center">
+                Emin misin? Bu işlem geri alınamaz.
+              </p>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => setFinalConfirm(false)} disabled={loading}>
+                  Geri Dön
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleDelete}
+                  disabled={loading}
+                >
+                  {loading
+                    ? <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />Siliniyor</>
+                    : <><Trash2 className="w-3.5 h-3.5 mr-1.5" />Evet, Sil</>
+                  }
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} disabled={loading}>
+                İptal
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setFinalConfirm(true)}
+                disabled={!confirmed}
+              >
+                <Trash2 className="w-3.5 h-3.5 mr-1.5" />Kalıcı Olarak Sil
+              </Button>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
