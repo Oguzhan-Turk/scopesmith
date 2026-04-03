@@ -10,4 +10,6 @@ public class SpDecisionRequest {
     @NotNull(message = "Story point value is required")
     @Min(value = 1, message = "Story point must be at least 1")
     private Integer spFinal;
+
+    private String divergenceReason;
 }

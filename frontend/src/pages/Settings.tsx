@@ -200,7 +200,7 @@ export default function Settings() {
                   onClick={() => selectPrompt(p)}
                   className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                     selected?.id === p.id
-                      ? "bg-muted border border-border font-medium text-foreground"
+                      ? "bg-primary/8 text-foreground border-l-2 border-primary font-medium"
                       : "hover:bg-muted"
                   }`}
                 >

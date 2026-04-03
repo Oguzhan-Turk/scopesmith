@@ -33,6 +33,12 @@ Rules:
 Return all human-readable text (summary, questions, assumptions, risk reason) in Turkish.
 Keep JSON field names, enum values, and technical terms in English.
 
+IMPORTANT: The "structuredSummary" field must be filled. Write 2-3 sentences in Turkish covering:
+(1) what needs to be built and the core problem it solves,
+(2) the primary technical challenge or approach,
+(3) any notable constraint or integration point.
+This is the most important field — engineers read it first. Do NOT leave it blank.
+
 IMPORTANT: The "questions" field must be an array of objects with these fields:
 - "question": the question text (Turkish)
 - "suggestedAnswer": a suggested answer based on context (Turkish), or null

@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { Plus, MoreHorizontal, Zap, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { timeAgo } from "@/lib/utils";
 import type { RequirementsTabProps } from "./types";
 import { statusColor } from "./utils";
 
 export default function RequirementsTab({
   requirements,
+  loading,
   selectedRequirementId,
   handleSelectRequirement,
   handleAnalyzeWithConfirm,
@@ -15,6 +17,16 @@ export default function RequirementsTab({
   actionLoading,
 }: RequirementsTabProps) {
   const [reqMenuOpen, setReqMenuOpen] = useState<number | null>(null);
+
+  if (loading) {
+    return (
+      <div className="space-y-2">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-12 rounded-lg bg-muted/50 animate-pulse" />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -35,6 +47,7 @@ export default function RequirementsTab({
                 <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3 w-20">Tip</th>
                 <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">Aciklama</th>
                 <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3 w-32">Durum</th>
+                <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3 w-28 hidden sm:table-cell">Tarih</th>
                 <th className="text-right text-sm font-medium text-muted-foreground px-4 py-3 w-24"></th>
               </tr>
             </thead>
@@ -65,7 +78,7 @@ export default function RequirementsTab({
                     </td>
                     <td className="px-4 py-3">
                       <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
-                        req.type === "BUG" ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground border border-border"
+                        req.type === "BUG" ? "bg-destructive/10 text-destructive border border-destructive/20" : "bg-primary/8 text-primary border border-primary/20"
                       }`}>
                         {req.type === "BUG" ? "Bug" : "Feature"}
                       </span>
@@ -79,12 +92,15 @@ export default function RequirementsTab({
                         <span className="text-sm text-muted-foreground">{statusLabel[req.status] || req.status}</span>
                       </div>
                     </td>
+                    <td className="px-4 py-3 hidden sm:table-cell">
+                      <span className="text-xs text-muted-foreground tabular-nums">{timeAgo(req.createdAt)}</span>
+                    </td>
                     <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                         <button
                           onClick={() => handleAnalyzeWithConfirm(req.id)}
                           disabled={!!actionLoading}
-                          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-1.5 py-0.5 disabled:opacity-50"
+                          className="inline-flex items-center gap-1 text-xs text-primary/70 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-1.5 py-0.5 disabled:opacity-50"
                           aria-label="Analiz et"
                         >
                           <Zap className="w-3 h-3" />
@@ -102,6 +118,7 @@ export default function RequirementsTab({
                             <button
                               className="w-full text-left px-3 py-1.5 text-sm text-destructive hover:bg-muted rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                               onClick={() => { setReqMenuOpen(null); handleDeleteRequirement(req.id); }}
+                              aria-label={`#${req.sequenceNumber} talebini sil`}
                             >
                               Sil
                             </button>

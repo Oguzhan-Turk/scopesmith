@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { Code, FileText, RefreshCw, Plus, Sparkles, ChevronDown } from "lucide-react";
+import { Code, RefreshCw, Plus, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { timeAgo } from "@/lib/utils";
-import { suggestFeatures } from "@/api/client";
+import MarkdownBody from "./MarkdownBody";
 import type { ContextTabProps } from "./types";
 
 interface StatItem { key: string; label: string; value: number; items: string[]; }
@@ -91,46 +91,109 @@ export default function ContextTab({
   project,
   projectId,
   scanPath,
+  setScanPath,
   scanMode,
+  setScanMode,
   gitUrl,
+  setGitUrl,
+  gitToken,
+  setGitToken,
   handleScan,
   documents,
   setDocDialog,
   handleDeleteDocument,
-  featureSuggestions,
-  setFeatureSuggestions,
   integrationConfig: _integrationConfig,
   actionLoading,
   setActionLoading,
   showToast,
   setActiveTab,
 }: ContextTabProps) {
+  const [reportOpen, setReportOpen] = useState(true);
+  const [scanOpen, setScanOpen] = useState(false);
   return (
     <div className="space-y-4">
-      {/* Context uyarıları */}
-      {!project.hasContext && (
-        <div className="flex items-center gap-2 rounded-lg border border-dashed border-warning/30 bg-warning/5 px-4 py-2.5 text-sm">
-          <span className="w-1.5 h-1.5 rounded-full bg-warning flex-shrink-0" />
-          <span className="font-medium">Context yok</span>
-          <span className="text-muted-foreground">— Kod taraması yaparak analiz kalitesini artırın.</span>
-        </div>
-      )}
-      {project.contextStale && (
-        <div className="flex items-center justify-between rounded-lg border border-warning/20 bg-warning/5 px-4 py-2.5">
-          <div className="flex items-center gap-2 text-sm">
-            <span className="w-1.5 h-1.5 rounded-full bg-warning flex-shrink-0" />
-            <span className="font-medium">Context güncellenmeli</span>
-            <span className="text-muted-foreground">
-              {project.lastScannedAt ? `Son tarama: ${timeAgo(project.lastScannedAt)}` :
-               project.daysSinceLastScan != null ? `${project.daysSinceLastScan} gün önce tarandı` : ""}
-              {project.commitsBehind != null && project.commitsBehind > 0 && ` · ${project.commitsBehind} commit geride`}
-            </span>
+      {/* Kaynak Kod */}
+      <Card className={!project.hasContext ? "border-[var(--color-warning)]/40" : project.contextStale ? "border-[var(--color-warning)]/40" : ""}>
+        <CardHeader className="pb-3 cursor-pointer select-none" onClick={() => setScanOpen(v => !v)}>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Code className="w-4 h-4 text-muted-foreground" />
+              Kaynak Kod
+            </CardTitle>
+            <div className="flex items-center gap-3">
+              {!project.hasContext ? (
+                <span className="text-xs text-[var(--color-warning)]">Henüz taranmadı</span>
+              ) : project.lastScannedAt && (
+                <span className={`text-xs ${project.contextStale ? "text-[var(--color-warning)]" : "text-muted-foreground"}`}>
+                  Son tarama: {timeAgo(project.lastScannedAt)}
+                  {project.contextStale && project.commitsBehind != null && project.commitsBehind > 0 && ` · ${project.commitsBehind} commit geride`}
+                </span>
+              )}
+              <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${scanOpen ? "rotate-180" : ""}`} />
+            </div>
           </div>
-          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleScan}>
-            Yeniden Tara
-          </Button>
-        </div>
-      )}
+        </CardHeader>
+        {scanOpen && <CardContent className="space-y-3">
+          <div className="inline-flex rounded bg-muted/40 p-0.5 gap-0.5">
+            <button
+              onClick={() => setScanMode("local")}
+              className={`px-2.5 py-0.5 text-xs rounded transition-colors ${scanMode === "local" ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              Yerel Klasör
+            </button>
+            <button
+              onClick={() => setScanMode("git")}
+              className={`px-2.5 py-0.5 text-xs rounded transition-colors ${scanMode === "git" ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              Git URL
+            </button>
+          </div>
+          {scanMode === "local" ? (
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="/Users/username/projects/my-app"
+                value={scanPath}
+                onChange={(e) => setScanPath(e.target.value)}
+                className="flex-1 px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+              <Button
+                size="sm"
+                onClick={handleScan}
+                disabled={!!actionLoading || !scanPath.trim()}
+              >
+                {actionLoading === "scan" ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : project.lastScannedAt ? "Yeniden Tara" : "Tara"}
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <input
+                type="text"
+                placeholder="https://github.com/owner/repo.git"
+                value={gitUrl}
+                onChange={(e) => setGitUrl(e.target.value)}
+                className="w-full px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  placeholder="ghp_... (private repo için)"
+                  value={gitToken}
+                  onChange={(e) => setGitToken(e.target.value)}
+                  className="flex-1 px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+                <Button
+                  size="sm"
+                  onClick={handleScan}
+                  disabled={!!actionLoading || !gitUrl.trim()}
+                >
+                  {actionLoading === "scan" ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : project.lastScannedAt ? "Yeniden Tara" : "Tara"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>}
+      </Card>
 
       {/* Proje Dokümanları */}
       <Card>
@@ -159,56 +222,13 @@ export default function ContextTab({
                       <p className="text-xs text-muted-foreground mt-1 truncate max-w-lg">{doc.summary}</p>
                     )}
                   </div>
-                  <button onClick={() => { if (window.confirm(`"${doc.filename}" belgesini silmek istediğinizden emin misiniz?`)) handleDeleteDocument(doc.id); }} className="text-xs text-destructive hover:underline flex-shrink-0 ml-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">Sil</button>
+                  <button onClick={() => { if (window.confirm(`"${doc.filename}" belgesini silmek istediğinizden emin misiniz?`)) handleDeleteDocument(doc.id); }} aria-label={`${doc.filename} belgesini sil`} className="text-xs text-destructive hover:underline flex-shrink-0 ml-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">Sil</button>
                 </div>
               ))}
             </div>
           )}
         </CardContent>
       </Card>
-
-      {/* Kod Tarama */}
-      {(() => {
-        const hasSource = scanMode === "git" ? !!gitUrl.trim() : !!scanPath.trim();
-        const raw = scanMode === "git" ? gitUrl.trim() : scanPath.trim();
-        // Kısa isim: git → "owner/repo", local → "klasör adı"
-        const shortName = scanMode === "git"
-          ? raw.replace(/\.git$/, "").split("/").slice(-2).join("/")
-          : raw.split("/").filter(Boolean).pop() || raw;
-        return (
-          <div className="flex items-center justify-between rounded-lg border px-4 py-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <Code className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-              {hasSource ? (
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">{shortName}</p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {project.lastScannedAt ? `Son tarama: ${timeAgo(project.lastScannedAt)}` : "Henüz taranmadı"}
-                  </p>
-                </div>
-              ) : (
-                <div>
-                  <p className="text-sm text-muted-foreground">Kaynak kod yolu ayarlanmadi</p>
-                  <button onClick={() => setActiveTab("integrations")} className="text-xs text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">
-                    Entegrasyonlar'dan ayarla
-                  </button>
-                </div>
-              )}
-            </div>
-            {hasSource && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="flex-shrink-0 ml-3"
-                onClick={handleScan}
-                disabled={!!actionLoading}
-              >
-                {actionLoading === "scan" ? <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />Taraniyor</> : project.lastScannedAt ? "Yeniden Tara" : "Tara"}
-              </Button>
-            )}
-          </div>
-        );
-      })()}
 
       {/* Structured Context */}
       {project.structuredContext && (() => {
@@ -322,19 +342,21 @@ export default function ContextTab({
 
       {/* AI Analiz Raporu */}
       {project.techContext && (
-        <details className="group">
-          <summary className="flex items-center justify-between cursor-pointer border rounded-xl px-4 py-3 hover:bg-muted/30 transition-colors">
-            <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm font-medium">AI Analiz Raporu</span>
+        <Card>
+          <CardHeader className="cursor-pointer select-none" onClick={() => setReportOpen(v => !v)}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${reportOpen ? "" : "-rotate-90"}`} />
+                <CardTitle className="text-base">AI Analiz Raporu</CardTitle>
+              </div>
             </div>
-            <span className="text-xs text-muted-foreground group-open:hidden">Göster</span>
-            <span className="text-xs text-muted-foreground hidden group-open:inline">Gizle</span>
-          </summary>
-          <div className="mt-2 border rounded-xl px-4 py-4">
-            <div className="text-sm leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto">{project.techContext}</div>
-          </div>
-        </details>
+          </CardHeader>
+          {reportOpen && (
+            <CardContent className="space-y-0 max-h-[480px] overflow-y-auto">
+              <MarkdownBody text={project.techContext} />
+            </CardContent>
+          )}
+        </Card>
       )}
 
       {!project.structuredContext && !project.techContext && (
@@ -345,55 +367,6 @@ export default function ContextTab({
         </Card>
       )}
 
-      {/* Feature Önerisi */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base">Feature Önerisi</CardTitle>
-            <div className="flex items-center gap-2">
-              {project.contextStale && (
-                <Badge variant="outline" className="text-xs border-warning/30 text-warning font-normal">Context eski</Badge>
-              )}
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={async () => {
-                  setActionLoading("suggest-features");
-                  try {
-                    const result = await suggestFeatures(projectId);
-                    setFeatureSuggestions(result);
-                    showToast(`${result.suggestions.length} öneri üretildi.`, "success");
-                  } catch { showToast("Öneriler üretilemedi."); }
-                  finally { setActionLoading(null); }
-                }}
-                disabled={!!actionLoading || !project.hasContext}
-              >
-                {actionLoading === "suggest-features" ? <><RefreshCw className="w-3.5 h-3.5 mr-1 animate-spin" />Uretiliyor</> : <><Sparkles className="w-3.5 h-3.5 mr-1" />AI'a Sor</>}
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {!project.hasContext ? (
-            <p className="text-sm text-muted-foreground">Feature önerisi için önce proje context'i oluşturulmalı. Yukarıdan kod taraması yapın.</p>
-          ) : !featureSuggestions ? (
-            <p className="text-sm text-muted-foreground">Proje context'ine göre AI'ın önerdiği özellikler burada görünecek.</p>
-          ) : (
-            <div className="space-y-3">
-              {featureSuggestions.suggestions.map((s, i) => (
-                <div key={i} className="border-l-2 border-primary/20 pl-3 py-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">{s.title}</span>
-                    <Badge variant="outline" className="text-xs">{s.category}</Badge>
-                    <Badge variant="secondary" className="text-xs">{s.complexity}</Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">{s.description}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }

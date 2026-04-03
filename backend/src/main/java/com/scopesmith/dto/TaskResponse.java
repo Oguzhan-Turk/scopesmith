@@ -18,6 +18,7 @@ public class TaskResponse {
     private Integer spSuggestion;
     private String spRationale;
     private Integer spFinal;
+    private String spDivergenceReason;
     private String priority;
     private String category;
     private String dependencyTitle;
@@ -34,6 +35,7 @@ public class TaskResponse {
                 .spSuggestion(task.getSpSuggestion())
                 .spRationale(task.getSpRationale())
                 .spFinal(task.getSpFinal())
+                .spDivergenceReason(task.getSpDivergenceReason())
                 .priority(task.getPriority().name())
                 .category(task.getCategory())
                 .dependencyTitle(task.getDependency() != null ? task.getDependency().getTitle() : null)

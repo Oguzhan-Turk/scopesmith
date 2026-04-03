@@ -47,7 +47,7 @@ export default function Login() {
           <div className="flex items-center gap-2 mb-8 lg:hidden">
             <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white" style={{ background: "var(--gradient-brand)" }}>S</div>
             <span className="text-xl font-bold">ScopeSmith</span>
-            <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full font-semibold border border-border">AI</span>
+            <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-semibold border border-primary/20">AI</span>
           </div>
 
           <h2 className="text-2xl font-bold mb-1">Giriş Yap</h2>

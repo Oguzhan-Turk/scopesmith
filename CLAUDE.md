@@ -8,9 +8,9 @@ AI-powered requirement analysis platform. Ham talep → yapılandırılmış ana
 # PostgreSQL
 docker compose up -d
 
-# Backend (Java 21 gerekli)
+# Backend (Java 21 gerekli) — sadece ANTHROPIC_API_KEY alınacak şekilde:
 cd backend
-ANTHROPIC_API_KEY=<key> ./mvnw spring-boot:run
+ANTHROPIC_API_KEY=$(grep '^ANTHROPIC_API_KEY' ../.env | cut -d= -f2) ./mvnw spring-boot:run
 
 # Frontend
 cd frontend
@@ -64,16 +64,33 @@ Layered architecture: Controller → Service → Repository → Entity
 | Sayfa | İçerik |
 |---|---|
 | Dashboard | Proje listesi, yeni proje oluşturma |
-| ProjectDetail | 6 tab: Talepler, Talep Detay, Task'lar, Context, Entegrasyonlar, Kullanım |
+| ProjectDetail | 6 tab: Talepler, Talep Detay, Task'lar, Bağlam, Proje Ayarları, Kullanım |
 | Settings | Global credential + prompt yönetimi (admin) |
 | Login | Split-panel giriş ekranı |
 
 ### Frontend Mimari
 - **Component split:** ProjectDetail.tsx orchestrator, 6 tab component `components/project/` altında
-- **Design tokens:** Semantic renk sistemi index.css'te (status, priority, category, feedback, risk) — light + dark mode
+- **Design tokens:** Semantic renk sistemi + typography + spacing token'ları index.css'te — light + dark mode
 - **Renk fonksiyonları:** `utils.ts` — `statusColor()`, `priorityColor()`, `categoryColor()` (CSS var tabanlı)
 - **ErrorBoundary:** App root'ta, component crash → kullanıcı dostu hata ekranı
 - **Stale guard:** `loadIdRef` ile hızlı navigasyonda eski response'lar ignore edilir
+
+### Tab Yapısı (ProjectDetail)
+| Tab | İçerik | Görünürlük |
+|---|---|---|
+| Talepler | Talep listesi, skeleton loader, Yeni Talep (+ AI'a Sor) | Herkes |
+| Talep Detay | Ham talep metni + AI analiz, sorular, refinement | Herkes |
+| Task'lar | Task grupları, SP, Gönder (Jira/GitHub/CSV), Task Sync | Herkes |
+| Bağlam | Kaynak Kod (edit+tara), Proje Dokümanları, AI Analiz Raporu | Herkes |
+| Proje Ayarları | Proje Bilgileri (admin), Issue Tracker, Projeyi Sil (admin) | Admin |
+| Kullanım | Token/maliyet/ROI dashboard | Admin |
+
+## Bilinen Davranışlar / Kararlar
+
+- **Re-analiz soru üretmez:** Son soru cevaplanınca tetiklenen re-analiz `questions: []` döner. Sonsuz döngüyü önlemek için bilinçli karar (buildReAnalysisMessage'da explicit instruction var).
+- **SP refetch yok:** `TasksTab` mount'ta `task.spSuggestion` doluysa `suggestSp` API'si çağrılmaz. Sonuç `setTasks` ile parent state'e yazılır — tab geçişlerinde kaybolmaz.
+- **Backend başlatma:** `cat .env | cut -d= -f2` tüm satırları birleştirir, sadece `grep '^ANTHROPIC_API_KEY'` kullan.
+- **Dosya upload URL:** `uploadDocument` / `uploadRequirementDocument` API_BASE kullanır, `/api/v1/...` değil (Vite proxy yok).
 
 ## Açık Fikirler / Backlog
 

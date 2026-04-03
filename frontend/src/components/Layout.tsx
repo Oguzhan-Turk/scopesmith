@@ -32,7 +32,7 @@ export default function Layout() {
               S
             </div>
             <span className="text-lg font-bold tracking-tight">ScopeSmith</span>
-            <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full font-medium border border-border">
+            <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-medium border border-primary/20">
               AI
             </span>
           </Link>
@@ -41,7 +41,7 @@ export default function Layout() {
               to="/"
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                 location.pathname === "/"
-                  ? "bg-accent text-accent-foreground font-medium"
+                  ? "bg-primary/10 text-primary font-medium"
                   : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
               }`}
             >
@@ -53,7 +53,7 @@ export default function Layout() {
                 to="/settings"
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                   location.pathname === "/settings"
-                    ? "bg-accent text-accent-foreground font-medium"
+                    ? "bg-primary/10 text-primary font-medium"
                     : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                 }`}
               >

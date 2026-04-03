@@ -60,6 +60,9 @@ public class TaskController {
                 .orElseThrow(() -> new EntityNotFoundException("Task not found with id: " + id));
 
         task.setSpFinal(request.getSpFinal());
+        if (request.getDivergenceReason() != null && !request.getDivergenceReason().isBlank()) {
+            task.setSpDivergenceReason(request.getDivergenceReason());
+        }
         return TaskResponse.from(taskRepository.save(task));
     }
 

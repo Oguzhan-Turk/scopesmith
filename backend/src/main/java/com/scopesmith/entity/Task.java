@@ -51,6 +51,11 @@ public class Task {
      */
     private Integer spFinal;
 
+    /**
+     * Why the team deviated from AI suggestion. Feeds Learning SP calibration.
+     */
+    private String spDivergenceReason;
+
     @Enumerated(EnumType.STRING)
     @Builder.Default
     private TaskPriority priority = TaskPriority.MEDIUM;

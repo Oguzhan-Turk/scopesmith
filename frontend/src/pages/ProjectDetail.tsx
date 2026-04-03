@@ -33,6 +33,8 @@ import {
   uploadDocument,
   addRequirementDocument,
   uploadRequirementDocument,
+  updateProject,
+  suggestFeatures,
   type UsageSummary,
   type FeatureSuggestionResult,
   type Project,
@@ -43,7 +45,7 @@ import {
   type Document,
 } from "@/api/client";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -65,6 +67,7 @@ const LOADING_LABELS: Record<string, string> = {
   summary: "İş özeti hazırlanıyor...",
   "refine-summary": "Özet iyileştiriliyor...",
   "refine-tasks": "Task'lar iyileştiriliyor...",
+  "re-analyze": "Tüm sorular cevaplandı, yeniden analiz yapılıyor...",
 };
 
 export default function ProjectDetail() {
@@ -248,9 +251,9 @@ export default function ProjectDetail() {
 
   async function handleScan() {
     if (scanMode === "git") {
-      if (!gitUrl.trim()) { showToast("Entegrasyonlar sekmesinden Git URL'i ayarlayın.", "info"); return; }
+      if (!gitUrl.trim()) { showToast("Proje Ayarları sekmesinden Git URL'i ayarlayın.", "info"); return; }
     } else {
-      if (!scanPath.trim()) { showToast("Entegrasyonlar sekmesinden klasör yolunu ayarlayın.", "info"); return; }
+      if (!scanPath.trim()) { showToast("Proje Ayarları sekmesinden klasör yolunu ayarlayın.", "info"); return; }
     }
     setActionLoading("scan");
     try {
@@ -313,7 +316,7 @@ export default function ProjectDetail() {
 
   function handleAnalyzeWithConfirm(reqId: number, tier?: string) {
     if (!project?.hasContext) {
-      showToast("Proje context'i oluşturulmamış. Context sekmesinden tarama yaparak daha isabetli analiz alabilirsiniz.", "info");
+      showToast("Proje context'i oluşturulmamış. Bağlam sekmesinden tarama yaparak daha isabetli analiz alabilirsiniz.", "info");
     } else if (project?.contextStale) {
       showToast("Proje context'i güncel değil. Sonuçlar yanıltıcı olabilir.", "info");
     }
@@ -358,17 +361,20 @@ export default function ProjectDetail() {
     }
   }
 
-  async function handleAnswer(questionId: number) {
-    const answer = answers[questionId];
+  async function handleAnswer(questionId: number, answerOverride?: string) {
+    const answer = answerOverride ?? answers[questionId];
     if (!answer?.trim()) return;
-    setActionLoading(`answer-${questionId}`);
+    const openCount = selectedAnalysis?.questions.filter((q) => q.status === "OPEN").length ?? 0;
+    const isLast = openCount === 1;
+    setActionLoading(isLast ? "re-analyze" : `answer-${questionId}`);
     try {
       const updated = await answerQuestion(questionId, answer);
       setSelectedAnalysis(updated);
       setAnalyses((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
       setAnswers((prev) => ({ ...prev, [questionId]: "" }));
     } catch (e) {
-      showToast("Cevap gönderilemedi.");
+      const msg = e instanceof Error ? e.message : String(e);
+      showToast(`Cevap gönderilemedi: ${msg}`);
       console.error("Failed to answer:", e);
     } finally {
       setActionLoading(null);
@@ -485,9 +491,9 @@ export default function ProjectDetail() {
     }
   }
 
-  async function handleSpDecision(taskId: number, spFinal: number) {
+  async function handleSpDecision(taskId: number, spFinal: number, divergenceReason?: string) {
     try {
-      const updated = await setSpDecision(taskId, spFinal);
+      const updated = await setSpDecision(taskId, spFinal, divergenceReason);
       setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
     } catch (e) {
       showToast("SP kararı kaydedilemedi.");
@@ -576,7 +582,7 @@ export default function ProjectDetail() {
   async function handleExportCsv() {
     if (!selectedAnalysis) return;
     const key = integrationConfig.jira?.projectKey;
-    if (!key) { showToast("Önce Entegrasyonlar sekmesinden Jira proje key'ini ayarlayın."); return; }
+    if (!key) { showToast("Önce Proje Ayarları sekmesinden Jira proje key'ini ayarlayın."); return; }
     setActionLoading("export");
     try {
       await exportJiraCsv(selectedAnalysis.id, key, integrationConfig.jira?.defaultIssueType || "Story");
@@ -592,7 +598,7 @@ export default function ProjectDetail() {
   async function handleSyncJira() {
     if (!selectedAnalysis) return;
     const key = integrationConfig.jira?.projectKey;
-    if (!key) { showToast("Önce Entegrasyonlar sekmesinden Jira proje key'ini ayarlayın."); return; }
+    if (!key) { showToast("Önce Proje Ayarları sekmesinden Jira proje key'ini ayarlayın."); return; }
     setActionLoading("jira-sync");
     try {
       const result = await syncToJira(selectedAnalysis.id, key, integrationConfig.jira?.defaultIssueType || "Task");
@@ -619,6 +625,20 @@ export default function ProjectDetail() {
     } catch (e) {
       showToast("Ayarlar kaydedilemedi.");
       console.error("Save config failed:", e);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleUpdateProject(name: string, description: string) {
+    setActionLoading("update-project");
+    try {
+      const updated = await updateProject(projectId, { name, description });
+      setProject(updated);
+      showToast("Proje bilgileri güncellendi.", "success");
+    } catch (e) {
+      showToast("Proje güncellenemedi.");
+      console.error("Update project failed:", e);
     } finally {
       setActionLoading(null);
     }
@@ -683,6 +703,7 @@ export default function ProjectDetail() {
   const aiLoadingLabel = actionLoading ? LOADING_LABELS[actionLoading] : null;
   const isAnalyzing = actionLoading?.startsWith("analyze-");
   const showProgress = !!(aiLoadingLabel || isAnalyzing);
+  const progressLabel = aiLoadingLabel || (isAnalyzing ? "AI analiz ediyor..." : null);
 
   return (
     <div className="space-y-6 relative">
@@ -690,40 +711,97 @@ export default function ProjectDetail() {
       {showProgress && (
         <div className="sticky top-0 z-30 -mx-6 -mt-6 mb-2 px-6 py-2.5 bg-primary/10 border-b flex items-center gap-3">
           <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          <p className="text-sm font-medium">{aiLoadingLabel || "AI analiz ediyor..."}</p>
+          <p className="text-sm font-medium">{progressLabel}</p>
         </div>
       )}
 
       {/* Project Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">{project.name}</h1>
-        <div className="flex items-center gap-3 mt-1">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold tracking-tight truncate">{project.name}</h1>
           {project.description && (
-            <p className="text-sm text-muted-foreground">{project.description}</p>
+            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{project.description}</p>
           )}
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <div className="flex items-center justify-between mb-4">
-          <TabsList>
-            <TabsTrigger value="requirements">Talepler</TabsTrigger>
-            <TabsTrigger value="detail">Talep Detay</TabsTrigger>
-            <TabsTrigger value="tasks">
-              Task'lar
-              {tasks.length > 0 && <span className="ml-1.5 text-xs opacity-60">({tasks.length})</span>}
-            </TabsTrigger>
-          </TabsList>
-          <TabsList>
-            <TabsTrigger value="context">
-              Context{project.hasContext && <span className="ml-1 text-xs opacity-60">v{project.contextVersion}</span>}
-              {(project.contextStale || !project.hasContext) && (
-                <span className="ml-1 w-1.5 h-1.5 rounded-full bg-warning inline-block" />
+        {/* Underline tab navigation — Linear/GitHub style */}
+        <div className="flex items-center justify-between border-b border-border mb-6">
+          {/* Primary workflow tabs */}
+          <div className="flex items-center">
+            {[
+              { value: "requirements", label: "Talepler" },
+              { value: "detail", label: "Talep Detay" },
+              {
+                value: "tasks",
+                label: (
+                  <>
+                    Task'lar
+                    {tasks.length > 0 && (
+                      <span className="ml-1.5 text-xs tabular-nums opacity-50">({tasks.length})</span>
+                    )}
+                  </>
+                ),
+              },
+            ].map((tab) => (
+              <button
+                key={tab.value}
+                onClick={() => setActiveTab(tab.value)}
+                className={`flex items-center gap-1 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 ${
+                  activeTab === tab.value
+                    ? "border-primary text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Utility / config tabs */}
+          <div className="flex items-center">
+            <button
+              onClick={() => setActiveTab("context")}
+              className={`flex items-center gap-1 px-3 py-2.5 text-sm border-b-2 -mb-px transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                activeTab === "context"
+                  ? "border-primary text-foreground font-medium"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+              }`}
+            >
+              Bağlam
+              {project.hasContext && (
+                <span className="text-xs opacity-50 font-normal">v{project.contextVersion}</span>
               )}
-            </TabsTrigger>
-            {isAdmin && <TabsTrigger value="integrations">Entegrasyonlar</TabsTrigger>}
-            {isAdmin && <TabsTrigger value="usage">Kullanım</TabsTrigger>}
-          </TabsList>
+              {(project.contextStale || !project.hasContext) && (
+                <span className="w-1.5 h-1.5 rounded-full bg-warning inline-block" />
+              )}
+            </button>
+            {isAdmin && (
+              <button
+                onClick={() => setActiveTab("integrations")}
+                className={`px-3 py-2.5 text-sm border-b-2 -mb-px transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                  activeTab === "integrations"
+                    ? "border-primary text-foreground font-medium"
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+                }`}
+              >
+                Proje Ayarları
+              </button>
+            )}
+            {isAdmin && (
+              <button
+                onClick={() => setActiveTab("usage")}
+                className={`px-3 py-2.5 text-sm border-b-2 -mb-px transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                  activeTab === "usage"
+                    ? "border-primary text-foreground font-medium"
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+                }`}
+              >
+                Kullanım
+              </button>
+            )}
+          </div>
         </div>
 
         <TabsContent value="requirements" className="space-y-4">
@@ -735,6 +813,7 @@ export default function ProjectDetail() {
             setActionLoading={setActionLoading}
             showToast={showToast}
             requirements={requirements}
+            loading={loading}
             selectedRequirementId={selectedRequirementId}
             handleSelectRequirement={handleSelectRequirement}
             handleAnalyzeWithConfirm={handleAnalyzeWithConfirm}
@@ -753,6 +832,7 @@ export default function ProjectDetail() {
             setActionLoading={setActionLoading}
             showToast={showToast}
             selectedRequirementId={selectedRequirementId}
+            selectedRequirement={selectedRequirement ?? null}
             selectedAnalysis={selectedAnalysis}
             setSelectedAnalysis={setSelectedAnalysis}
             isBug={isBug}
@@ -809,14 +889,17 @@ export default function ProjectDetail() {
             setActionLoading={setActionLoading}
             showToast={showToast}
             scanPath={scanPath}
+            setScanPath={setScanPath}
             scanMode={scanMode}
+            setScanMode={setScanMode}
             gitUrl={gitUrl}
+            setGitUrl={setGitUrl}
+            gitToken={gitToken}
+            setGitToken={setGitToken}
             handleScan={handleScan}
             documents={documents}
             setDocDialog={setDocDialog}
             handleDeleteDocument={handleDeleteDocument}
-            featureSuggestions={featureSuggestions}
-            setFeatureSuggestions={setFeatureSuggestions}
             integrationConfig={integrationConfig}
             setActiveTab={setActiveTab}
           />
@@ -833,14 +916,7 @@ export default function ProjectDetail() {
             integrationConfig={integrationConfig}
             setIntegrationConfig={setIntegrationConfig}
             handleSaveIntegrationConfig={handleSaveIntegrationConfig}
-            scanPath={scanPath}
-            setScanPath={setScanPath}
-            scanMode={scanMode}
-            setScanMode={setScanMode}
-            gitUrl={gitUrl}
-            setGitUrl={setGitUrl}
-            gitToken={gitToken}
-            setGitToken={setGitToken}
+            handleUpdateProject={handleUpdateProject}
             onDeleteProject={() => setDeleteDialogOpen(true)}
           />
         </TabsContent>
@@ -1027,7 +1103,7 @@ export default function ProjectDetail() {
       />
 
       {/* New Requirement Dialog */}
-      <Dialog open={reqDialogOpen} onOpenChange={setReqDialogOpen}>
+      <Dialog open={reqDialogOpen} onOpenChange={(open) => { setReqDialogOpen(open); if (!open) setFeatureSuggestions(null); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Yeni Talep</DialogTitle>
@@ -1052,7 +1128,40 @@ export default function ProjectDetail() {
               </button>
             </div>
             <div>
-              <label htmlFor="req-text" className="text-sm font-medium mb-1 block">Açıklama</label>
+              <div className="flex items-center justify-between mb-1">
+                <label htmlFor="req-text" className="text-sm font-medium">Açıklama</label>
+                {project?.hasContext && (
+                  <button
+                    onClick={async () => {
+                      setActionLoading("suggest-features");
+                      try {
+                        const result = await suggestFeatures(projectId);
+                        setFeatureSuggestions(result);
+                      } catch { showToast("Öneriler üretilemedi."); }
+                      finally { setActionLoading(null); }
+                    }}
+                    disabled={actionLoading === "suggest-features"}
+                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 focus-visible:outline-none"
+                  >
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>
+                    {actionLoading === "suggest-features" ? "Üretiliyor..." : "AI'a Sor"}
+                  </button>
+                )}
+              </div>
+              {featureSuggestions && (
+                <div className="mb-2 rounded-md border bg-muted/30 divide-y max-h-40 overflow-y-auto">
+                  {featureSuggestions.suggestions.map((s, i) => (
+                    <button
+                      key={i}
+                      onClick={() => { setNewRequirement(`${s.title}\n\n${s.description}`); setFeatureSuggestions(null); }}
+                      className="w-full text-left px-3 py-2 hover:bg-muted/60 transition-colors"
+                    >
+                      <p className="text-xs font-medium">{s.title}</p>
+                      <p className="text-xs text-muted-foreground truncate">{s.description}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
               <Textarea
                 id="req-text"
                 placeholder="Talep açıklaması"

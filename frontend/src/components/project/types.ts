@@ -6,7 +6,6 @@ import type {
   Task,
   Document,
   UsageSummary,
-  FeatureSuggestionResult,
 } from "@/api/client";
 
 export interface ProjectTabProps {
@@ -20,6 +19,7 @@ export interface ProjectTabProps {
 
 export interface RequirementsTabProps extends ProjectTabProps {
   requirements: Requirement[];
+  loading?: boolean;
   selectedRequirementId: number | null;
   handleSelectRequirement: (reqId: number) => void;
   handleAnalyzeWithConfirm: (reqId: number, tier?: string) => void;
@@ -30,12 +30,13 @@ export interface RequirementsTabProps extends ProjectTabProps {
 
 export interface DetailTabProps extends ProjectTabProps {
   selectedRequirementId: number | null;
+  selectedRequirement: Requirement | null;
   selectedAnalysis: Analysis | null;
   setSelectedAnalysis: (a: Analysis | null) => void;
   isBug: boolean;
   answers: Record<number, string>;
   setAnswers: (fn: (prev: Record<number, string>) => Record<number, string>) => void;
-  handleAnswer: (questionId: number) => void;
+  handleAnswer: (questionId: number, answerOverride?: string) => void;
   handleDismiss: (questionId: number) => void;
   handleStakeholderSummary: () => void;
   summaryInstruction: string;
@@ -53,7 +54,7 @@ export interface TasksTabProps extends ProjectTabProps {
   toggleTask: (id: number) => void;
   integrationConfig: IntegrationConfig;
   handleGenerateTasks: () => void;
-  handleSpDecision: (taskId: number, sp: number) => void;
+  handleSpDecision: (taskId: number, sp: number, divergenceReason?: string) => void;
   handleRefineTasks: () => void;
   handleSyncJira: () => void;
   handleSyncGitHub: () => void;
@@ -71,13 +72,16 @@ export interface TasksTabProps extends ProjectTabProps {
 export interface ContextTabProps extends ProjectTabProps {
   handleScan: () => void;
   scanPath: string;
-  gitUrl: string;
+  setScanPath: (v: string) => void;
   scanMode: "local" | "git";
+  setScanMode: (v: "local" | "git") => void;
+  gitUrl: string;
+  setGitUrl: (v: string) => void;
+  gitToken: string;
+  setGitToken: (v: string) => void;
   documents: Document[];
   setDocDialog: (d: { type: "project" } | { type: "requirement"; reqId: number } | null) => void;
   handleDeleteDocument: (docId: number, reqId?: number) => void;
-  featureSuggestions: FeatureSuggestionResult | null;
-  setFeatureSuggestions: (v: FeatureSuggestionResult | null) => void;
   integrationConfig: IntegrationConfig;
   setActiveTab: (tab: string) => void;
 }
@@ -86,14 +90,7 @@ export interface IntegrationsTabProps extends ProjectTabProps {
   integrationConfig: IntegrationConfig;
   setIntegrationConfig: (v: IntegrationConfig) => void;
   handleSaveIntegrationConfig: () => void;
-  scanPath: string;
-  setScanPath: (v: string) => void;
-  scanMode: "local" | "git";
-  setScanMode: (v: "local" | "git") => void;
-  gitUrl: string;
-  setGitUrl: (v: string) => void;
-  gitToken: string;
-  setGitToken: (v: string) => void;
+  handleUpdateProject: (name: string, description: string) => Promise<void>;
   onDeleteProject: () => void;
 }
 

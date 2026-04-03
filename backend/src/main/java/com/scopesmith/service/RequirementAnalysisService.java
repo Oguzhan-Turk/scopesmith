@@ -188,9 +188,10 @@ public class RequirementAnalysisService {
             }
         }
 
-        message.append("Based on these answers, refine your analysis. ");
-        message.append("Ask NEW questions only if critical information is still missing. ");
-        message.append("Do not repeat already-answered questions.");
+        message.append("Based on these answers, produce a FINAL refined analysis. ");
+        message.append("The clarification round is now COMPLETE. ");
+        message.append("Return an EMPTY array [] for the questions field — do NOT generate any new questions. ");
+        message.append("All necessary clarifications have been collected.");
 
         return message.toString();
     }

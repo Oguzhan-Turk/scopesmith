@@ -52,6 +52,12 @@ export function formatOperationType(op: string): string {
     PROJECT_CONTEXT_STRUCTURED: "Yapısal Context",
     CHANGE_IMPACT: "Değişiklik Etkisi",
     HEALTH_CHECK: "Sağlık Kontrolü",
+    DOCUMENT_SUMMARY: "Belge Özeti",
+    ANALYSIS_REFINEMENT: "Analiz İyileştirme",
+    SP_SUGGESTION: "SP Önerisi",
+    FEATURE_SUGGESTION: "Özellik Önerisi",
+    BUG_ANALYSIS: "Bug Analizi",
+    CLAUDE_CODE_EXPORT: "Claude Code Export",
   };
-  return labels[op] || op;
+  return labels[op] || op.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
 }

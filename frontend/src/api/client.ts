@@ -35,6 +35,8 @@ export const getProjects = () => request<Project[]>("/projects");
 export const getProject = (id: number) => request<Project>(`/projects/${id}`);
 export const createProject = (data: { name: string; description?: string }) =>
   request<Project>("/projects", { method: "POST", body: JSON.stringify(data) });
+export const updateProject = (id: number, data: { name: string; description?: string }) =>
+  request<Project>(`/projects/${id}`, { method: "PUT", body: JSON.stringify(data) });
 export const scanProject = (id: number, folderPath: string) =>
   request<{ status: string }>(`/projects/${id}/scan`, {
     method: "POST",
@@ -171,10 +173,10 @@ export const generateTasks = (analysisId: number) =>
   request<Task[]>(`/analyses/${analysisId}/tasks`, { method: "POST" });
 export const updateTask = (taskId: number, data: Partial<Pick<Task, "title" | "description" | "acceptanceCriteria" | "priority" | "category">>) =>
   request<Task>(`/tasks/${taskId}`, { method: "PUT", body: JSON.stringify(data) });
-export const setSpDecision = (taskId: number, spFinal: number) =>
+export const setSpDecision = (taskId: number, spFinal: number, divergenceReason?: string) =>
   request<Task>(`/tasks/${taskId}/sp-decision`, {
     method: "PUT",
-    body: JSON.stringify({ spFinal }),
+    body: JSON.stringify({ spFinal, ...(divergenceReason ? { divergenceReason } : {}) }),
   });
 
 export const suggestSp = (taskId: number) =>
@@ -316,7 +318,7 @@ export const uploadDocument = async (projectId: number, file: File, docType: str
   const form = new FormData();
   form.append("file", file);
   form.append("docType", docType);
-  const res = await fetch(`/api/v1/projects/${projectId}/documents/upload`, {
+  const res = await fetch(`${API_BASE}/projects/${projectId}/documents/upload`, {
     method: "POST", body: form, credentials: "include",
   });
   if (!res.ok) throw new Error(await res.text());
@@ -326,7 +328,7 @@ export const uploadRequirementDocument = async (reqId: number, file: File, docTy
   const form = new FormData();
   form.append("file", file);
   form.append("docType", docType);
-  const res = await fetch(`/api/v1/requirements/${reqId}/documents/upload`, {
+  const res = await fetch(`${API_BASE}/requirements/${reqId}/documents/upload`, {
     method: "POST", body: form, credentials: "include",
   });
   if (!res.ok) throw new Error(await res.text());
@@ -432,6 +434,7 @@ export interface Task {
   spSuggestion: number | null;
   spRationale: string | null;
   spFinal: number | null;
+  spDivergenceReason?: string;
   priority: string;
   category: string | null;
   dependencyTitle: string | null;
