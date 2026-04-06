@@ -46,10 +46,7 @@ import {
 } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/useToast";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -60,6 +57,11 @@ import ContextTab from "@/components/project/ContextTab";
 import IntegrationsTab from "@/components/project/IntegrationsTab";
 import UsageTab from "@/components/project/UsageTab";
 import DeleteProjectDialog from "@/components/project/DeleteProjectDialog";
+import EditTaskDialog from "@/components/project/dialogs/EditTaskDialog";
+import ManualTaskDialog from "@/components/project/dialogs/ManualTaskDialog";
+import ConfirmDialog from "@/components/project/dialogs/ConfirmDialog";
+import ReqDialog from "@/components/project/dialogs/ReqDialog";
+import DocDialog from "@/components/project/dialogs/DocDialog";
 
 const LOADING_LABELS: Record<string, string> = {
   scan: "Proje taranıyor... Bu birkaç dakika sürebilir.",
@@ -934,164 +936,27 @@ export default function ProjectDetail() {
         </TabsContent>
       </Tabs>
 
-      {/* Task Edit Dialog */}
-      <Dialog open={!!editingTask} onOpenChange={(open) => { if (!open) setEditingTask(null); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Task Düzenle</DialogTitle>
-          </DialogHeader>
-          {editingTask && (
-            <div className="space-y-3">
-              <div>
-                <label className="text-sm font-medium mb-1 block">Başlık</label>
-                <input
-                  type="text"
-                  value={editingTask.title}
-                  onChange={(e) => setEditingTask({ ...editingTask, title: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Açıklama</label>
-                <Textarea
-                  value={editingTask.description}
-                  onChange={(e) => setEditingTask({ ...editingTask, description: e.target.value })}
-                  rows={3}
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Kabul Kriterleri</label>
-                <Textarea
-                  value={editingTask.acceptanceCriteria}
-                  onChange={(e) => setEditingTask({ ...editingTask, acceptanceCriteria: e.target.value })}
-                  rows={3}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-sm font-medium mb-1 block">Priority</label>
-                  <select
-                    value={editingTask.priority}
-                    onChange={(e) => setEditingTask({ ...editingTask, priority: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <option value="LOW">LOW</option>
-                    <option value="MEDIUM">MEDIUM</option>
-                    <option value="HIGH">HIGH</option>
-                    <option value="CRITICAL">CRITICAL</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-1 block">Category</label>
-                  <select
-                    value={editingTask.category || ""}
-                    onChange={(e) => setEditingTask({ ...editingTask, category: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <option value="">—</option>
-                    <option value="BACKEND">BACKEND</option>
-                    <option value="FRONTEND">FRONTEND</option>
-                    <option value="MOBILE">MOBILE</option>
-                    <option value="DATABASE">DATABASE</option>
-                    <option value="DEVOPS">DEVOPS</option>
-                    <option value="TESTING">TESTING</option>
-                    <option value="FULLSTACK">FULLSTACK</option>
-                  </select>
-                </div>
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button size="sm" variant="outline" onClick={() => setEditingTask(null)}>İptal</Button>
-                <Button size="sm" onClick={handleSaveTask}>Kaydet</Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <EditTaskDialog
+        task={editingTask}
+        onClose={() => setEditingTask(null)}
+        onSave={handleSaveTask}
+        onChange={setEditingTask}
+        loading={actionLoading === "save-task"}
+      />
 
-      {/* Manuel Task Dialog */}
-      <Dialog open={manualTaskDialog} onOpenChange={(open) => { if (!open) setManualTaskDialog(false); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Task Ekle</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 pt-2">
-            <div>
-              <label htmlFor="manual-task-title" className="text-sm font-medium mb-1 block">Başlık *</label>
-              <input
-                id="manual-task-title"
-                type="text"
-                value={manualTaskForm.title}
-                onChange={(e) => setManualTaskForm((f) => ({ ...f, title: e.target.value }))}
-                className="w-full px-3 py-2 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                placeholder="Task başlığı"
-                autoFocus
-              />
-            </div>
-            <div>
-              <label htmlFor="manual-task-desc" className="text-sm font-medium mb-1 block">Açıklama</label>
-              <textarea
-                id="manual-task-desc"
-                value={manualTaskForm.description}
-                onChange={(e) => setManualTaskForm((f) => ({ ...f, description: e.target.value }))}
-                className="w-full px-3 py-2 border rounded-md bg-background text-sm resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                rows={3}
-                placeholder="Opsiyonel"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="manual-task-priority" className="text-sm font-medium mb-1 block">Öncelik</label>
-                <select
-                  id="manual-task-priority"
-                  value={manualTaskForm.priority}
-                  onChange={(e) => setManualTaskForm((f) => ({ ...f, priority: e.target.value }))}
-                  className="w-full px-3 py-2 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <option value="LOW">Low</option>
-                  <option value="MEDIUM">Medium</option>
-                  <option value="HIGH">High</option>
-                  <option value="CRITICAL">Critical</option>
-                </select>
-              </div>
-              <div>
-                <label htmlFor="manual-task-category" className="text-sm font-medium mb-1 block">Kategori</label>
-                <input
-                  id="manual-task-category"
-                  type="text"
-                  value={manualTaskForm.category}
-                  onChange={(e) => setManualTaskForm((f) => ({ ...f, category: e.target.value }))}
-                  className="w-full px-3 py-2 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder="Opsiyonel"
-                />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 pt-1">
-              <Button size="sm" variant="outline" onClick={() => setManualTaskDialog(false)}>İptal</Button>
-              <Button
-                size="sm"
-                onClick={handleCreateManualTask}
-                disabled={!manualTaskForm.title.trim() || actionLoading === "manual-task"}
-              >
-                {actionLoading === "manual-task" ? "Ekleniyor..." : "Ekle"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ManualTaskDialog
+        open={manualTaskDialog}
+        onClose={() => setManualTaskDialog(false)}
+        form={manualTaskForm}
+        onChange={setManualTaskForm}
+        onSubmit={handleCreateManualTask}
+        loading={actionLoading === "manual-task"}
+      />
 
-      {/* Confirmation Dialog */}
-      <Dialog open={!!confirmDialog} onOpenChange={(open) => { if (!open) setConfirmDialog(null); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Onay</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground whitespace-pre-wrap">{confirmDialog?.message}</p>
-          <div className="flex justify-end gap-2 mt-4">
-            <Button size="sm" variant="outline" onClick={() => setConfirmDialog(null)}>İptal</Button>
-            <Button size="sm" onClick={() => { confirmDialog?.onConfirm(); setConfirmDialog(null); }}>Onayla</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        dialog={confirmDialog}
+        onClose={() => setConfirmDialog(null)}
+      />
 
       {/* Delete Project Dialog */}
       <DeleteProjectDialog
@@ -1102,203 +967,43 @@ export default function ProjectDetail() {
         onDeleted={() => navigate("/")}
       />
 
-      {/* New Requirement Dialog */}
-      <Dialog open={reqDialogOpen} onOpenChange={(open) => { setReqDialogOpen(open); if (!open) setFeatureSuggestions(null); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Yeni Talep</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-2">
-            <div className="flex gap-2">
-              <button
-                onClick={() => setNewRequirementType("FEATURE")}
-                className={`px-3 py-1.5 text-sm rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                  newRequirementType === "FEATURE" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"
-                }`}
-              >
-                Feature
-              </button>
-              <button
-                onClick={() => setNewRequirementType("BUG")}
-                className={`px-3 py-1.5 text-sm rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                  newRequirementType === "BUG" ? "bg-destructive text-destructive-foreground" : "bg-background hover:bg-muted"
-                }`}
-              >
-                Bug
-              </button>
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label htmlFor="req-text" className="text-sm font-medium">Açıklama</label>
-                {project?.hasContext && (
-                  <button
-                    onClick={async () => {
-                      setActionLoading("suggest-features");
-                      try {
-                        const result = await suggestFeatures(projectId);
-                        setFeatureSuggestions(result);
-                      } catch { showToast("Öneriler üretilemedi."); }
-                      finally { setActionLoading(null); }
-                    }}
-                    disabled={actionLoading === "suggest-features"}
-                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 focus-visible:outline-none"
-                  >
-                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>
-                    {actionLoading === "suggest-features" ? "Üretiliyor..." : "AI'a Sor"}
-                  </button>
-                )}
-              </div>
-              {featureSuggestions && (
-                <div className="mb-2 rounded-md border bg-muted/30 divide-y max-h-40 overflow-y-auto">
-                  {featureSuggestions.suggestions.map((s, i) => (
-                    <button
-                      key={i}
-                      onClick={() => { setNewRequirement(`${s.title}\n\n${s.description}`); setFeatureSuggestions(null); }}
-                      className="w-full text-left px-3 py-2 hover:bg-muted/60 transition-colors"
-                    >
-                      <p className="text-xs font-medium">{s.title}</p>
-                      <p className="text-xs text-muted-foreground truncate">{s.description}</p>
-                    </button>
-                  ))}
-                </div>
-              )}
-              <Textarea
-                id="req-text"
-                placeholder="Talep açıklaması"
-                value={newRequirement}
-                onChange={(e) => setNewRequirement(e.target.value)}
-                rows={6}
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button size="sm" variant="outline" onClick={() => setReqDialogOpen(false)}>İptal</Button>
-              <Button
-                size="sm"
-                onClick={async () => {
-                  await handleCreateRequirement();
-                  setReqDialogOpen(false);
-                }}
-                disabled={actionLoading === "create-req" || !newRequirement.trim()}
-              >
-                {actionLoading === "create-req" ? "Ekleniyor..." : "Ekle"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ReqDialog
+        open={reqDialogOpen}
+        onClose={() => { setReqDialogOpen(false); setFeatureSuggestions(null); }}
+        value={newRequirement}
+        onChange={setNewRequirement}
+        type={newRequirementType}
+        onTypeChange={setNewRequirementType}
+        onSubmit={handleCreateRequirement}
+        loading={actionLoading === "create-req"}
+        hasContext={!!project?.hasContext}
+        suggestions={featureSuggestions}
+        onSuggest={async () => {
+          setActionLoading("suggest-features");
+          try {
+            const result = await suggestFeatures(projectId);
+            setFeatureSuggestions(result);
+          } catch { showToast("Öneriler üretilemedi."); }
+          finally { setActionLoading(null); }
+        }}
+        onPickSuggestion={(text) => { setNewRequirement(text); setFeatureSuggestions(null); }}
+        suggestLoading={actionLoading === "suggest-features"}
+      />
 
-      {/* Document Add Dialog */}
-      <Dialog open={!!docDialog} onOpenChange={(open) => { if (!open) setDocDialog(null); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {docDialog?.type === "requirement" ? "Talebe Doküman Ekle" : "Proje Dokümanı Ekle"}
-            </DialogTitle>
-          </DialogHeader>
-          {docDialog?.type === "requirement" && (reqDocs[docDialog.reqId]?.length ?? 0) > 0 && (
-            <div className="space-y-1.5 mb-3">
-              <h4 className="text-sm font-semibold text-muted-foreground">Mevcut Belgeler</h4>
-              {reqDocs[docDialog.reqId]?.map((doc) => (
-                <div key={doc.id} className="flex items-center justify-between text-sm py-1 border-b last:border-0">
-                  <div className="flex items-center gap-2">
-                    <span>{doc.filename}</span>
-                    <Badge variant="outline" className="text-xs">{doc.docType}</Badge>
-                  </div>
-                  <button onClick={() => handleDeleteDocument(doc.id, docDialog.reqId)} className="text-xs text-destructive">Sil</button>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="space-y-3">
-            <div className="flex gap-2">
-              <button
-                onClick={() => { setDocMode("file"); setDocFile(null); }}
-                className={`px-3 py-1.5 text-sm rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${docMode === "file" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
-              >
-                Dosya Yükle
-              </button>
-              <button
-                onClick={() => setDocMode("paste")}
-                className={`px-3 py-1.5 text-sm rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${docMode === "paste" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
-              >
-                Metin Yapıştır
-              </button>
-            </div>
-            <div>
-              <label htmlFor="doc-type" className="text-sm font-medium mb-1 block">Tür</label>
-              <select
-                id="doc-type"
-                value={docForm.docType}
-                onChange={(e) => setDocForm((f) => ({ ...f, docType: e.target.value }))}
-                className="w-full px-3 py-2 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <option value="MEETING_NOTES">Toplantı Notu</option>
-                <option value="EMAIL">E-posta</option>
-                <option value="SPECIFICATION">Spesifikasyon</option>
-                <option value="ARCHITECTURE">Mimari Doküman</option>
-                <option value="OTHER">Diğer</option>
-              </select>
-            </div>
-            {docMode === "file" ? (
-              <div>
-                <label className="text-sm font-medium mb-1 block">Dosya</label>
-                <input
-                  type="file"
-                  accept=".txt,.md,.csv,.json,.xml,.html,.log,.yml,.yaml"
-                  onChange={(e) => setDocFile(e.target.files?.[0] || null)}
-                  className="w-full text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border file:border-input file:bg-background file:text-sm file:font-medium hover:file:bg-muted"
-                />
-                {docFile && (
-                  <p className="text-xs text-muted-foreground mt-1">{docFile.name} — {(docFile.size / 1024).toFixed(1)}KB</p>
-                )}
-              </div>
-            ) : (
-              <>
-                <div>
-                  <label htmlFor="doc-filename" className="text-sm font-medium mb-1 block">Dosya Adı *</label>
-                  <input
-                    id="doc-filename"
-                    type="text"
-                    value={docForm.filename}
-                    onChange={(e) => setDocForm((f) => ({ ...f, filename: e.target.value }))}
-                    className="w-full px-3 py-2 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    placeholder="toplanti-notu-12-mart.md"
-                  />
-                </div>
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label htmlFor="doc-content" className="text-sm font-medium">İçerik *</label>
-                    <span className={`text-xs ${docForm.content.length > 10240 ? "text-destructive" : "text-muted-foreground"}`}>
-                      {docForm.content.length.toLocaleString()} / 10,240
-                    </span>
-                  </div>
-                  <textarea
-                    id="doc-content"
-                    value={docForm.content}
-                    onChange={(e) => setDocForm((f) => ({ ...f, content: e.target.value }))}
-                    className="w-full px-3 py-2 border rounded-md bg-background text-sm resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    rows={6}
-                    placeholder="Belge içeriğini yapıştırın..."
-                  />
-                </div>
-              </>
-            )}
-            <div className="flex justify-end gap-2">
-              <Button size="sm" variant="outline" onClick={() => { setDocDialog(null); setDocFile(null); }}>İptal</Button>
-              <Button
-                size="sm"
-                onClick={handleAddDocument}
-                disabled={
-                  (docMode === "file" ? !docFile : (!docForm.filename.trim() || !docForm.content.trim() || docForm.content.length > 10240))
-                  || actionLoading === "add-doc"
-                }
-              >
-                {actionLoading === "add-doc" ? "Ekleniyor..." : "Ekle"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <DocDialog
+        dialog={docDialog}
+        onClose={() => setDocDialog(null)}
+        mode={docMode}
+        onModeChange={setDocMode}
+        file={docFile}
+        onFileChange={setDocFile}
+        form={docForm}
+        onFormChange={setDocForm}
+        reqDocs={reqDocs}
+        onDeleteDoc={handleDeleteDocument}
+        onSubmit={handleAddDocument}
+        loading={actionLoading === "add-doc"}
+      />
     </div>
   );
 }
