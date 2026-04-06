@@ -1,5 +1,6 @@
 package com.scopesmith.entity;
 
+import com.scopesmith.dto.enums.RiskLevel;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -42,7 +43,7 @@ public class Analysis {
     /**
      * Risk assessment: LOW, MEDIUM, HIGH
      */
-    private String riskLevel;
+    private RiskLevel riskLevel;
 
     @Column(columnDefinition = "TEXT")
     private String riskReason;

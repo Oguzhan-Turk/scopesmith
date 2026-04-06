@@ -2,15 +2,22 @@ package com.scopesmith.service;
 
 import com.scopesmith.config.PromptLoader;
 import com.scopesmith.dto.AnalysisResult;
+import com.scopesmith.dto.ProjectContextResult;
 import com.scopesmith.entity.*;
 import com.scopesmith.repository.AnalysisRepository;
+import com.scopesmith.service.validation.AiResultValidationService;
+import com.scopesmith.service.validation.QuestionDeduplicationService;
+import com.scopesmith.service.validation.ValidationContext;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.scopesmith.util.StructuredContextFormatter;
+
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +30,8 @@ public class RequirementAnalysisService {
     private final DocumentService documentService;
     private final InsightService insightService;
     private final PromptLoader promptLoader;
+    private final AiResultValidationService validationService;
+    private final QuestionDeduplicationService questionDeduplicationService;
 
     /**
      * Analyze a requirement. AI call is made OUTSIDE the transaction
@@ -48,6 +57,10 @@ public class RequirementAnalysisService {
         AnalysisResult result = aiService.chatWithStructuredOutput(
                 promptLoader.load(promptName), userMessage, AnalysisResult.class,
                 OperationType.REQUIREMENT_ANALYSIS, projectId, effectiveTier);
+        result = validationService.validate(result, buildValidationContext(requirement.getProject()));
+        result.setQuestions(
+            questionDeduplicationService.deduplicate(result.getQuestions(), requirement.getId())
+        );
         long durationMs = System.currentTimeMillis() - startTime;
         log.info("Analysis complete for requirement #{} in {}ms (tier: {})", requirementId, durationMs, effectiveTier);
 
@@ -86,7 +99,7 @@ public class RequirementAnalysisService {
                     .analysis(savedAnalysis)
                     .questionText(qi.getQuestion())
                     .suggestedAnswer(qi.getSuggestedAnswer())
-                    .questionType(qi.getType() != null ? qi.getType() : "OPEN")
+                    .questionType(qi.getType() != null ? qi.getType().name() : "OPEN")
                     .options(optionsJson)
                     .build();
             savedAnalysis.getQuestions().add(question);
@@ -118,6 +131,7 @@ public class RequirementAnalysisService {
         AnalysisResult result = aiService.chatWithStructuredOutput(
                 promptLoader.load(promptName), userMessage, AnalysisResult.class,
                 OperationType.REQUIREMENT_ANALYSIS, requirement.getProject().getId(), effectiveTier);
+        result = validationService.validate(result, buildValidationContext(requirement.getProject()));
         long durationMs = System.currentTimeMillis() - startTime;
         log.info("Re-analysis complete for requirement #{} in {}ms", requirement.getId(), durationMs);
 
@@ -148,6 +162,10 @@ public class RequirementAnalysisService {
         AnalysisResult result = aiService.chatWithStructuredOutput(
                 promptLoader.load("analysis-refine"), message.toString(), AnalysisResult.class,
                 OperationType.REQUIREMENT_ANALYSIS, requirement.getProject().getId(), tier);
+        result = validationService.validate(result, buildValidationContext(requirement.getProject()));
+        result.setQuestions(
+            questionDeduplicationService.deduplicate(result.getQuestions(), requirement.getId())
+        );
         long durationMs = System.currentTimeMillis() - startTime;
 
         return saveAnalysisResult(requirement, result, durationMs, tier);
@@ -162,6 +180,12 @@ public class RequirementAnalysisService {
             message.append("## Project Context\n");
             message.append(techContext);
             message.append("\n\n");
+        }
+
+        // Add structured context for re-analysis
+        String structuredSection = StructuredContextFormatter.format(requirement.getProject().getStructuredContext());
+        if (!structuredSection.isEmpty()) {
+            message.append(structuredSection);
         }
 
         message.append("## Raw Requirement\n");
@@ -196,6 +220,28 @@ public class RequirementAnalysisService {
         return message.toString();
     }
 
+    private ValidationContext buildValidationContext(Project project) {
+        List<String> knownModules = List.of();
+        if (project.getStructuredContext() != null) {
+            try {
+                var ctx = new com.fasterxml.jackson.databind.ObjectMapper()
+                    .readValue(project.getStructuredContext(), ProjectContextResult.class);
+                if (ctx.getModules() != null) {
+                    knownModules = ctx.getModules().stream()
+                        .map(ProjectContextResult.ModuleInfo::getName)
+                        .filter(Objects::nonNull)
+                        .toList();
+                }
+            } catch (Exception e) {
+                log.warn("Failed to parse structured context for validation: {}", e.getMessage());
+            }
+        }
+        return ValidationContext.builder()
+            .projectId(project.getId())
+            .knownModules(knownModules)
+            .build();
+    }
+
     private String buildUserMessage(Requirement requirement) {
         StringBuilder message = new StringBuilder();
 
@@ -205,6 +251,12 @@ public class RequirementAnalysisService {
             message.append("## Project Context\n");
             message.append(techContext);
             message.append("\n\n");
+        }
+
+        // Add structured context (modules, entities, tech stack, etc.)
+        String structuredSection = StructuredContextFormatter.format(requirement.getProject().getStructuredContext());
+        if (!structuredSection.isEmpty()) {
+            message.append(structuredSection);
         }
 
         // Add CLAUDE.md content if available (developer notes, conventions)

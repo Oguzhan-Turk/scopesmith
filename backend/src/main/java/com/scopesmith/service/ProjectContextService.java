@@ -2,10 +2,13 @@ package com.scopesmith.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scopesmith.config.PromptLoader;
+import com.scopesmith.dto.DependencyInfo;
 import com.scopesmith.dto.ProjectContextResult;
 import com.scopesmith.entity.OperationType;
 import com.scopesmith.entity.Project;
 import com.scopesmith.repository.ProjectRepository;
+import com.scopesmith.service.validation.AiResultValidationService;
+import com.scopesmith.service.validation.ValidationContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -15,9 +18,7 @@ import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -30,6 +31,8 @@ public class ProjectContextService {
     private final ProjectRepository projectRepository;
     private final PromptLoader promptLoader;
     private final ObjectMapper objectMapper;
+    private final AiResultValidationService validationService;
+    private final DependencyParsingService dependencyParsingService;
 
     /**
      * Key files that reveal project structure.
@@ -102,8 +105,9 @@ public class ProjectContextService {
         // Build file tree
         String fileTree = buildFileTree(root);
 
-        // Read key files
-        String keyFileContents = readKeyFiles(root);
+        // Read key files (also collects build file contents for dependency parsing)
+        Map<String, String> buildFileContents = new HashMap<>();
+        String keyFileContents = readKeyFiles(root, buildFileContents);
 
         // Build message for Claude
         String userMessage = "## File Tree\n```\n" + fileTree + "\n```\n\n" +
@@ -120,9 +124,24 @@ public class ProjectContextService {
         ProjectContextResult structured = aiService.chatWithStructuredOutput(
                 promptLoader.load("project-context-structured"), userMessage, ProjectContextResult.class,
                 OperationType.PROJECT_CONTEXT_STRUCTURED, projectId);
+        structured = validationService.validate(structured,
+                ValidationContext.builder().projectId(projectId).build());
 
         long duration = System.currentTimeMillis() - startTime;
         log.info("Project context generated for #{} in {}ms (text + structured)", projectId, duration);
+
+        // Parse dependencies from build files (token-free, regex-based)
+        List<DependencyInfo> allDeps = new ArrayList<>();
+        for (Map.Entry<String, String> entry : buildFileContents.entrySet()) {
+            String filename = entry.getKey();
+            String name = filename.contains("/") ? filename.substring(filename.lastIndexOf('/') + 1) : filename;
+            List<DependencyInfo> parsed = dependencyParsingService.parse(name, entry.getValue());
+            allDeps.addAll(parsed);
+        }
+        if (!allDeps.isEmpty()) {
+            structured.setDependencies(allDeps);
+            log.info("Parsed {} dependencies from build files", allDeps.size());
+        }
 
         // Update project
         project.setTechContext(context);
@@ -225,7 +244,15 @@ public class ProjectContextService {
      * Read contents of key files — config files, entity/model files, README.
      * Respects MAX_FILE_SIZE per file and MAX_TOTAL_CONTENT total.
      */
-    private String readKeyFiles(Path root) {
+    /**
+     * Build file names that contain dependency declarations.
+     */
+    private static final Set<String> BUILD_FILENAMES = Set.of(
+            "pom.xml", "build.gradle", "build.gradle.kts",
+            "package.json", "requirements.txt", "go.mod"
+    );
+
+    private String readKeyFiles(Path root, Map<String, String> buildFileContents) {
         StringBuilder content = new StringBuilder();
         long totalSize = 0;
 
@@ -288,6 +315,12 @@ public class ProjectContextService {
                     content.append(fileContent);
                     content.append("\n```\n");
                     totalSize += fileSize;
+
+                    // Collect build file contents for dependency parsing
+                    String fn = file.getFileName().toString();
+                    if (BUILD_FILENAMES.contains(fn)) {
+                        buildFileContents.put(root.relativize(file).toString(), fileContent);
+                    }
                 } catch (IOException e) {
                     log.debug("Could not read file: {}", file);
                 }

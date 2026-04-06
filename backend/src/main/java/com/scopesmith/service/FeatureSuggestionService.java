@@ -6,6 +6,8 @@ import com.scopesmith.entity.ModelTier;
 import com.scopesmith.entity.OperationType;
 import com.scopesmith.entity.Project;
 import com.scopesmith.entity.Requirement;
+import com.scopesmith.service.validation.AiResultValidationService;
+import com.scopesmith.service.validation.ValidationContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,6 +22,7 @@ public class FeatureSuggestionService {
     private final AiService aiService;
     private final ProjectService projectService;
     private final PromptLoader promptLoader;
+    private final AiResultValidationService validationService;
 
     public FeatureSuggestionResult suggestFeatures(Long projectId) {
         Project project = projectService.getProjectOrThrow(projectId);
@@ -53,9 +56,10 @@ public class FeatureSuggestionService {
         }
 
         log.info("Generating feature suggestions for project #{}", projectId);
-        return aiService.chatWithStructuredOutput(
+        FeatureSuggestionResult result = aiService.chatWithStructuredOutput(
                 promptLoader.load("feature-suggestion"), message.toString(),
                 FeatureSuggestionResult.class,
                 OperationType.FEATURE_SUGGESTION, projectId);
+        return validationService.validate(result, ValidationContext.builder().projectId(projectId).build());
     }
 }

@@ -1,5 +1,7 @@
 package com.scopesmith.service;
 
+import lombok.Builder;
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.LogCommand;
@@ -337,5 +339,451 @@ public class CodeIntelligenceService {
             log.warn("Git history analysis failed: {}", e.getMessage());
             return null;
         }
+    }
+
+    // ── Module Dependency Graph ──
+
+    @Data
+    @Builder
+    public static class ModuleMetrics {
+        private String moduleName;
+        private String packagePath;
+        private int fileCount;
+        private int publicClassCount;
+        private int methodCount;
+        @Builder.Default
+        private Set<String> dependsOn = new TreeSet<>();
+        @Builder.Default
+        private Set<String> consumedBy = new TreeSet<>();
+        private int gitChangeCount;
+    }
+
+    /**
+     * Analyze cross-module dependency graph from import statements.
+     * Entirely regex-based, no AI tokens spent.
+     */
+    public Map<String, ModuleMetrics> analyzeModuleGraph(Path projectRoot) {
+        if (!Files.isDirectory(projectRoot)) return Map.of();
+
+        try {
+            // 1. Detect base package (for Java projects)
+            String basePackage = detectBasePackage(projectRoot);
+
+            // 2. Scan all source files
+            List<Path> sourceFiles;
+            try (var stream = Files.walk(projectRoot, 10)) {
+                sourceFiles = stream
+                        .filter(Files::isRegularFile)
+                        .filter(p -> Language.detect(p.getFileName().toString()) != Language.UNKNOWN)
+                        .filter(p -> !isSkippedPath(projectRoot.relativize(p).toString()))
+                        .collect(Collectors.toList());
+            }
+
+            if (sourceFiles.isEmpty()) return Map.of();
+
+            // 3. Build module metrics
+            Map<String, ModuleMetrics> metrics = new TreeMap<>();
+
+            for (Path file : sourceFiles) {
+                try {
+                    long size = Files.size(file);
+                    if (size > MAX_FILE_SIZE) continue;
+
+                    String content = Files.readString(file);
+                    String filename = file.getFileName().toString();
+                    Language lang = Language.detect(filename);
+                    String relativePath = projectRoot.relativize(file).toString();
+
+                    // Determine this file's module
+                    String module = resolveModule(content, relativePath, lang, basePackage);
+                    if (module == null || module.isBlank()) continue;
+
+                    ModuleMetrics m = metrics.computeIfAbsent(module, k ->
+                            ModuleMetrics.builder().moduleName(k).dependsOn(new TreeSet<>()).consumedBy(new TreeSet<>()).build());
+
+                    m.setFileCount(m.getFileCount() + 1);
+
+                    // Count public classes and methods
+                    List<String> types = extractTypeDeclarations(content, lang);
+                    m.setPublicClassCount(m.getPublicClassCount() + types.size());
+
+                    List<String> methods = extractMethodSignatures(content, lang);
+                    m.setMethodCount(m.getMethodCount() + methods.size());
+
+                    // Extract package path from first type declaration context
+                    if (m.getPackagePath() == null) {
+                        String pkgPath = extractPackagePath(content, lang);
+                        if (pkgPath != null) m.setPackagePath(pkgPath);
+                    }
+
+                    // Resolve import targets to module names
+                    List<String> fullImports = extractFullImports(content, lang);
+                    for (String imp : fullImports) {
+                        String targetModule = resolveImportToModule(imp, lang, basePackage);
+                        if (targetModule != null && !targetModule.equals(module)) {
+                            m.getDependsOn().add(targetModule);
+                        }
+                    }
+                } catch (Exception e) {
+                    // Skip problematic files silently
+                }
+            }
+
+            // 4. Build reverse graph (consumedBy)
+            for (var entry : metrics.entrySet()) {
+                String moduleName = entry.getKey();
+                for (String dep : entry.getValue().getDependsOn()) {
+                    ModuleMetrics target = metrics.get(dep);
+                    if (target != null) {
+                        target.getConsumedBy().add(moduleName);
+                    }
+                }
+            }
+
+            // 5. Git change counts per module
+            enrichWithGitChangeCounts(projectRoot, metrics, sourceFiles, basePackage);
+
+            log.info("Module graph analysis: {} modules found in {}", metrics.size(), projectRoot);
+            return metrics;
+        } catch (Exception e) {
+            log.warn("Module graph analysis failed: {}", e.getMessage());
+            return Map.of();
+        }
+    }
+
+    /**
+     * Format module dependency graph as markdown for AI prompt context.
+     */
+    public String formatModuleGraph(Map<String, ModuleMetrics> metrics) {
+        if (metrics == null || metrics.isEmpty()) return "";
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("## Module Dependency Graph\n\n");
+
+        for (var entry : metrics.entrySet().stream()
+                .sorted(Comparator.comparing(Map.Entry::getKey))
+                .toList()) {
+            ModuleMetrics m = entry.getValue();
+            sb.append("### ").append(m.getModuleName()).append("\n");
+            if (m.getPackagePath() != null) {
+                sb.append("  Package: ").append(m.getPackagePath()).append("\n");
+            }
+            sb.append("  Files: ").append(m.getFileCount());
+            sb.append(" | Classes: ").append(m.getPublicClassCount());
+            sb.append(" | Methods: ").append(m.getMethodCount()).append("\n");
+
+            if (!m.getDependsOn().isEmpty()) {
+                sb.append("  Depends on: ").append(String.join(", ", m.getDependsOn())).append("\n");
+            }
+            if (!m.getConsumedBy().isEmpty()) {
+                sb.append("  Consumed by: ").append(String.join(", ", m.getConsumedBy())).append("\n");
+            }
+            if (m.getGitChangeCount() > 0) {
+                sb.append("  Git activity: ").append(m.getGitChangeCount()).append(" changes\n");
+            }
+            sb.append("\n");
+        }
+
+        return sb.toString();
+    }
+
+    // ── Module Graph Helpers ──
+
+    /**
+     * Detect the base package for Java/Kotlin projects by looking for the main class or
+     * the most common root package across source files.
+     */
+    private String detectBasePackage(Path projectRoot) {
+        // Strategy: find src/main/java and take the common prefix of package declarations
+        Path srcMain = projectRoot.resolve("src/main/java");
+        if (!Files.isDirectory(srcMain)) return null;
+
+        try (var stream = Files.walk(srcMain, 6)) {
+            List<String> packages = stream
+                    .filter(Files::isRegularFile)
+                    .filter(p -> p.toString().endsWith(".java") || p.toString().endsWith(".kt"))
+                    .limit(20)
+                    .map(p -> {
+                        try {
+                            String content = Files.readString(p);
+                            Matcher m = Pattern.compile("^package\\s+([\\w.]+)", Pattern.MULTILINE).matcher(content);
+                            return m.find() ? m.group(1) : null;
+                        } catch (Exception e) { return null; }
+                    })
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+
+            if (packages.isEmpty()) return null;
+
+            // Find common prefix
+            String first = packages.get(0);
+            String[] parts = first.split("\\.");
+            int commonLen = parts.length;
+
+            for (String pkg : packages) {
+                String[] pp = pkg.split("\\.");
+                int len = Math.min(commonLen, pp.length);
+                int match = 0;
+                for (int i = 0; i < len; i++) {
+                    if (parts[i].equals(pp[i])) match++;
+                    else break;
+                }
+                commonLen = match;
+            }
+
+            if (commonLen == 0) return null;
+            return String.join(".", Arrays.copyOf(parts, commonLen));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * Resolve a file to its module name based on language and package.
+     */
+    private String resolveModule(String content, String relativePath, Language lang, String basePackage) {
+        return switch (lang) {
+            case JAVA, KOTLIN -> {
+                Matcher m = Pattern.compile("^package\\s+([\\w.]+)", Pattern.MULTILINE).matcher(content);
+                if (m.find()) {
+                    String pkg = m.group(1);
+                    if (basePackage != null && pkg.startsWith(basePackage + ".")) {
+                        String sub = pkg.substring(basePackage.length() + 1);
+                        // Take first segment: "service.impl" → "service"
+                        int dot = sub.indexOf('.');
+                        yield dot > 0 ? sub.substring(0, dot) : sub;
+                    }
+                    // Fallback: last meaningful segment
+                    String[] parts = pkg.split("\\.");
+                    yield parts.length > 1 ? parts[parts.length - 1] : pkg;
+                }
+                yield null;
+            }
+            case TYPESCRIPT, JAVASCRIPT -> {
+                // Use directory structure: src/components/auth/Login.tsx → "components/auth" or "auth"
+                String normalized = relativePath.replace('\\', '/');
+                // Strip src/ prefix if present
+                if (normalized.startsWith("src/")) normalized = normalized.substring(4);
+                String[] parts = normalized.split("/");
+                if (parts.length >= 2) {
+                    // Take first meaningful directory (skip "app", "pages", "lib" as they're common roots)
+                    yield parts[0];
+                }
+                yield null;
+            }
+            case PYTHON -> {
+                // from app.models.user → "models"
+                String normalized = relativePath.replace('\\', '/');
+                String[] parts = normalized.split("/");
+                if (parts.length >= 2) {
+                    yield parts[parts.length - 2]; // parent directory as module
+                }
+                yield null;
+            }
+            case GO -> {
+                Matcher m = Pattern.compile("^package\\s+(\\w+)", Pattern.MULTILINE).matcher(content);
+                yield m.find() ? m.group(1) : null;
+            }
+            default -> null;
+        };
+    }
+
+    /**
+     * Extract full import paths (not simplified like extractImports).
+     */
+    private List<String> extractFullImports(String content, Language lang) {
+        List<String> results = new ArrayList<>();
+        List<Pattern> patterns = switch (lang) {
+            case JAVA, KOTLIN -> List.of(Pattern.compile("^import\\s+(?:static\\s+)?([\\w.]+)", Pattern.MULTILINE));
+            case PYTHON -> List.of(
+                    Pattern.compile("^from\\s+(\\S+)\\s+import", Pattern.MULTILINE),
+                    Pattern.compile("^import\\s+(\\S+)", Pattern.MULTILINE));
+            case TYPESCRIPT, JAVASCRIPT -> List.of(
+                    Pattern.compile("import\\s+.*?from\\s+['\"]([^'\"]+)['\"]"),
+                    Pattern.compile("require\\s*\\(\\s*['\"]([^'\"]+)['\"]\\s*\\)"));
+            case GO -> List.of(Pattern.compile("\"([^\"]+)\""));
+            default -> List.of();
+        };
+
+        for (Pattern p : patterns) {
+            Matcher m = p.matcher(content);
+            while (m.find()) {
+                String imp = m.group(1);
+                if (imp != null && !imp.isBlank()) {
+                    results.add(imp);
+                }
+            }
+        }
+        return results;
+    }
+
+    /**
+     * Map an import path to a module name.
+     */
+    private String resolveImportToModule(String importPath, Language lang, String basePackage) {
+        return switch (lang) {
+            case JAVA, KOTLIN -> {
+                // com.scopesmith.service.UserService → "service"
+                if (basePackage != null && importPath.startsWith(basePackage + ".")) {
+                    String sub = importPath.substring(basePackage.length() + 1);
+                    int dot = sub.indexOf('.');
+                    yield dot > 0 ? sub.substring(0, dot) : sub;
+                }
+                // External dependency — skip
+                yield null;
+            }
+            case TYPESCRIPT, JAVASCRIPT -> {
+                // Relative imports: ./components/auth → "components"
+                // Alias imports: @/components/auth → "components"
+                String normalized = importPath.replace('\\', '/');
+                if (normalized.startsWith("./") || normalized.startsWith("../")) {
+                    // Relative — hard to resolve without knowing full path context
+                    yield null;
+                }
+                if (normalized.startsWith("@/") || normalized.startsWith("~/")) {
+                    normalized = normalized.substring(2);
+                }
+                // Skip node_modules / external packages
+                if (!normalized.contains("/")) yield null;
+                String[] parts = normalized.split("/");
+                yield parts[0];
+            }
+            case PYTHON -> {
+                // from app.models.user → "models"
+                String[] parts = importPath.split("\\.");
+                if (parts.length >= 2) {
+                    // Skip the root package (e.g., "app"), take next segment
+                    yield parts[1];
+                }
+                yield null;
+            }
+            case GO -> {
+                // "github.com/example/pkg/auth" → "auth"
+                String[] parts = importPath.split("/");
+                yield parts.length > 0 ? parts[parts.length - 1] : null;
+            }
+            default -> null;
+        };
+    }
+
+    /**
+     * Extract the package/namespace path from file content.
+     */
+    private String extractPackagePath(String content, Language lang) {
+        return switch (lang) {
+            case JAVA, KOTLIN -> {
+                Matcher m = Pattern.compile("^package\\s+([\\w.]+)", Pattern.MULTILINE).matcher(content);
+                yield m.find() ? m.group(1) : null;
+            }
+            case CSHARP -> {
+                Matcher m = Pattern.compile("^namespace\\s+([\\w.]+)", Pattern.MULTILINE).matcher(content);
+                yield m.find() ? m.group(1) : null;
+            }
+            case GO -> {
+                Matcher m = Pattern.compile("^package\\s+(\\w+)", Pattern.MULTILINE).matcher(content);
+                yield m.find() ? m.group(1) : null;
+            }
+            default -> null;
+        };
+    }
+
+    /**
+     * Enrich module metrics with git change counts.
+     */
+    private void enrichWithGitChangeCounts(Path projectRoot, Map<String, ModuleMetrics> metrics,
+                                           List<Path> sourceFiles, String basePackage) {
+        Path gitDir = projectRoot.resolve(".git");
+        if (!Files.isDirectory(gitDir)) return;
+
+        try (Git git = Git.open(projectRoot.toFile())) {
+            Repository repo = git.getRepository();
+            Map<String, Integer> moduleChangeCounts = new HashMap<>();
+
+            LogCommand logCmd = git.log().setMaxCount(MAX_COMMITS);
+            Iterable<RevCommit> commits = logCmd.call();
+
+            RevCommit prev = null;
+            for (RevCommit commit : commits) {
+                if (prev != null) {
+                    try (ObjectReader reader = repo.newObjectReader()) {
+                        CanonicalTreeParser oldTree = new CanonicalTreeParser();
+                        oldTree.reset(reader, prev.getTree());
+                        CanonicalTreeParser newTree = new CanonicalTreeParser();
+                        newTree.reset(reader, commit.getTree());
+
+                        try (DiffFormatter df = new DiffFormatter(DisabledOutputStream.INSTANCE)) {
+                            df.setRepository(repo);
+                            List<DiffEntry> diffs = df.scan(oldTree, newTree);
+
+                            for (DiffEntry diff : diffs) {
+                                String path = diff.getNewPath().equals("/dev/null") ? diff.getOldPath() : diff.getNewPath();
+                                String module = resolvePathToModule(path, basePackage);
+                                if (module != null) {
+                                    moduleChangeCounts.merge(module, 1, Integer::sum);
+                                }
+                            }
+                        }
+                    }
+                }
+                prev = commit;
+            }
+
+            // Apply counts to metrics
+            for (var entry : moduleChangeCounts.entrySet()) {
+                ModuleMetrics m = metrics.get(entry.getKey());
+                if (m != null) {
+                    m.setGitChangeCount(entry.getValue());
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Git enrichment for module graph failed: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Resolve a git diff file path to a module name (lightweight, path-based only).
+     */
+    private String resolvePathToModule(String filePath, String basePackage) {
+        if (filePath == null) return null;
+        String normalized = filePath.replace('\\', '/');
+
+        // Java/Kotlin: src/main/java/com/scopesmith/service/Foo.java → "service"
+        if (normalized.contains("src/main/java/") || normalized.contains("src/main/kotlin/")) {
+            String after = normalized.contains("src/main/java/")
+                    ? normalized.substring(normalized.indexOf("src/main/java/") + 14)
+                    : normalized.substring(normalized.indexOf("src/main/kotlin/") + 16);
+            // Convert path to package: com/scopesmith/service/Foo.java → com.scopesmith.service
+            String[] parts = after.split("/");
+            if (parts.length >= 2) {
+                // Build package path (minus filename)
+                String pkg = String.join(".", Arrays.copyOf(parts, parts.length - 1));
+                if (basePackage != null && pkg.startsWith(basePackage + ".")) {
+                    String sub = pkg.substring(basePackage.length() + 1);
+                    int dot = sub.indexOf('.');
+                    return dot > 0 ? sub.substring(0, dot) : sub;
+                }
+            }
+            return null;
+        }
+
+        // JS/TS: src/components/auth/Login.tsx → "components"
+        if (normalized.startsWith("src/") && (normalized.endsWith(".ts") || normalized.endsWith(".tsx")
+                || normalized.endsWith(".js") || normalized.endsWith(".jsx"))) {
+            String after = normalized.substring(4);
+            String[] parts = after.split("/");
+            if (parts.length >= 2) {
+                return parts[0];
+            }
+        }
+
+        // Python: app/models/user.py → "models"
+        if (normalized.endsWith(".py")) {
+            String[] parts = normalized.split("/");
+            if (parts.length >= 2) {
+                return parts[parts.length - 2];
+            }
+        }
+
+        return null;
     }
 }

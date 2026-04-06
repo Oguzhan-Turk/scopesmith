@@ -7,6 +7,8 @@ import com.scopesmith.entity.OperationType;
 import com.scopesmith.entity.Requirement;
 import com.scopesmith.entity.Task;
 import com.scopesmith.repository.AnalysisRepository;
+import com.scopesmith.service.validation.AiResultValidationService;
+import com.scopesmith.service.validation.ValidationContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,7 @@ public class ChangeImpactService {
     private final RequirementService requirementService;
     private final AnalysisRepository analysisRepository;
     private final PromptLoader promptLoader;
+    private final AiResultValidationService validationService;
 
     /**
      * Compare the current requirement text against the latest analysis
@@ -65,6 +68,8 @@ public class ChangeImpactService {
         ChangeImpactResult result = aiService.chatWithStructuredOutput(
                 promptLoader.load("change-impact"), userMessage, ChangeImpactResult.class,
                 OperationType.CHANGE_IMPACT, requirement.getProject().getId());
+        result = validationService.validate(result,
+                ValidationContext.builder().projectId(requirement.getProject().getId()).build());
 
         log.info("Change impact analysis complete for requirement #{}", requirementId);
         return result;

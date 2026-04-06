@@ -1,7 +1,9 @@
 package com.scopesmith.dto;
 
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import lombok.Data;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -10,6 +12,7 @@ import java.util.List;
  * queried, compared, and displayed meaningfully.
  */
 @Data
+@JsonPropertyOrder({"techStack", "architecturePattern", "architectureDescription", "modules", "entities", "apiEndpoints", "externalIntegrations", "dependencies", "keyObservations"})
 public class ProjectContextResult {
 
     private TechStack techStack;
@@ -19,9 +22,11 @@ public class ProjectContextResult {
     private List<EntityInfo> entities;
     private List<String> apiEndpoints;
     private List<String> externalIntegrations;
+    private List<DependencyInfo> dependencies = new ArrayList<>();
     private List<String> keyObservations;
 
     @Data
+    @JsonPropertyOrder({"languages", "frameworks", "databases", "buildTools", "otherTools"})
     public static class TechStack {
         private List<String> languages;
         private List<String> frameworks;
@@ -31,12 +36,14 @@ public class ProjectContextResult {
     }
 
     @Data
+    @JsonPropertyOrder({"name", "description"})
     public static class ModuleInfo {
         private String name;
         private String description;
     }
 
     @Data
+    @JsonPropertyOrder({"name", "description", "relationships"})
     public static class EntityInfo {
         private String name;
         private String description;

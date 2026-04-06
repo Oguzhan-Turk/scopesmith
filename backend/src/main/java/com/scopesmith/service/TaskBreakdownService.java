@@ -1,19 +1,25 @@
 package com.scopesmith.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scopesmith.config.PromptLoader;
+import com.scopesmith.dto.ProjectContextResult;
 import com.scopesmith.dto.SpSuggestionResult;
 import com.scopesmith.dto.TaskBreakdownResult;
 import com.scopesmith.dto.TaskRefineResponse;
 import com.scopesmith.dto.TaskResponse;
+import com.scopesmith.util.StructuredContextFormatter;
 import com.scopesmith.entity.*;
 import com.scopesmith.repository.AnalysisRepository;
 import com.scopesmith.repository.TaskRepository;
+import com.scopesmith.service.validation.AiResultValidationService;
+import com.scopesmith.service.validation.ValidationContext;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.file.Path;
 import java.util.*;
 
 @Service
@@ -29,6 +35,7 @@ public class TaskBreakdownService {
     private final JiraService jiraService;
     private final GitHubService gitHubService;
     private final PromptLoader promptLoader;
+    private final AiResultValidationService validationService;
 
     private static final long MIN_TASKS_FOR_CALIBRATION = 20;
 
@@ -52,9 +59,10 @@ public class TaskBreakdownService {
             message.append("Description: ").append(task.getDescription()).append("\n");
         }
 
-        return aiService.chatWithStructuredOutput(
+        SpSuggestionResult result = aiService.chatWithStructuredOutput(
                 promptLoader.load("sp-suggestion"), message.toString(), SpSuggestionResult.class,
                 OperationType.SP_SUGGESTION, projectId, ModelTier.LIGHT);
+        return validationService.validate(result, ValidationContext.builder().projectId(projectId).build());
     }
 
     /**
@@ -70,6 +78,7 @@ public class TaskBreakdownService {
         TaskBreakdownResult result = aiService.chatWithStructuredOutput(
                 promptLoader.load("task-breakdown"), userMessage, TaskBreakdownResult.class,
                 OperationType.TASK_BREAKDOWN, projectId);
+        result = validationService.validate(result, ValidationContext.builder().projectId(projectId).build());
         log.info("Task breakdown complete for analysis #{}. {} tasks generated.",
                 analysisId, result.getTasks().size());
 
@@ -90,6 +99,7 @@ public class TaskBreakdownService {
         TaskBreakdownResult result = aiService.chatWithStructuredOutput(
                 promptLoader.load("task-breakdown-refine"), userMessage, TaskBreakdownResult.class,
                 OperationType.TASK_REFINEMENT, projectId);
+        result = validationService.validate(result, ValidationContext.builder().projectId(projectId).build());
         log.info("Task refinement complete for analysis #{}. {} tasks generated.", analysisId, result.getTasks().size());
 
         // Phase 3: Replace tasks (short tx)
@@ -187,8 +197,8 @@ public class TaskBreakdownService {
                     .acceptanceCriteria(item.getAcceptanceCriteria())
                     .spSuggestion(item.getSpSuggestion())
                     .spRationale(item.getSpRationale())
-                    .priority(parsePriority(item.getPriority()))
-                    .category(item.getCategory());
+                    .priority(item.getPriority())
+                    .category(item.getCategory() != null ? item.getCategory().name() : null);
 
             // Smart merge: match by previousTaskId first, fall back to title
             Task oldMatch = null;
@@ -267,8 +277,8 @@ public class TaskBreakdownService {
                     .acceptanceCriteria(item.getAcceptanceCriteria())
                     .spSuggestion(item.getSpSuggestion())
                     .spRationale(item.getSpRationale())
-                    .priority(parsePriority(item.getPriority()))
-                    .category(item.getCategory())
+                    .priority(item.getPriority())
+                    .category(item.getCategory() != null ? item.getCategory().name() : null)
                     .build();
 
             if (item.getDependsOn() != null && savedTasks.containsKey(item.getDependsOn())) {
@@ -293,6 +303,12 @@ public class TaskBreakdownService {
             message.append("## Project Context\n");
             message.append(techContext);
             message.append("\n\n");
+        }
+
+        // Structured context (modules, entities, tech stack, etc.)
+        String structuredSection = StructuredContextFormatter.format(requirement.getProject().getStructuredContext());
+        if (!structuredSection.isEmpty()) {
+            message.append(structuredSection);
         }
 
         // CLAUDE.md content
@@ -343,7 +359,34 @@ public class TaskBreakdownService {
         if (analysis.getAffectedModules() != null) {
             message.append("## Affected Modules\n");
             message.append(analysis.getAffectedModules());
-            message.append("\n\n");
+            message.append("\n");
+
+            // Enrich affected module names with descriptions from structured context
+            if (requirement.getProject().getStructuredContext() != null) {
+                try {
+                    var ctx = new ObjectMapper().readValue(
+                            requirement.getProject().getStructuredContext(), ProjectContextResult.class);
+                    if (ctx.getModules() != null) {
+                        List<String> affectedModules = List.of(analysis.getAffectedModules().split(",\\s*"));
+                        for (String affectedModule : affectedModules) {
+                            ctx.getModules().stream()
+                                    .filter(m -> m.getName() != null &&
+                                            (m.getName().toLowerCase(java.util.Locale.ENGLISH)
+                                                    .contains(affectedModule.toLowerCase(java.util.Locale.ENGLISH)) ||
+                                             affectedModule.toLowerCase(java.util.Locale.ENGLISH)
+                                                    .contains(m.getName().toLowerCase(java.util.Locale.ENGLISH))))
+                                    .findFirst()
+                                    .ifPresent(m -> {
+                                        if (m.getDescription() != null) {
+                                            message.append("  -> ").append(m.getName())
+                                                    .append(": ").append(m.getDescription()).append("\n");
+                                        }
+                                    });
+                        }
+                    }
+                } catch (Exception ignored) {}
+            }
+            message.append("\n");
 
             // Code intelligence — local regex parsing + git analysis (token-free)
             String projectPath = requirement.getProject().getLocalPath();
@@ -352,6 +395,17 @@ public class TaskBreakdownService {
                 String codeAnalysis = codeIntelligenceService.analyzeModules(projectPath, modules);
                 if (codeAnalysis != null) {
                     message.append(codeAnalysis).append("\n");
+                }
+
+                // Module dependency graph — cross-module import analysis (token-free)
+                try {
+                    Map<String, CodeIntelligenceService.ModuleMetrics> graph =
+                            codeIntelligenceService.analyzeModuleGraph(Path.of(projectPath));
+                    if (!graph.isEmpty()) {
+                        message.append(codeIntelligenceService.formatModuleGraph(graph));
+                    }
+                } catch (Exception e) {
+                    log.warn("Module graph analysis failed: {}", e.getMessage());
                 }
             }
         }
@@ -419,14 +473,6 @@ public class TaskBreakdownService {
         message.append("Break this down into development tasks with story point estimates.");
 
         return message.toString();
-    }
-
-    private TaskPriority parsePriority(String priority) {
-        try {
-            return TaskPriority.valueOf(priority.toUpperCase(java.util.Locale.ENGLISH));
-        } catch (Exception e) {
-            return TaskPriority.MEDIUM;
-        }
     }
 
     @Transactional(readOnly = true)
