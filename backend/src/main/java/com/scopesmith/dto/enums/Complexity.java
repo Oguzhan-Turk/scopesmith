@@ -1,17 +1,14 @@
-package com.scopesmith.entity;
+package com.scopesmith.dto.enums;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 
 import java.util.Locale;
 
-public enum TaskPriority {
-    LOW,
-    MEDIUM,
-    HIGH,
-    CRITICAL;
+public enum Complexity {
+    LOW, MEDIUM, HIGH;
 
     @JsonCreator
-    public static TaskPriority fromString(String value) {
+    public static Complexity fromString(String value) {
         if (value == null || value.isBlank()) return MEDIUM;
         try {
             return valueOf(value.toUpperCase(Locale.ENGLISH).trim());

@@ -11,6 +11,7 @@ import java.util.List;
 public interface QuestionRepository extends JpaRepository<Question, Long> {
     List<Question> findByAnalysisId(Long analysisId);
     List<Question> findByAnalysisIdAndStatus(Long analysisId, QuestionStatus status);
+    List<Question> findByAnalysis_Requirement_Id(Long requirementId);
 
     /**
      * Find answered questions for a project — used by InsightService to prevent re-asking.

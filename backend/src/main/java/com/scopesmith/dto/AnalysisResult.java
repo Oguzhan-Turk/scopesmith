@@ -1,5 +1,8 @@
 package com.scopesmith.dto;
 
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import com.scopesmith.dto.enums.QuestionType;
+import com.scopesmith.dto.enums.RiskLevel;
 import lombok.Data;
 
 import java.util.ArrayList;
@@ -11,6 +14,7 @@ import java.util.List;
  * when AI returns incomplete JSON.
  */
 @Data
+@JsonPropertyOrder({"structuredSummary", "ambiguities", "missingInfo", "contradictions", "assumptions", "questions", "affectedModules", "riskLevel", "riskReason"})
 public class AnalysisResult {
 
     private String structuredSummary;
@@ -20,14 +24,15 @@ public class AnalysisResult {
     private List<String> assumptions = new ArrayList<>();
     private List<QuestionItem> questions = new ArrayList<>();
     private List<String> affectedModules = new ArrayList<>();
-    private String riskLevel = "MEDIUM";
+    private RiskLevel riskLevel = RiskLevel.MEDIUM;
     private String riskReason;
 
     @Data
+    @JsonPropertyOrder({"question", "suggestedAnswer", "type", "options"})
     public static class QuestionItem {
         private String question;
         private String suggestedAnswer;
-        private String type = "OPEN"; // OPEN, SINGLE_CHOICE, MULTIPLE_CHOICE
+        private QuestionType type = QuestionType.OPEN;
         private List<String> options; // choices for SINGLE/MULTIPLE_CHOICE
     }
 }

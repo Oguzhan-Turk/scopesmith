@@ -1,6 +1,5 @@
 package com.scopesmith.service.impl;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scopesmith.config.ModelProperties;
 import com.scopesmith.entity.ModelTier;
 import com.scopesmith.entity.OperationType;
@@ -12,6 +11,7 @@ import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.metadata.Usage;
+import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -21,7 +21,6 @@ public class SpringAiService implements AiService {
 
     private final ChatClient.Builder chatClientBuilder;
     private final UsageTrackingService usageTrackingService;
-    private final ObjectMapper objectMapper;
     private final ModelProperties modelProperties;
 
     @Override
@@ -87,19 +86,19 @@ public class SpringAiService implements AiService {
         ModelTier effectiveTier = resolveEffectiveTier(operationType, modelTier);
         String modelName = modelProperties.getModelName(effectiveTier);
 
+        BeanOutputConverter<T> converter = new BeanOutputConverter<>(responseType);
+        String formatInstructions = converter.getFormat();
+        String enhancedSystemPrompt = systemPrompt + "\n\n" + formatInstructions;
+
         log.debug("AI structured request [{}] — model: {}, type: {}, system: {} chars, user: {} chars",
                 effectiveTier, modelName, responseType.getSimpleName(),
-                systemPrompt.length(), userMessage.length());
+                enhancedSystemPrompt.length(), userMessage.length());
 
         long startTime = System.currentTimeMillis();
 
-        String jsonSystemPrompt = systemPrompt + "\n\nIMPORTANT: Return your response as a valid JSON object only. " +
-                "Do not include any text, markdown, or explanation before or after the JSON. " +
-                "The JSON must match the structure of " + responseType.getSimpleName() + ".";
-
         ChatResponse chatResponse = chatClientBuilder.build()
                 .prompt()
-                .system(jsonSystemPrompt)
+                .system(enhancedSystemPrompt)
                 .user(userMessage)
                 .options(AnthropicChatOptions.builder().model(modelName).build())
                 .call()
@@ -113,8 +112,7 @@ public class SpringAiService implements AiService {
 
         String content = chatResponse.getResult().getOutput().getText();
         try {
-            String json = extractJson(content);
-            T entity = objectMapper.readValue(json, responseType);
+            T entity = converter.convert(content);
             log.debug("AI structured response [{}] — parsed to {}, {}ms",
                     effectiveTier, responseType.getSimpleName(), durationMs);
             return entity;
@@ -141,39 +139,6 @@ public class SpringAiService implements AiService {
         if (modelTier != null) return modelTier;
         if (operationType != null) return operationType.getDefaultTier();
         return ModelTier.STANDARD;
-    }
-
-    /**
-     * Extract JSON from AI response — handles markdown code blocks and leading text.
-     */
-    private String extractJson(String content) {
-        if (content == null) throw new RuntimeException("AI returned null response");
-        String text = content.trim();
-
-        if (text.contains("```")) {
-            int start = text.indexOf("```");
-            int contentStart = text.indexOf('\n', start);
-            int end = text.lastIndexOf("```");
-            if (contentStart > 0 && end > contentStart) {
-                text = text.substring(contentStart + 1, end).trim();
-            }
-        }
-
-        int braceIdx = text.indexOf('{');
-        int bracketIdx = text.indexOf('[');
-        int startIdx = -1;
-        if (braceIdx >= 0 && bracketIdx >= 0) startIdx = Math.min(braceIdx, bracketIdx);
-        else if (braceIdx >= 0) startIdx = braceIdx;
-        else if (bracketIdx >= 0) startIdx = bracketIdx;
-
-        if (startIdx > 0) text = text.substring(startIdx);
-
-        int lastBrace = text.lastIndexOf('}');
-        int lastBracket = text.lastIndexOf(']');
-        int endIdx = Math.max(lastBrace, lastBracket);
-        if (endIdx > 0 && endIdx < text.length() - 1) text = text.substring(0, endIdx + 1);
-
-        return text;
     }
 
     private void trackUsage(ChatResponse chatResponse, OperationType operationType,

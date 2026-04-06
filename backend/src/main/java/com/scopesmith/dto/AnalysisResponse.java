@@ -57,7 +57,7 @@ public class AnalysisResponse {
                 .requirementId(analysis.getRequirement().getId())
                 .structuredSummary(analysis.getStructuredSummary())
                 .assumptions(analysis.getAssumptions())
-                .riskLevel(analysis.getRiskLevel())
+                .riskLevel(analysis.getRiskLevel() != null ? analysis.getRiskLevel().name() : "MEDIUM")
                 .riskReason(analysis.getRiskReason())
                 .affectedModules(analysis.getAffectedModules())
                 .stakeholderSummary(analysis.getPoSummary())
