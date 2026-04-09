@@ -2,6 +2,7 @@ package com.scopesmith.service;
 
 import com.scopesmith.dto.ProjectRequest;
 import com.scopesmith.dto.ProjectResponse;
+import com.scopesmith.entity.AppUser;
 import com.scopesmith.entity.Project;
 import com.scopesmith.entity.ProjectRole;
 import com.scopesmith.repository.ProjectMembershipRepository;
@@ -31,23 +32,26 @@ public class ProjectService {
 
     @Transactional
     public ProjectResponse create(ProjectRequest request) {
+        AppUser currentUser = accessService.getCurrentUser()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+
         Project project = Project.builder()
                 .name(request.getName())
                 .description(request.getDescription())
                 .repoUrl(request.getRepoUrl())
+                .organization(currentUser.getOrganization())
                 .build();
 
         Project saved = projectRepository.save(project);
 
         // Auto-assign OWNER to creator
-        accessService.getCurrentUser().ifPresent(user ->
-                accessService.addMembership(user.getId(), saved.getId(), ProjectRole.OWNER));
+        accessService.addMembership(currentUser.getId(), saved.getId(), ProjectRole.OWNER);
 
         return ProjectResponse.from(saved);
     }
 
     /**
-     * List projects — admin sees all, users see only their projects.
+     * List projects — admin sees all, users see only their org's projects (filtered by membership).
      */
     @Transactional(readOnly = true)
     public List<ProjectResponse> findAll() {
@@ -55,7 +59,7 @@ public class ProjectService {
 
         List<Project> projects;
         if (accessibleIds == null) {
-            // Admin — all projects
+            // Admin — all projects across all organizations
             projects = projectRepository.findAll();
         } else if (accessibleIds.isEmpty()) {
             return List.of();

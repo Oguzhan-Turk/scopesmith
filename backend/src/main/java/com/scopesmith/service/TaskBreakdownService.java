@@ -67,16 +67,19 @@ public class TaskBreakdownService {
 
     /**
      * Generate tasks from analysis. AI call is outside the transaction.
+     * Bug requirements use a dedicated single-card prompt.
      */
     public List<TaskResponse> generateTasks(Long analysisId) {
         // Phase 1: Read + validate (short tx)
         String userMessage = readTaskBreakdownData(analysisId);
         Long projectId = getProjectId(analysisId);
+        RequirementType reqType = getRequirementType(analysisId);
 
         // Phase 2: AI call (no tx — no DB connection held)
-        log.info("Generating task breakdown for analysis #{}", analysisId);
+        String promptName = reqType == RequirementType.BUG ? "task-breakdown-bug" : "task-breakdown";
+        log.info("Generating {} task breakdown for analysis #{}", reqType, analysisId);
         TaskBreakdownResult result = aiService.chatWithStructuredOutput(
-                promptLoader.load("task-breakdown"), userMessage, TaskBreakdownResult.class,
+                promptLoader.load(promptName), userMessage, TaskBreakdownResult.class,
                 OperationType.TASK_BREAKDOWN, projectId);
         result = validationService.validate(result, ValidationContext.builder().projectId(projectId).build());
         log.info("Task breakdown complete for analysis #{}. {} tasks generated.",
@@ -478,6 +481,11 @@ public class TaskBreakdownService {
     @Transactional(readOnly = true)
     protected Long getProjectId(Long analysisId) {
         return findAnalysis(analysisId).getRequirement().getProject().getId();
+    }
+
+    @Transactional(readOnly = true)
+    protected RequirementType getRequirementType(Long analysisId) {
+        return findAnalysis(analysisId).getRequirement().getType();
     }
 
     private Analysis findAnalysis(Long analysisId) {

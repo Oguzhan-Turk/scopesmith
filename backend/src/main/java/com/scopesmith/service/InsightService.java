@@ -33,6 +33,7 @@ public class InsightService {
 
     private final AnalysisRepository analysisRepository;
     private final QuestionRepository questionRepository;
+    private final EmbeddingService embeddingService;
 
     private static final int STALENESS_THRESHOLD_DAYS = 7;
     private static final int MAX_ANSWERED_QUESTIONS = 15;
@@ -40,10 +41,23 @@ public class InsightService {
 
     /**
      * Build the complete intelligence insights section for prompt injection.
-     * Returns null if no insights are available (new project, no history).
+     * Accepts full Requirement to enable semantic similarity (embedding-based).
+     */
+    @Transactional(readOnly = true)
+    public String buildInsightsSection(Requirement requirement) {
+        return buildInsightsSection(requirement.getProject(), requirement.getType(), requirement);
+    }
+
+    /**
+     * Backward-compatible overload (used by reAnalyze, refine paths without embedding context).
      */
     @Transactional(readOnly = true)
     public String buildInsightsSection(Project project, RequirementType currentType) {
+        return buildInsightsSection(project, currentType, null);
+    }
+
+    @Transactional(readOnly = true)
+    private String buildInsightsSection(Project project, RequirementType currentType, Requirement requirement) {
         StringBuilder insights = new StringBuilder();
         boolean hasContent = false;
 
@@ -54,21 +68,30 @@ public class InsightService {
             hasContent = true;
         }
 
-        // 2. Pattern Detection
+        // 2. Semantic Similarity (Organizational Memory — requires OPENAI_API_KEY)
+        if (requirement != null) {
+            String semantic = buildSemanticSimilaritySection(requirement);
+            if (semantic != null) {
+                insights.append(semantic);
+                hasContent = true;
+            }
+        }
+
+        // 3. Pattern Detection
         String patterns = buildPatternInsight(project.getId());
         if (patterns != null) {
             insights.append(patterns);
             hasContent = true;
         }
 
-        // 3. Previously Answered Questions
+        // 4. Previously Answered Questions
         String questions = buildAnsweredQuestionsInsight(project.getId());
         if (questions != null) {
             insights.append(questions);
             hasContent = true;
         }
 
-        // 4. Cross-Project Learning
+        // 5. Cross-Project Learning
         String crossProject = buildCrossProjectInsight(project.getId(), currentType);
         if (crossProject != null) {
             insights.append(crossProject);
@@ -118,6 +141,33 @@ public class InsightService {
     ) {}
 
     // === Private builders ===
+
+    private String buildSemanticSimilaritySection(Requirement requirement) {
+        if (!embeddingService.isEnabled()) return null;
+
+        var similar = embeddingService.findSimilar(
+                requirement.getProject().getId(),
+                requirement.getId(),
+                requirement.getRawText()
+        );
+        if (similar.isEmpty()) return null;
+
+        log.info("Found {} semantically similar requirements for req #{}", similar.size(), requirement.getId());
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("### Benzer Geçmiş Talepler (Semantic Similarity)\n");
+        sb.append("Aşağıdaki benzer talepler daha önce analiz edildi. Bunlara dayanarak kalıpları, riskleri ve sık sorulan soruları tahmin edebilirsin:\n\n");
+
+        for (var s : similar) {
+            sb.append(String.format("**Benzerlik: %.0f%%**\n", s.similarity() * 100));
+            sb.append(String.format("- Talep: %s\n", truncate(s.rawText(), 120)));
+            if (s.summary() != null) sb.append(String.format("- Özet: %s\n", truncate(s.summary(), 150)));
+            if (s.riskLevel() != null) sb.append(String.format("- Risk: %s\n", s.riskLevel()));
+            if (s.affectedModules() != null) sb.append(String.format("- Modüller: %s\n", s.affectedModules()));
+            sb.append("\n");
+        }
+        return sb.toString();
+    }
 
     private String buildStalenessInsight(Project project) {
         if (project.getLastScannedAt() == null) return null;

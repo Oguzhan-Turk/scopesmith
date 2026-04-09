@@ -28,6 +28,8 @@ public class ProjectResponse {
     private Integer commitsBehind;
     private boolean contextStale;
     private String stalenessWarning;
+    private Long organizationId;
+    private String organizationName;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -50,6 +52,8 @@ public class ProjectResponse {
                 .requirementCount(project.getRequirements().size())
                 .documentCount(project.getDocuments().size())
                 .integrationConfig(project.getIntegrationConfig())
+                .organizationId(project.getOrganization() != null ? project.getOrganization().getId() : null)
+                .organizationName(project.getOrganization() != null ? project.getOrganization().getName() : null)
                 .createdAt(project.getCreatedAt())
                 .updatedAt(project.getUpdatedAt());
 

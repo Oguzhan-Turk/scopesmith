@@ -16,6 +16,9 @@ Controller → Service → Repository → Entity (Layered)
 - **AiService interface** — provider-agnostic (Spring AI üzerinden)
 - **PromptLoader** — DB-first, classpath-fallback (runtime düzenlenebilir)
 - **BeanOutputConverter** — Spring AI JSON schema structured output
+- **Multi-tenancy Seviye 1:** Organization entity, `app_users` ve `projects` tablosunda `organization_id` FK. Proje oluşturma otomatik org atar
+- **Organizational Memory:** pgvector (`pgvector/pgvector:pg17` Docker image), `requirement_embeddings` tablosu, OpenAI text-embedding-3-small (1536 dim). `OPENAI_API_KEY` yoksa graceful degrade (embedding skip edilir)
+- **Managed Agent (altyapı hazır, UX askıda):** Feature flag (`MANAGED_AGENT_ENABLED=false` default). `ManagedAgentService` interface → `CliAgentService`. Backend endpoint'leri var, frontend tetikleme butonu yok (ADR-007). Entity: `agentSessionId/agentStatus/agentBranch`
 
 ## Çalıştırma
 ```bash
@@ -28,9 +31,9 @@ Backend: http://localhost:8080 | Frontend: http://localhost:5173 | Users: admin/
 ## Kritik Kurallar
 - `toLowerCase()` → **mutlaka** `Locale.ENGLISH` (Türkçe locale bug: LIGHT → lıght)
 - Prompt'lar İngilizce, AI çıktısı Türkçe (ADR-004)
-- `ddl-auto: update` — migration yok
+- **Flyway migration:** `ddl-auto: validate`, schema `db/migration/V*.sql` ile yönetilir. Yeni tablo/kolon → yeni migration dosyası
 - Credential'lar DB'de AES şifreli, frontend'e masked
-- `usage_records.operation_type` check constraint'i yeni OperationType'ta manuel güncelle
+- `usage_records.operation_type` check constraint'i yeni OperationType'ta migration ile güncelle
 - Upload URL: `uploadDocument` API_BASE kullanır (`/api/v1/...` değil)
 - Backend başlatma: `grep '^ANTHROPIC_API_KEY'` kullan (`cat .env | cut -d= -f2` hatalı)
 

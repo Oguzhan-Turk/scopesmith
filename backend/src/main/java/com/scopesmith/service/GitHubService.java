@@ -48,7 +48,7 @@ public class GitHubService {
     );
 
     @Transactional
-    public Map<String, Object> syncTasksToGitHub(Long analysisId, String repo) {
+    public Map<String, Object> syncTasksToGitHub(Long analysisId, String repo, List<Long> taskIds) {
         if (!gitHubConfig.isConfigured()) {
             throw new IllegalStateException("GitHub is not configured. Set GITHUB_TOKEN and GITHUB_REPO.");
         }
@@ -56,9 +56,17 @@ public class GitHubService {
         Analysis analysis = analysisRepository.findById(analysisId)
                 .orElseThrow(() -> new EntityNotFoundException("Analysis not found: " + analysisId));
 
-        List<Task> tasks = taskRepository.findByAnalysisId(analysisId);
+        List<Task> allTasks = taskRepository.findByAnalysisId(analysisId);
+        // Filter: only SP-approved tasks. If taskIds specified, further restrict to those.
+        java.util.Set<Long> requestedIds = taskIds != null && !taskIds.isEmpty()
+                ? new java.util.HashSet<>(taskIds) : null;
+        List<Task> tasks = allTasks.stream()
+                .filter(t -> t.getSpFinal() != null)
+                .filter(t -> requestedIds == null || requestedIds.contains(t.getId()))
+                .toList();
         if (tasks.isEmpty()) {
-            throw new IllegalStateException("No tasks to sync for analysis #" + analysisId);
+            throw new IllegalStateException("No SP-approved tasks to sync for analysis #" + analysisId
+                    + ". Approve story points before syncing.");
         }
 
         // Resolve config: request param → project integration config → server config (.env)

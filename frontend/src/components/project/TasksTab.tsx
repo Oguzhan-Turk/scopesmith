@@ -100,7 +100,7 @@ function IntegrationMenu({
                   disabled={allSynced || !!actionLoading}
                   onClick={() =>
                     askConfirm(
-                      `${unsyncedCount} task Jira'ya gönderilecek. Devam edilsin mi?`,
+                      `SP onaylı ${unsyncedCount} task Jira'ya gönderilecek. Devam edilsin mi?`,
                       handleSyncJira,
                     )
                   }
@@ -117,7 +117,7 @@ function IntegrationMenu({
                   disabled={allSynced || !!actionLoading}
                   onClick={() =>
                     askConfirm(
-                      `${unsyncedCount} task GitHub'a gönderilecek. Devam edilsin mi?`,
+                      `SP onaylı ${unsyncedCount} task GitHub'a gönderilecek. Devam edilsin mi?`,
                       handleSyncGitHub,
                     )
                   }
@@ -237,8 +237,10 @@ export default function TasksTab({
   };
 
   const syncedCount = tasks.filter((t) => t.jiraKey).length;
-  const unsyncedCount = tasks.length - syncedCount;
-  const allSynced = unsyncedCount === 0;
+  // SP-approved and not yet synced — these are eligible for bulk sync
+  const spApprovedUnsyncedCount = tasks.filter((t) => !t.jiraKey && t.spFinal != null).length;
+  const unsyncedCount = spApprovedUnsyncedCount;
+  const allSynced = spApprovedUnsyncedCount === 0;
 
   return (
     <div className="space-y-4">
@@ -362,15 +364,15 @@ export default function TasksTab({
 
                       {/* Actions */}
                       <div className="flex items-center gap-0.5 opacity-0 group-hover/card:opacity-100 transition-opacity">
-                        {!task.jiraKey && isAdmin && (integrationConfig.jira?.projectKey || integrationConfig.github?.repo) && (
+                        {!task.jiraKey && task.spFinal != null && isAdmin && (integrationConfig.jira?.projectKey || integrationConfig.github?.repo) && (
                           <button
                             onClick={async () => {
                               setActionLoading(`sync-${task.id}`);
                               try {
                                 if (integrationConfig.jira?.projectKey) {
-                                  await syncToJira(selectedAnalysis!.id, integrationConfig.jira.projectKey);
+                                  await syncToJira(selectedAnalysis!.id, integrationConfig.jira.projectKey, undefined, [task.id]);
                                 } else if (integrationConfig.github?.repo) {
-                                  await syncToGitHub(selectedAnalysis!.id, integrationConfig.github.repo);
+                                  await syncToGitHub(selectedAnalysis!.id, integrationConfig.github.repo, [task.id]);
                                 }
                                 await loadTasks(selectedAnalysis!.id);
                                 showToast("Gönderildi.", "success");
@@ -509,7 +511,7 @@ export default function TasksTab({
                         </div>
                       )}
                     </div>
-                    <div className="flex gap-2 pt-1">
+                    <div className="flex flex-wrap gap-2 pt-1">
                       <Button
                         size="sm"
                         variant="outline"
@@ -524,6 +526,11 @@ export default function TasksTab({
                       >
                         <Copy className="w-3.5 h-3.5 mr-1.5" />Claude Code Kopyala
                       </Button>
+                      {task.agentBranch && task.agentStatus === "COMPLETED" && (
+                        <Badge variant="outline" className="text-xs font-mono">
+                          {task.agentBranch}
+                        </Badge>
+                      )}
                     </div>
                   </CardContent>
                 )}

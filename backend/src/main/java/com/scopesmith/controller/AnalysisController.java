@@ -126,18 +126,24 @@ public class AnalysisController {
     @PostMapping("/{id}/sync/jira")
     public Map<String, Object> syncToJira(
             @PathVariable Long id,
-            @RequestBody(required = false) Map<String, String> request) {
-        String projectKey = request != null ? request.get("projectKey") : null;
-        String issueType = request != null ? request.get("issueType") : null;
-        return jiraService.syncTasksToJira(id, projectKey, issueType != null ? issueType : "Task");
+            @RequestBody(required = false) Map<String, Object> request) {
+        String projectKey = request != null ? (String) request.get("projectKey") : null;
+        String issueType = request != null ? (String) request.get("issueType") : null;
+        @SuppressWarnings("unchecked")
+        java.util.List<Long> taskIds = request != null && request.get("taskIds") instanceof java.util.List<?> raw
+                ? ((java.util.List<?>) raw).stream().map(v -> ((Number) v).longValue()).toList() : null;
+        return jiraService.syncTasksToJira(id, projectKey, issueType != null ? issueType : "Task", taskIds);
     }
 
     @PostMapping("/{id}/sync/github")
     public Map<String, Object> syncToGitHub(
             @PathVariable Long id,
-            @RequestBody(required = false) Map<String, String> request) {
-        String repo = request != null ? request.get("repo") : null;
-        return gitHubService.syncTasksToGitHub(id, repo);
+            @RequestBody(required = false) Map<String, Object> request) {
+        String repo = request != null ? (String) request.get("repo") : null;
+        @SuppressWarnings("unchecked")
+        java.util.List<Long> taskIds = request != null && request.get("taskIds") instanceof java.util.List<?> raw
+                ? ((java.util.List<?>) raw).stream().map(v -> ((Number) v).longValue()).toList() : null;
+        return gitHubService.syncTasksToGitHub(id, repo, taskIds);
     }
 
     @PostMapping("/{id}/sync/verify")

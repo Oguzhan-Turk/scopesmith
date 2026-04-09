@@ -94,6 +94,10 @@ public class Project {
     @Builder.Default
     private Integer contextVersion = 0;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "organization_id", nullable = false)
+    private Organization organization;
+
     @Builder.Default
     @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Requirement> requirements = new ArrayList<>();

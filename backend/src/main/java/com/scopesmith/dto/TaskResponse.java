@@ -23,6 +23,9 @@ public class TaskResponse {
     private String category;
     private String dependencyTitle;
     private String jiraKey;
+    private String agentSessionId;
+    private String agentStatus;
+    private String agentBranch;
     private LocalDateTime createdAt;
 
     public static TaskResponse from(Task task) {
@@ -40,6 +43,9 @@ public class TaskResponse {
                 .category(task.getCategory())
                 .dependencyTitle(task.getDependency() != null ? task.getDependency().getTitle() : null)
                 .jiraKey(task.getJiraKey())
+                .agentSessionId(task.getAgentSessionId())
+                .agentStatus(task.getAgentStatus())
+                .agentBranch(task.getAgentBranch())
                 .createdAt(task.getCreatedAt())
                 .build();
     }

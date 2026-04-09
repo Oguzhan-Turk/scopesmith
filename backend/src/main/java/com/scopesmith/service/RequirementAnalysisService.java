@@ -29,6 +29,7 @@ public class RequirementAnalysisService {
     private final AnalysisRepository analysisRepository;
     private final DocumentService documentService;
     private final InsightService insightService;
+    private final EmbeddingService embeddingService;
     private final PromptLoader promptLoader;
     private final AiResultValidationService validationService;
     private final QuestionDeduplicationService questionDeduplicationService;
@@ -110,6 +111,10 @@ public class RequirementAnalysisService {
         );
 
         analysisRepository.save(savedAnalysis);
+
+        // Trigger rich embedding async (outside transaction context)
+        embeddingService.embedRequirementRich(requirement.getId(), savedAnalysis.getId());
+
         return savedAnalysis;
     }
 
@@ -284,8 +289,7 @@ public class RequirementAnalysisService {
         }
 
         // Add intelligence insights (Layer 3 — Project Intelligence Insights)
-        String insights = insightService.buildInsightsSection(
-                requirement.getProject(), requirement.getType());
+        String insights = insightService.buildInsightsSection(requirement);
         if (insights != null) {
             message.append(insights);
             message.append("\n");

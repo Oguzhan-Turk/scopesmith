@@ -80,6 +80,11 @@ public class Task {
      */
     private String jiraKey;
 
+    // Managed Agent fields (preview — feature flag controlled)
+    private String agentSessionId;
+    private String agentStatus;
+    private String agentBranch;
+
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;

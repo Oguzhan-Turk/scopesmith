@@ -19,6 +19,7 @@ public class RequirementService {
 
     private final RequirementRepository requirementRepository;
     private final ProjectService projectService;
+    private final EmbeddingService embeddingService;
 
     @Transactional
     public RequirementResponse create(Long projectId, RequirementRequest request) {
@@ -34,7 +35,9 @@ public class RequirementService {
                 .sequenceNumber(nextSeq)
                 .build();
 
-        return RequirementResponse.from(requirementRepository.save(requirement));
+        Requirement saved = requirementRepository.save(requirement);
+        embeddingService.embedRequirement(saved.getId());
+        return RequirementResponse.from(saved);
     }
 
     @Transactional(readOnly = true)

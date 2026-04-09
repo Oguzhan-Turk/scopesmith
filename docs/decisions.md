@@ -188,3 +188,36 @@ stale context, results will be inaccurate and users will lose trust.
 - MVP: zero extra effort, durationMs is one field, high presentation impact
 - Full billing: requires Spring AI token usage extraction, aggregation logic, dedicated UI — not worth the effort in 15-day sprint
 - "This analysis cost $0.45 and took 12 seconds" is a killer demo line
+
+## ADR-007: Managed Agent — Altyapı Hazır, UX Askıda
+**Date:** 2026-04-10
+**Status:** Draft — derinleştirme gerekli
+
+**Durum:** Backend altyapısı implement edildi (entity alanları, ManagedAgentService interface, CliAgentService, feature flag). Frontend'de tetikleme butonu **bilinçli olarak eklenmedi**.
+
+**Neden askıda:**
+ScopeSmith = analiz + planlama aracı. Agent execution = implementation aşaması. Bu iki sorumluluk farklı yerlere ait. "Agent Başlat" butonunu task kartına koymak, planlama arayüzüne execution sorumluluğu yüklüyor.
+
+**Cevaplanması gereken sorular:**
+1. **Kim tetikler?** Kullanıcı ScopeSmith'ten mi, Jira transition hook mu, CI/CD pipeline mı, CLI komut mu?
+2. **Workflow nedir?** Task → Jira sync → "In Progress" → agent tetiklenir → PR açılır → review → merge? Yoksa ScopeSmith'ten direkt mi?
+3. **Agent çıktısını kim review eder?** Otomatik PR → human review? Yoksa agent kendi merge mi eder?
+4. **Güvenlik sınırı:** Hangi repo'da, hangi branch'te, hangi izinlerle çalışır? Sandbox mu, production repo mu?
+5. **Başarısızlık durumu:** Agent başarısız olursa ne olur? Retry? Farklı strateji? Manuel devralma?
+6. **Maliyet kontrolü:** Agent 30dk Claude API kullanabilir. Rate limit, budget cap, abort mekanizması?
+7. **Multi-tenancy:** Farklı org'ların agent'ları birbirinden nasıl izole edilir?
+
+**Mevcut altyapı (feature flag arkasında, `MANAGED_AGENT_ENABLED=false`):**
+- `Task` entity: `agentSessionId`, `agentStatus`, `agentBranch`
+- `ManagedAgentService` interface → `CliAgentService` (ProcessBuilder + `claude` CLI)
+- `ManagedAgentConfig` (`@ConditionalOnProperty`)
+- `agentExecutor` async thread pool
+- Controller endpoints: `POST /tasks/{id}/agent/start`, `GET /tasks/{id}/agent/status`, `POST /tasks/{id}/agent/cancel`
+- Frontend API fonksiyonları hazır (`startManagedAgent`, `getManagedAgentStatus`), UI'da kullanılmıyor
+
+**Dönüşüm planı (altyapı hazır):**
+- CLI-based (on-prem): `CliAgentService` — ProcessBuilder ile `claude` CLI
+- Cloud-based (SaaS): `CloudAgentService` — Anthropic Managed Agents API
+- Aynı interface, config ile seçim
+
+**Sunum notu:** "Altyapıyı hazırladık, interface'i tanımladık, ama UX kararını production data ve kullanıcı geri bildirimiyle vereceğiz. Bilinçli bir 'implement etmeme' kararı."

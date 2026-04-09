@@ -183,6 +183,14 @@ export const suggestSp = (taskId: number) =>
   request<{ spSuggestion: number; spRationale: string }>(`/tasks/${taskId}/suggest-sp`, { method: "POST" });
 export const getClaudeCodePrompt = (taskId: number) =>
   request<{ prompt: string }>(`/tasks/${taskId}/claude-code-prompt`);
+
+// Managed Agent
+export interface AgentStartResult { sessionId: string | null; status: string; branch: string; }
+export interface AgentStatusResult { sessionId: string | null; status: string; branch: string | null; error: string | null; }
+export const startManagedAgent = (taskId: number) =>
+  request<AgentStartResult>(`/tasks/${taskId}/agent/start`, { method: "POST" });
+export const getManagedAgentStatus = (taskId: number) =>
+  request<AgentStatusResult>(`/tasks/${taskId}/agent/status`);
 export const refineAnalysis = (analysisId: number, instruction: string) =>
   request<Analysis>(`/analyses/${analysisId}/refine`, {
     method: "POST",
@@ -242,10 +250,10 @@ export const refineStakeholderSummary = (analysisId: number, instruction: string
   });
 
 // GitHub Sync
-export const syncToGitHub = (analysisId: number, repo?: string) =>
+export const syncToGitHub = (analysisId: number, repo?: string, taskIds?: number[]) =>
   request<GitHubSyncResult>(`/analyses/${analysisId}/sync/github`, {
     method: "POST",
-    body: JSON.stringify({ repo }),
+    body: JSON.stringify({ repo, taskIds }),
   });
 
 export interface GitHubSyncResult {
@@ -257,10 +265,10 @@ export interface GitHubSyncResult {
 }
 
 // Jira Sync
-export const syncToJira = (analysisId: number, projectKey?: string, issueType?: string) =>
+export const syncToJira = (analysisId: number, projectKey?: string, issueType?: string, taskIds?: number[]) =>
   request<JiraSyncResult>(`/analyses/${analysisId}/sync/jira`, {
     method: "POST",
-    body: JSON.stringify({ projectKey, issueType }),
+    body: JSON.stringify({ projectKey, issueType, taskIds }),
   });
 
 export interface JiraSyncResult {
@@ -370,6 +378,8 @@ export interface Project {
   commitsBehind: number | null;
   contextStale: boolean;
   stalenessWarning: string | null;
+  organizationId: number | null;
+  organizationName: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -439,6 +449,9 @@ export interface Task {
   category: string | null;
   dependencyTitle: string | null;
   jiraKey: string | null;
+  agentSessionId: string | null;
+  agentStatus: string | null;
+  agentBranch: string | null;
   createdAt: string;
 }
 

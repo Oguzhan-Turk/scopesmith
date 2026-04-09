@@ -1,17 +1,18 @@
 package com.scopesmith.controller;
 
-import com.scopesmith.dto.SpDecisionRequest;
-import com.scopesmith.dto.SpSuggestionResult;
-import com.scopesmith.dto.TaskResponse;
-import com.scopesmith.dto.TaskUpdateRequest;
+import com.scopesmith.dto.*;
 import com.scopesmith.entity.Task;
 import com.scopesmith.repository.TaskRepository;
 import com.scopesmith.service.ClaudeCodeService;
+import com.scopesmith.service.ManagedAgentService;
 import com.scopesmith.service.TaskBreakdownService;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/v1/tasks")
@@ -21,6 +22,9 @@ public class TaskController {
     private final TaskRepository taskRepository;
     private final TaskBreakdownService taskBreakdownService;
     private final ClaudeCodeService claudeCodeService;
+
+    @Autowired(required = false)
+    private ManagedAgentService managedAgentService;
 
     /**
      * Update task fields — partial update, only non-null fields applied.
@@ -90,5 +94,32 @@ public class TaskController {
     public java.util.Map<String, String> getClaudeCodePrompt(@PathVariable Long id) {
         String prompt = claudeCodeService.buildPrompt(id);
         return java.util.Map.of("prompt", prompt);
+    }
+
+    // === Managed Agent endpoints (feature flag controlled) ===
+
+    @PostMapping("/{id}/agent/start")
+    public AgentStartResult startAgent(@PathVariable Long id) {
+        requireAgentEnabled();
+        return managedAgentService.startAgent(id);
+    }
+
+    @GetMapping("/{id}/agent/status")
+    public AgentStatusResult getAgentStatus(@PathVariable Long id) {
+        requireAgentEnabled();
+        return managedAgentService.getStatus(id);
+    }
+
+    @PostMapping("/{id}/agent/cancel")
+    public void cancelAgent(@PathVariable Long id) {
+        requireAgentEnabled();
+        managedAgentService.cancelAgent(id);
+    }
+
+    private void requireAgentEnabled() {
+        if (managedAgentService == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Managed Agent is not enabled. Set MANAGED_AGENT_ENABLED=true to activate.");
+        }
     }
 }

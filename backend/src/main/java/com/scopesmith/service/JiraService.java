@@ -53,7 +53,8 @@ public class JiraService {
      * Returns a map with created issue keys.
      */
     @Transactional
-    public Map<String, Object> syncTasksToJira(Long analysisId, String projectKey, String issueType) {
+    public Map<String, Object> syncTasksToJira(Long analysisId, String projectKey, String issueType,
+                                                List<Long> taskIds) {
         if (!jiraConfig.isConfigured()) {
             throw new IllegalStateException("Jira is not configured. Set JIRA_URL, JIRA_EMAIL, and JIRA_API_TOKEN.");
         }
@@ -61,9 +62,17 @@ public class JiraService {
         Analysis analysis = analysisRepository.findById(analysisId)
                 .orElseThrow(() -> new EntityNotFoundException("Analysis not found: " + analysisId));
 
-        List<Task> tasks = taskRepository.findByAnalysisId(analysisId);
+        List<Task> allTasks = taskRepository.findByAnalysisId(analysisId);
+        // Filter: only SP-approved tasks. If taskIds specified, further restrict to those.
+        java.util.Set<Long> requestedIds = taskIds != null && !taskIds.isEmpty()
+                ? new java.util.HashSet<>(taskIds) : null;
+        List<Task> tasks = allTasks.stream()
+                .filter(t -> t.getSpFinal() != null)
+                .filter(t -> requestedIds == null || requestedIds.contains(t.getId()))
+                .toList();
         if (tasks.isEmpty()) {
-            throw new IllegalStateException("No tasks to sync for analysis #" + analysisId);
+            throw new IllegalStateException("No SP-approved tasks to sync for analysis #" + analysisId
+                    + ". Approve story points before syncing.");
         }
 
         // Resolve config: request param → project integration config → server config (.env)
@@ -235,6 +244,30 @@ public class JiraService {
         // Dependency
         if (task.getDependency() != null) {
             content.add(adfParagraph("Bağımlılık: \"" + task.getDependency().getTitle() + "\""));
+        }
+
+        // Affected modules (from analysis)
+        String affectedModules = task.getAnalysis().getAffectedModules();
+        if (affectedModules != null && !affectedModules.isBlank()) {
+            content.add(adfHeading("Etkilenen Modüller"));
+            content.add(adfParagraph(affectedModules));
+        }
+
+        // Sibling tasks — other tasks in the same analysis
+        List<Task> siblings = task.getAnalysis().getTasks().stream()
+                .filter(t -> !t.getId().equals(task.getId()))
+                .toList();
+        if (!siblings.isEmpty()) {
+            content.add(adfHeading("Bu Gereksinim Kapsamındaki Diğer Task'lar"));
+            StringBuilder sibText = new StringBuilder();
+            for (Task s : siblings) {
+                Integer sSp = s.getSpFinal() != null ? s.getSpFinal() : s.getSpSuggestion();
+                sibText.append("• ").append(s.getTitle());
+                if (sSp != null) sibText.append(" (").append(sSp).append(" SP)");
+                if (s.getJiraKey() != null) sibText.append(" → ").append(s.getJiraKey());
+                sibText.append("\n");
+            }
+            content.add(adfParagraph(sibText.toString().trim()));
         }
 
         return Map.of(

@@ -10,20 +10,36 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
 
+  flyway:
+    baseline-on-migrate: true
+    baseline-version: 0
+
   ai:
+    model:
+      chat: anthropic
     anthropic:
       api-key: ${ANTHROPIC_API_KEY}
       chat:
         options:
           model: claude-sonnet-4-20250514
           max-tokens: 4096
+    openai:
+      api-key: ${OPENAI_API_KEY:NO_OPENAI_KEY}
+      embedding:
+        options:
+          model: text-embedding-3-small
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
 
 github:
   token: ${GITHUB_TOKEN:}
@@ -51,10 +67,8 @@ scopesmith:
       input-per-million: 5.00
       output-per-million: 25.00
 
-  servlet:
-    multipart:
-      max-file-size: 10MB
-      max-request-size: 10MB
+  features:
+    managed-agent-enabled: ${MANAGED_AGENT_ENABLED:false}
 
 server:
   port: 8080

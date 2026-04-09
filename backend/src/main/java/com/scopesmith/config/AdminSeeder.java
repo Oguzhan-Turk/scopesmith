@@ -1,17 +1,16 @@
 package com.scopesmith.config;
 
-import com.scopesmith.entity.AppUser;
+import com.scopesmith.entity.Organization;
 import com.scopesmith.entity.ProjectMembership;
 import com.scopesmith.entity.ProjectRole;
-import com.scopesmith.entity.Role;
 import com.scopesmith.repository.AppUserRepository;
+import com.scopesmith.repository.OrganizationRepository;
 import com.scopesmith.repository.ProjectMembershipRepository;
 import com.scopesmith.repository.ProjectRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -22,34 +21,34 @@ public class AdminSeeder implements ApplicationRunner {
     private final AppUserRepository appUserRepository;
     private final ProjectRepository projectRepository;
     private final ProjectMembershipRepository membershipRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final OrganizationRepository organizationRepository;
 
     @Override
     public void run(ApplicationArguments args) {
-        if (appUserRepository.findByUsername("admin").isEmpty()) {
-            AppUser admin = AppUser.builder()
-                    .username("admin")
-                    .passwordHash(passwordEncoder.encode("admin123"))
-                    .role(Role.ADMIN)
-                    .build();
-            appUserRepository.save(admin);
-            log.info("Default admin user created (admin/admin123)");
-        }
+        // User + org creation is handled by Flyway (V2 + V3)
 
-        if (appUserRepository.findByUsername("user").isEmpty()) {
-            AppUser user = AppUser.builder()
-                    .username("user")
-                    .passwordHash(passwordEncoder.encode("user123"))
-                    .role(Role.USER)
-                    .build();
-            appUserRepository.save(user);
-            log.info("Default user created (user/user123)");
-        }
+        // Ensure default org exists (runtime safety for edge cases)
+        Organization defaultOrg = organizationRepository.findBySlug("default")
+                .orElseGet(() -> {
+                    log.warn("Default organization missing — creating");
+                    return organizationRepository.save(Organization.builder()
+                            .name("Default")
+                            .slug("default")
+                            .build());
+                });
 
-        // Ensure all existing projects have at least one membership (migration safety)
+        // Assign orphan users (no org) to default org
+        appUserRepository.findAll().stream()
+                .filter(u -> u.getOrganization() == null)
+                .forEach(u -> {
+                    u.setOrganization(defaultOrg);
+                    appUserRepository.save(u);
+                    log.info("Assigned user '{}' to default organization", u.getUsername());
+                });
+
+        // Ensure all existing projects have at least one membership (runtime safety)
         projectRepository.findAll().forEach(project -> {
             if (membershipRepository.findByProjectId(project.getId()).isEmpty()) {
-                // Assign admin as OWNER for orphaned projects
                 appUserRepository.findByUsername("admin").ifPresent(admin -> {
                     membershipRepository.save(ProjectMembership.builder()
                             .user(admin)
