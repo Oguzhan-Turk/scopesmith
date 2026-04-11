@@ -6,6 +6,12 @@ import type {
   Task,
   Document,
   UsageSummary,
+  ContextFreshness,
+  PartialRefreshResult,
+  TraceabilityReport,
+  ProjectService,
+  ServiceGraph,
+  ServiceType,
 } from "@/api/client";
 
 export interface ProjectTabProps {
@@ -64,6 +70,7 @@ export interface TasksTabProps extends ProjectTabProps {
   setTaskInstruction: (v: string) => void;
   setManualTaskDialog: (open: boolean) => void;
   setEditingTask: (task: Task | null) => void;
+  projectServices: ProjectService[];
   setConfirmDialog: (d: { message: string; onConfirm: () => void } | null) => void;
   setActiveTab: (tab: string) => void;
   loadTasks: (analysisId: number) => void;
@@ -71,6 +78,14 @@ export interface TasksTabProps extends ProjectTabProps {
 
 export interface ContextTabProps extends ProjectTabProps {
   handleScan: () => void;
+  contextFreshness: ContextFreshness | null;
+  partialRefreshStatus: PartialRefreshResult | null;
+  partialRefreshHistory: PartialRefreshResult[];
+  partialRefreshHasMore: boolean;
+  partialRefreshLoadingMore: boolean;
+  traceability: TraceabilityReport | null;
+  onPartialRefresh: () => void;
+  onLoadMorePartialRefreshHistory: () => void;
   scanPath: string;
   setScanPath: (v: string) => void;
   scanMode: "local" | "git";
@@ -91,6 +106,31 @@ export interface IntegrationsTabProps extends ProjectTabProps {
   setIntegrationConfig: (v: IntegrationConfig) => void;
   handleSaveIntegrationConfig: () => void;
   handleUpdateProject: (name: string, description: string) => Promise<void>;
+  projectServices: ProjectService[];
+  serviceGraph: ServiceGraph | null;
+  newServiceForm: {
+    name: string;
+    serviceType: ServiceType;
+    repoUrl: string;
+    localPath: string;
+    defaultBranch: string;
+    ownerTeam: string;
+  };
+  setNewServiceForm: (v: {
+    name: string;
+    serviceType: ServiceType;
+    repoUrl: string;
+    localPath: string;
+    defaultBranch: string;
+    ownerTeam: string;
+  }) => void;
+  handleCreateService: () => Promise<void>;
+  handleDeleteService: (serviceId: number) => Promise<void>;
+  handleScanService: (serviceId: number) => Promise<void>;
+  dependencyForm: { fromServiceId: number | ""; toServiceId: number | ""; dependencyType: string };
+  setDependencyForm: (v: { fromServiceId: number | ""; toServiceId: number | ""; dependencyType: string }) => void;
+  handleAddDependency: () => Promise<void>;
+  handleDeleteDependency: (dependencyId: number) => Promise<void>;
   onDeleteProject: () => void;
 }
 

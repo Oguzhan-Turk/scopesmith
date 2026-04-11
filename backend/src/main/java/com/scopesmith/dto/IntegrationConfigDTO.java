@@ -18,6 +18,11 @@ public class IntegrationConfigDTO {
     private JiraSettings jira;
     private GitHubSettings github;
     private String preferredProvider; // "JIRA" or "GITHUB"
+    /**
+     * Optional service-level routing (service name -> target config).
+     * Enables multi-service projects to sync each service to different destinations.
+     */
+    private Map<String, ServiceRouting> serviceRouting;
 
     @Data
     @Builder
@@ -49,5 +54,17 @@ public class IntegrationConfigDTO {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class GitHubSettings {
         private String repo;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class ServiceRouting {
+        private String preferredProvider; // "JIRA" | "GITHUB"
+        private String jiraProjectKey;
+        private String githubRepo;
+        private String defaultIssueType;
     }
 }

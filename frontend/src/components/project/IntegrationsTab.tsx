@@ -3,6 +3,7 @@ import { Save, Trash2, GitBranch, FolderOpen, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { timeAgo } from "@/lib/utils";
 import type { IntegrationsTabProps } from "./types";
 
 export default function IntegrationsTab({
@@ -11,6 +12,17 @@ export default function IntegrationsTab({
   setIntegrationConfig,
   handleSaveIntegrationConfig,
   handleUpdateProject,
+  projectServices,
+  serviceGraph,
+  newServiceForm,
+  setNewServiceForm,
+  handleCreateService,
+  handleDeleteService,
+  handleScanService,
+  dependencyForm,
+  setDependencyForm,
+  handleAddDependency,
+  handleDeleteDependency,
   actionLoading,
   isAdmin,
   onDeleteProject,
@@ -19,9 +31,51 @@ export default function IntegrationsTab({
   const [editDescription, setEditDescription] = useState(project.description ?? "");
   const [infoOpen, setInfoOpen] = useState(false);
   const [trackerOpen, setTrackerOpen] = useState(true);
+  const scannedServiceCount = projectServices.filter((s) => !!s.lastScannedAt).length;
+  const dependencyCount = serviceGraph?.dependencies?.length ?? 0;
+  const serviceRouting = integrationConfig.serviceRouting ?? {};
+  const routedServiceCount = projectServices.filter((s) => {
+    const route = serviceRouting[s.name];
+    return !!(route?.preferredProvider || route?.jiraProjectKey || route?.githubRepo);
+  }).length;
+  const unroutedServices = projectServices.filter((s) => {
+    const route = serviceRouting[s.name];
+    return !(route?.preferredProvider || route?.jiraProjectKey || route?.githubRepo);
+  });
 
   return (
     <div className="space-y-6">
+      {projectServices.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Workspace Services Readiness</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid sm:grid-cols-3 gap-3">
+              <div className="rounded-md border px-3 py-2">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Service Context</p>
+                <p className="text-sm font-medium mt-1">{scannedServiceCount}/{projectServices.length} tarandı</p>
+              </div>
+              <div className="rounded-md border px-3 py-2">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Dependency Graph</p>
+                <p className="text-sm font-medium mt-1">{dependencyCount} service bağımlılığı</p>
+              </div>
+              <div className="rounded-md border px-3 py-2">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Routing Coverage</p>
+                <p className="text-sm font-medium mt-1">{routedServiceCount}/{projectServices.length} route tanımlı</p>
+              </div>
+            </div>
+            {unroutedServices.length > 0 && (
+              <div className="rounded-md border border-amber-300/50 bg-amber-50/50 dark:bg-amber-500/10 px-3 py-2 text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">{unroutedServices.length} service için routing eksik:</span>{" "}
+                {unroutedServices.slice(0, 4).map((s) => s.name).join(", ")}
+                {unroutedServices.length > 4 ? " ..." : ""}. Sync doğruluğu için `serviceRouting` tanımlayın.
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Proje Bilgileri — sadece admin */}
       {isAdmin && (
         <Card>
@@ -151,6 +205,138 @@ export default function IntegrationsTab({
             </Button>
           </div>
         </CardContent>}
+      </Card>
+
+      {/* Workspace Services */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Workspace Services</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid md:grid-cols-6 gap-2">
+            <input
+              type="text"
+              placeholder="service adı (billing-api)"
+              value={newServiceForm.name}
+              onChange={(e) => setNewServiceForm({ ...newServiceForm, name: e.target.value })}
+              className="md:col-span-2 px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+            <select
+              value={newServiceForm.serviceType}
+              onChange={(e) => setNewServiceForm({ ...newServiceForm, serviceType: e.target.value as typeof newServiceForm.serviceType })}
+              className="px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {["BACKEND", "FRONTEND", "MOBILE", "GATEWAY", "DATA", "PLATFORM", "SHARED", "OTHER"].map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+            <input
+              type="text"
+              placeholder="repoUrl (opsiyonel)"
+              value={newServiceForm.repoUrl}
+              onChange={(e) => setNewServiceForm({ ...newServiceForm, repoUrl: e.target.value })}
+              className="px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+            <input
+              type="text"
+              placeholder="localPath (opsiyonel)"
+              value={newServiceForm.localPath}
+              onChange={(e) => setNewServiceForm({ ...newServiceForm, localPath: e.target.value })}
+              className="px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+            <Button size="sm" variant="outline" onClick={handleCreateService} disabled={actionLoading === "create-service"}>
+              {actionLoading === "create-service" ? "Ekleniyor..." : "Service Ekle"}
+            </Button>
+          </div>
+
+          {projectServices.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Henüz service tanımlanmadı.</p>
+          ) : (
+            <div className="space-y-2">
+              {projectServices.map((service) => (
+                <div key={service.id} className="rounded-lg border px-3 py-2 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{service.name}</span>
+                      <Badge variant="outline" className="text-xs">{service.serviceType}</Badge>
+                      <span className="text-xs text-muted-foreground">v{service.contextVersion}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {service.localPath || service.repoUrl || "Path/repo yok"} · {service.lastScannedAt ? `Son scan: ${timeAgo(service.lastScannedAt)}` : "Henüz scan edilmedi"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleScanService(service.id)}
+                      disabled={actionLoading === `scan-service-${service.id}`}
+                    >
+                      {actionLoading === `scan-service-${service.id}` ? "Scan..." : "Scan"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => handleDeleteService(service.id)}
+                      disabled={actionLoading === `delete-service-${service.id}`}
+                    >
+                      Sil
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {projectServices.length >= 2 && (
+            <div className="rounded-lg border p-3 space-y-2">
+              <p className="text-sm font-medium">Service Dependency</p>
+              <div className="grid md:grid-cols-4 gap-2">
+                <select
+                  value={dependencyForm.fromServiceId}
+                  onChange={(e) => setDependencyForm({ ...dependencyForm, fromServiceId: e.target.value ? Number(e.target.value) : "" })}
+                  className="px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <option value="">Kaynak service</option>
+                  {projectServices.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+                <select
+                  value={dependencyForm.toServiceId}
+                  onChange={(e) => setDependencyForm({ ...dependencyForm, toServiceId: e.target.value ? Number(e.target.value) : "" })}
+                  className="px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <option value="">Hedef service</option>
+                  {projectServices.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+                <input
+                  type="text"
+                  value={dependencyForm.dependencyType}
+                  onChange={(e) => setDependencyForm({ ...dependencyForm, dependencyType: e.target.value || "SYNC" })}
+                  className="px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+                <Button size="sm" variant="outline" onClick={handleAddDependency} disabled={actionLoading === "add-service-dependency"}>
+                  {actionLoading === "add-service-dependency" ? "Ekleniyor..." : "Bağımlılık Ekle"}
+                </Button>
+              </div>
+              {(serviceGraph?.dependencies?.length ?? 0) > 0 && (
+                <div className="space-y-1">
+                  {serviceGraph!.dependencies.map((d) => (
+                    <div key={d.id} className="text-xs flex items-center justify-between rounded border px-2 py-1">
+                      <span>{d.fromServiceName} → {d.toServiceName} ({d.dependencyType})</span>
+                      <button
+                        onClick={() => handleDeleteDependency(d.id)}
+                        className="text-destructive hover:underline"
+                        disabled={actionLoading === `delete-dependency-${d.id}`}
+                      >
+                        Sil
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
       </Card>
 
       {/* Projeyi Sil — sadece admin görür */}
