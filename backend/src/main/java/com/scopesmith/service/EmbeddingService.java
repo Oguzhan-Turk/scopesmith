@@ -153,11 +153,17 @@ public class EmbeddingService {
         String vectorLiteral = toVectorLiteral(queryVector);
 
         String sql = """
-            SELECT r.id, r.raw_text, a.structured_summary, a.risk_level, a.affected_modules,
+            SELECT r.id, r.raw_text, a_latest.structured_summary, a_latest.risk_level, a_latest.affected_modules,
                    (1 - (re.embedding <=> :qv::vector)) AS similarity
             FROM requirement_embeddings re
             JOIN requirements r ON r.id = re.requirement_id
-            LEFT JOIN analyses a ON a.requirement_id = r.id
+            LEFT JOIN LATERAL (
+                SELECT a.structured_summary, a.risk_level, a.affected_modules
+                FROM analyses a
+                WHERE a.requirement_id = r.id
+                ORDER BY a.created_at DESC
+                LIMIT 1
+            ) a_latest ON true
             WHERE r.project_id = :projectId
               AND r.id != :excludeId
               AND (1 - (re.embedding <=> :qv::vector)) >= :threshold
