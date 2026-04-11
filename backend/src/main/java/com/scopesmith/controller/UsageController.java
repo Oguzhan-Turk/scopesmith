@@ -3,6 +3,7 @@ package com.scopesmith.controller;
 import com.scopesmith.entity.OperationType;
 import com.scopesmith.entity.UsageRecord;
 import com.scopesmith.repository.UsageRecordRepository;
+import com.scopesmith.service.ResourceAccessService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,12 +19,14 @@ import java.util.Map;
 public class UsageController {
 
     private final UsageRecordRepository usageRecordRepository;
+    private final ResourceAccessService resourceAccessService;
 
     @GetMapping("/projects/{projectId}/summary")
     public Map<String, Object> getProjectSummary(
             @PathVariable Long projectId,
             @RequestParam(defaultValue = "1.5") double hoursPerAnalysis,
             @RequestParam(defaultValue = "25.0") double hourlyRate) {
+        resourceAccessService.assertProjectAccess(projectId);
         // Use entity-level aggregation instead of raw query to avoid cast issues
         List<UsageRecord> records = usageRecordRepository.findByProjectIdOrderByCreatedAtDesc(projectId);
 

@@ -1,6 +1,7 @@
 package com.scopesmith.controller;
 
 import com.scopesmith.dto.AnalysisResponse;
+import com.scopesmith.dto.SyncPolicyCheckResponse;
 import com.scopesmith.dto.TaskRefineResponse;
 import com.scopesmith.dto.TaskResponse;
 import com.scopesmith.entity.Analysis;
@@ -10,8 +11,10 @@ import com.scopesmith.repository.TaskRepository;
 import com.scopesmith.service.GitHubService;
 import com.scopesmith.service.JiraExportService;
 import com.scopesmith.service.JiraService;
+import com.scopesmith.service.ResourceAccessService;
 import com.scopesmith.service.RequirementAnalysisService;
 import com.scopesmith.service.StakeholderSummaryService;
+import com.scopesmith.service.SyncPolicyGateService;
 import com.scopesmith.service.TaskBreakdownService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -36,11 +39,14 @@ public class AnalysisController {
     private final GitHubService gitHubService;
     private final JiraExportService jiraExportService;
     private final JiraService jiraService;
+    private final SyncPolicyGateService syncPolicyGateService;
     private final AnalysisRepository analysisRepository;
     private final TaskRepository taskRepository;
+    private final ResourceAccessService resourceAccessService;
 
     @GetMapping("/{id}")
     public AnalysisResponse getAnalysis(@PathVariable Long id) {
+        resourceAccessService.assertAnalysisAccess(id);
         Analysis analysis = analysisRepository.findByIdWithRequirement(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Analysis not found"));
         return AnalysisResponse.from(analysis);
@@ -48,12 +54,14 @@ public class AnalysisController {
 
     @GetMapping("/{id}/tasks")
     public List<TaskResponse> getTasks(@PathVariable Long id) {
+        resourceAccessService.assertAnalysisAccess(id);
         List<Task> tasks = taskRepository.findByAnalysisId(id);
         return tasks.stream().map(TaskResponse::from).toList();
     }
 
     @PostMapping("/{id}/tasks")
     public List<TaskResponse> generateTasks(@PathVariable Long id) {
+        resourceAccessService.assertAnalysisEdit(id);
         return taskBreakdownService.generateTasks(id);
     }
 
@@ -61,6 +69,7 @@ public class AnalysisController {
     public TaskResponse createManualTask(
             @PathVariable Long id,
             @RequestBody Map<String, String> request) {
+        resourceAccessService.assertAnalysisEdit(id);
         Analysis analysis = analysisRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Analysis not found"));
 
@@ -95,6 +104,7 @@ public class AnalysisController {
     public TaskRefineResponse refineTasks(
             @PathVariable Long id,
             @RequestBody Map<String, String> request) {
+        resourceAccessService.assertAnalysisEdit(id);
         String instruction = extractInstruction(request);
         return taskBreakdownService.refineTasks(id, instruction);
     }
@@ -103,6 +113,7 @@ public class AnalysisController {
     public AnalysisResponse refineAnalysis(
             @PathVariable Long id,
             @RequestBody Map<String, String> request) {
+        resourceAccessService.assertAnalysisEdit(id);
         String instruction = extractInstruction(request);
         Analysis refined = requirementAnalysisService.refineAnalysis(id, instruction);
         return AnalysisResponse.from(refined);
@@ -110,6 +121,7 @@ public class AnalysisController {
 
     @PostMapping("/{id}/stakeholder-summary")
     public Map<String, String> generateStakeholderSummary(@PathVariable Long id) {
+        resourceAccessService.assertAnalysisEdit(id);
         String summary = stakeholderSummaryService.generateSummary(id);
         return Map.of("summary", summary);
     }
@@ -118,6 +130,7 @@ public class AnalysisController {
     public Map<String, String> refineStakeholderSummary(
             @PathVariable Long id,
             @RequestBody Map<String, String> request) {
+        resourceAccessService.assertAnalysisEdit(id);
         String instruction = extractInstruction(request);
         String refined = stakeholderSummaryService.refineSummary(id, instruction);
         return Map.of("summary", refined);
@@ -127,11 +140,12 @@ public class AnalysisController {
     public Map<String, Object> syncToJira(
             @PathVariable Long id,
             @RequestBody(required = false) Map<String, Object> request) {
+        resourceAccessService.assertAnalysisEdit(id);
         String projectKey = request != null ? (String) request.get("projectKey") : null;
         String issueType = request != null ? (String) request.get("issueType") : null;
-        @SuppressWarnings("unchecked")
-        java.util.List<Long> taskIds = request != null && request.get("taskIds") instanceof java.util.List<?> raw
-                ? ((java.util.List<?>) raw).stream().map(v -> ((Number) v).longValue()).toList() : null;
+        List<Long> taskIds = extractTaskIds(request);
+        syncPolicyGateService.assertCanSyncForProvider(
+                id, taskIds, SyncPolicyGateService.SyncProvider.JIRA, projectKey);
         return jiraService.syncTasksToJira(id, projectKey, issueType != null ? issueType : "Task", taskIds);
     }
 
@@ -139,15 +153,33 @@ public class AnalysisController {
     public Map<String, Object> syncToGitHub(
             @PathVariable Long id,
             @RequestBody(required = false) Map<String, Object> request) {
+        resourceAccessService.assertAnalysisEdit(id);
         String repo = request != null ? (String) request.get("repo") : null;
-        @SuppressWarnings("unchecked")
-        java.util.List<Long> taskIds = request != null && request.get("taskIds") instanceof java.util.List<?> raw
-                ? ((java.util.List<?>) raw).stream().map(v -> ((Number) v).longValue()).toList() : null;
+        List<Long> taskIds = extractTaskIds(request);
+        syncPolicyGateService.assertCanSyncForProvider(
+                id, taskIds, SyncPolicyGateService.SyncProvider.GITHUB, repo);
         return gitHubService.syncTasksToGitHub(id, repo, taskIds);
+    }
+
+    @GetMapping("/{id}/sync/policy-check")
+    public SyncPolicyCheckResponse checkSyncPolicy(
+            @PathVariable Long id,
+            @RequestParam(required = false) List<Long> taskIds,
+            @RequestParam(required = false) String provider,
+            @RequestParam(required = false) String target) {
+        resourceAccessService.assertAnalysisEdit(id);
+        if (provider == null || provider.isBlank()) {
+            return syncPolicyGateService.evaluate(id, taskIds);
+        }
+        SyncPolicyGateService.SyncProvider syncProvider = SyncPolicyGateService.SyncProvider.valueOf(
+                provider.trim().toUpperCase(java.util.Locale.ENGLISH)
+        );
+        return syncPolicyGateService.evaluateForProvider(id, taskIds, syncProvider, target);
     }
 
     @PostMapping("/{id}/sync/verify")
     public Map<String, Object> verifySyncStatus(@PathVariable Long id) {
+        resourceAccessService.assertAnalysisEdit(id);
         Map<String, Object> result = new LinkedHashMap<>();
         try {
             Map<String, Object> jiraResult = jiraService.verifySyncStatus(id);
@@ -169,6 +201,7 @@ public class AnalysisController {
             @PathVariable Long id,
             @RequestParam String projectKey,
             @RequestParam(defaultValue = "Story") String issueType) {
+        resourceAccessService.assertAnalysisAccess(id);
         if (projectKey == null || projectKey.isBlank()) {
             throw new IllegalArgumentException("projectKey cannot be empty");
         }
@@ -191,5 +224,16 @@ public class AnalysisController {
             throw new IllegalArgumentException("instruction too long (max 1000 characters)");
         }
         return instruction.trim();
+    }
+
+    private List<Long> extractTaskIds(Map<String, Object> request) {
+        if (request == null || !(request.get("taskIds") instanceof java.util.List<?> raw)) {
+            return null;
+        }
+        return raw.stream()
+                .filter(Number.class::isInstance)
+                .map(Number.class::cast)
+                .map(Number::longValue)
+                .toList();
     }
 }

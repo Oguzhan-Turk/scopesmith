@@ -27,19 +27,30 @@ public class ProjectAccessInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         String path = request.getRequestURI();
+        String method = request.getMethod();
 
         Matcher matcher = PROJECT_PATH.matcher(path);
         if (matcher.find()) {
             Long projectId = Long.parseLong(matcher.group(1));
-            if (!projectAccessService.canAccess(projectId)) {
-                log.warn("Access denied to project #{} for user", projectId);
+            boolean allowed = isReadMethod(method)
+                    ? projectAccessService.canAccess(projectId)
+                    : projectAccessService.canEdit(projectId);
+
+            if (!allowed) {
+                log.warn("Access denied to project #{} for user (method={})", projectId, method);
+                response.setContentType("application/json");
                 response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                 response.getWriter().write("{\"error\":\"Forbidden\",\"message\":\"Bu projeye erişim yetkiniz yok\"}");
-                response.setContentType("application/json");
                 return false;
             }
         }
 
         return true;
+    }
+
+    private boolean isReadMethod(String method) {
+        return "GET".equalsIgnoreCase(method)
+                || "HEAD".equalsIgnoreCase(method)
+                || "OPTIONS".equalsIgnoreCase(method);
     }
 }

@@ -2,9 +2,11 @@ package com.scopesmith.controller;
 
 import com.scopesmith.dto.*;
 import com.scopesmith.entity.Task;
+import com.scopesmith.repository.ProjectServiceNodeRepository;
 import com.scopesmith.repository.TaskRepository;
 import com.scopesmith.service.ClaudeCodeService;
 import com.scopesmith.service.ManagedAgentService;
+import com.scopesmith.service.ResourceAccessService;
 import com.scopesmith.service.TaskBreakdownService;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
@@ -22,6 +24,8 @@ public class TaskController {
     private final TaskRepository taskRepository;
     private final TaskBreakdownService taskBreakdownService;
     private final ClaudeCodeService claudeCodeService;
+    private final ResourceAccessService resourceAccessService;
+    private final ProjectServiceNodeRepository projectServiceNodeRepository;
 
     @Autowired(required = false)
     private ManagedAgentService managedAgentService;
@@ -33,6 +37,7 @@ public class TaskController {
     public TaskResponse updateTask(
             @PathVariable Long id,
             @RequestBody TaskUpdateRequest request) {
+        resourceAccessService.assertTaskEdit(id);
         Task task = taskRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Task not found with id: " + id));
 
@@ -47,6 +52,19 @@ public class TaskController {
             task.setCategory(request.getCategory().isBlank() ? null : request.getCategory().toUpperCase(java.util.Locale.ENGLISH));
         }
         if (request.getSpRationale() != null) task.setSpRationale(request.getSpRationale());
+        if (request.getServiceId() != null) {
+            if (request.getServiceId() <= 0) {
+                task.setService(null);
+            } else {
+                var service = projectServiceNodeRepository.findById(request.getServiceId())
+                        .orElseThrow(() -> new EntityNotFoundException("Project service not found with id: " + request.getServiceId()));
+                Long taskProjectId = task.getAnalysis().getRequirement().getProject().getId();
+                if (!service.getProject().getId().equals(taskProjectId)) {
+                    throw new IllegalArgumentException("Task ve service aynı projeye ait olmalı.");
+                }
+                task.setService(service);
+            }
+        }
 
         return TaskResponse.from(taskRepository.save(task));
     }
@@ -60,6 +78,7 @@ public class TaskController {
     public TaskResponse setSpDecision(
             @PathVariable Long id,
             @Valid @RequestBody SpDecisionRequest request) {
+        resourceAccessService.assertTaskEdit(id);
         Task task = taskRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Task not found with id: " + id));
 
@@ -74,6 +93,7 @@ public class TaskController {
     public TaskResponse setCategory(
             @PathVariable Long id,
             @RequestBody java.util.Map<String, String> request) {
+        resourceAccessService.assertTaskEdit(id);
         Task task = taskRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Task not found with id: " + id));
 
@@ -87,11 +107,13 @@ public class TaskController {
 
     @PostMapping("/{id}/suggest-sp")
     public SpSuggestionResult suggestSp(@PathVariable Long id) {
+        resourceAccessService.assertTaskAccess(id);
         return taskBreakdownService.suggestSpForTask(id);
     }
 
     @GetMapping("/{id}/claude-code-prompt")
     public java.util.Map<String, String> getClaudeCodePrompt(@PathVariable Long id) {
+        resourceAccessService.assertTaskAccess(id);
         String prompt = claudeCodeService.buildPrompt(id);
         return java.util.Map.of("prompt", prompt);
     }
@@ -100,18 +122,21 @@ public class TaskController {
 
     @PostMapping("/{id}/agent/start")
     public AgentStartResult startAgent(@PathVariable Long id) {
+        resourceAccessService.assertTaskEdit(id);
         requireAgentEnabled();
         return managedAgentService.startAgent(id);
     }
 
     @GetMapping("/{id}/agent/status")
     public AgentStatusResult getAgentStatus(@PathVariable Long id) {
+        resourceAccessService.assertTaskAccess(id);
         requireAgentEnabled();
         return managedAgentService.getStatus(id);
     }
 
     @PostMapping("/{id}/agent/cancel")
     public void cancelAgent(@PathVariable Long id) {
+        resourceAccessService.assertTaskEdit(id);
         requireAgentEnabled();
         managedAgentService.cancelAgent(id);
     }

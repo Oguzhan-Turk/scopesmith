@@ -8,6 +8,7 @@ import com.scopesmith.entity.Analysis;
 import com.scopesmith.entity.ModelTier;
 import com.scopesmith.repository.AnalysisRepository;
 import com.scopesmith.service.ChangeImpactService;
+import com.scopesmith.service.ResourceAccessService;
 import com.scopesmith.service.RequirementAnalysisService;
 import com.scopesmith.service.RequirementService;
 import jakarta.validation.Valid;
@@ -26,6 +27,7 @@ public class RequirementController {
     private final RequirementAnalysisService analysisService;
     private final ChangeImpactService changeImpactService;
     private final AnalysisRepository analysisRepository;
+    private final ResourceAccessService resourceAccessService;
 
     @PostMapping("/projects/{projectId}/requirements")
     @ResponseStatus(HttpStatus.CREATED)
@@ -42,6 +44,7 @@ public class RequirementController {
 
     @GetMapping("/requirements/{id}")
     public RequirementResponse findById(@PathVariable Long id) {
+        resourceAccessService.assertRequirementAccess(id);
         return requirementService.findById(id);
     }
 
@@ -49,11 +52,13 @@ public class RequirementController {
     public RequirementResponse update(
             @PathVariable Long id,
             @Valid @RequestBody RequirementRequest request) {
+        resourceAccessService.assertRequirementEdit(id);
         return requirementService.update(id, request);
     }
 
     @GetMapping("/requirements/{id}/analyses")
     public List<AnalysisResponse> getAnalyses(@PathVariable Long id) {
+        resourceAccessService.assertRequirementAccess(id);
         List<Analysis> analyses = analysisRepository.findByRequirementIdOrderByCreatedAtDesc(id);
         return analyses.stream().map(AnalysisResponse::from).toList();
     }
@@ -61,18 +66,21 @@ public class RequirementController {
     @DeleteMapping("/requirements/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Long id) {
+        resourceAccessService.assertRequirementEdit(id);
         requirementService.delete(id);
     }
 
     @PostMapping("/requirements/{id}/analyze")
     public AnalysisResponse analyze(@PathVariable Long id,
                                      @RequestParam(required = false) String modelTier) {
+        resourceAccessService.assertRequirementEdit(id);
         ModelTier tier = modelTier != null ? ModelTier.valueOf(modelTier.toUpperCase(java.util.Locale.ENGLISH)) : null;
         return AnalysisResponse.from(analysisService.analyze(id, tier));
     }
 
     @PostMapping("/requirements/{id}/change-impact")
     public ChangeImpactResult changeImpact(@PathVariable Long id) {
+        resourceAccessService.assertRequirementAccess(id);
         return changeImpactService.analyzeImpact(id);
     }
 }

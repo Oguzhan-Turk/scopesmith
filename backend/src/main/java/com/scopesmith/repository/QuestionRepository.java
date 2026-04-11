@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface QuestionRepository extends JpaRepository<Question, Long> {
     List<Question> findByAnalysisId(Long analysisId);
@@ -20,4 +21,7 @@ public interface QuestionRepository extends JpaRepository<Question, Long> {
             "WHERE r.project.id = :projectId AND q.status = 'ANSWERED' " +
             "ORDER BY q.id DESC")
     List<Question> findAnsweredByProjectId(@Param("projectId") Long projectId);
+
+    @Query("SELECT q.analysis.requirement.project.id FROM Question q WHERE q.id = :questionId")
+    Optional<Long> findProjectIdByQuestionId(@Param("questionId") Long questionId);
 }

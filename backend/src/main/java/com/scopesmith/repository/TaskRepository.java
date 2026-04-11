@@ -6,9 +6,13 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface TaskRepository extends JpaRepository<Task, Long> {
     List<Task> findByAnalysisId(Long analysisId);
+
+    @Query("SELECT t.analysis.requirement.project.id FROM Task t WHERE t.id = :taskId")
+    Optional<Long> findProjectIdByTaskId(@Param("taskId") Long taskId);
 
     /**
      * Find all tasks in a project that have been finalized (spFinal != null).

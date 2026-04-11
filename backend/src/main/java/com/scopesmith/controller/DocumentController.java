@@ -3,6 +3,7 @@ package com.scopesmith.controller;
 import com.scopesmith.dto.DocumentRequest;
 import com.scopesmith.dto.DocumentResponse;
 import com.scopesmith.service.DocumentService;
+import com.scopesmith.service.ResourceAccessService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -19,6 +20,7 @@ import java.util.List;
 public class DocumentController {
 
     private final DocumentService documentService;
+    private final ResourceAccessService resourceAccessService;
 
     // ── Project-level documents ──
 
@@ -56,6 +58,7 @@ public class DocumentController {
     public DocumentResponse addRequirementDocument(
             @PathVariable Long requirementId,
             @Valid @RequestBody DocumentRequest request) {
+        resourceAccessService.assertRequirementEdit(requirementId);
         return documentService.addRequirementDocument(requirementId, request);
     }
 
@@ -65,6 +68,7 @@ public class DocumentController {
             @PathVariable Long requirementId,
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "docType", required = false, defaultValue = "OTHER") String docType) throws IOException {
+        resourceAccessService.assertRequirementEdit(requirementId);
         String content = new String(file.getBytes(), StandardCharsets.UTF_8);
         DocumentRequest request = new DocumentRequest();
         request.setFilename(file.getOriginalFilename());
@@ -75,6 +79,7 @@ public class DocumentController {
 
     @GetMapping("/requirements/{requirementId}/documents")
     public List<DocumentResponse> findByRequirement(@PathVariable Long requirementId) {
+        resourceAccessService.assertRequirementAccess(requirementId);
         return documentService.findByRequirement(requirementId);
     }
 
@@ -83,6 +88,7 @@ public class DocumentController {
     @DeleteMapping("/documents/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Long id) {
+        resourceAccessService.assertDocumentEdit(id);
         documentService.delete(id);
     }
 }
