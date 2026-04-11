@@ -105,6 +105,19 @@
 			<artifactId>org.eclipse.jgit</artifactId>
 			<version>7.1.0.202411261347-r</version>
 		</dependency>
+
+		<!-- Rate limiting — Bucket4j (in-memory token bucket, no Redis required) -->
+		<dependency>
+			<groupId>com.bucket4j</groupId>
+			<artifactId>bucket4j-core</artifactId>
+			<version>8.10.1</version>
+		</dependency>
+		<!-- Caffeine cache for per-IP / per-user bucket storage -->
+		<dependency>
+			<groupId>com.github.ben-manes.caffeine</groupId>
+			<artifactId>caffeine</artifactId>
+			<!-- version managed by spring-boot-starter-parent -->
+		</dependency>
 	</dependencies>
 
 	<build>

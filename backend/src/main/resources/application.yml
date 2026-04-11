@@ -7,6 +7,13 @@ spring:
     username: ${DB_USERNAME:scopesmith}
     password: ${DB_PASSWORD:scopesmith_dev}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: ScopeSmithPool
+      maximum-pool-size: ${DB_POOL_MAX:20}
+      minimum-idle: ${DB_POOL_MIN:5}
+      connection-timeout: 20000      # ms — fail fast if pool is exhausted
+      idle-timeout: 300000           # ms — evict idle connections after 5 min
+      max-lifetime: 1200000          # ms — recycle connections every 20 min
 
   jpa:
     hibernate:
@@ -26,6 +33,8 @@ spring:
       chat: anthropic
     anthropic:
       api-key: ${ANTHROPIC_API_KEY}
+      connection-timeout: 10s        # TCP connection to Anthropic API
+      read-timeout: 120s             # Streaming / long analysis calls can take 60-90s
       chat:
         options:
           model: claude-sonnet-4-20250514
@@ -79,10 +88,20 @@ scopesmith:
     ai-min-question-length: ${SCOPESMITH_ASSISTANT_AI_MIN_QUESTION_LENGTH:10}
     ai-max-question-length: ${SCOPESMITH_ASSISTANT_AI_MAX_QUESTION_LENGTH:600}
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never   # don't expose DB credentials / internals
+
 server:
   port: 8080
   servlet:
     session:
+      timeout: ${SESSION_TIMEOUT:30m}
       cookie:
         http-only: true
         same-site: Lax
@@ -90,5 +109,5 @@ server:
 
 logging:
   level:
-    com.scopesmith: DEBUG
+    com.scopesmith: ${LOG_LEVEL:INFO}
     org.hibernate.SQL: WARN

@@ -1,0 +1,93 @@
+services:
+
+  # ── Database ────────────────────────────────────────────────────────────────
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: scopesmith-db
+    environment:
+      POSTGRES_DB:       scopesmith
+      POSTGRES_USER:     ${DB_USERNAME:-scopesmith}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}      # required — no default in prod
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-scopesmith}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    # DB not exposed to host in production — only reachable by backend container
+    networks:
+      - internal
+
+  # ── Backend ─────────────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: scopesmith-backend
+    environment:
+      # Database
+      DB_URL:      jdbc:postgresql://postgres:5432/scopesmith
+      DB_USERNAME: ${DB_USERNAME:-scopesmith}
+      DB_PASSWORD: ${DB_PASSWORD}
+
+      # AI
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      OPENAI_API_KEY:    ${OPENAI_API_KEY:-}
+
+      # Security
+      SCOPESMITH_SESSION_COOKIE_SECURE: "true"
+      SCOPESMITH_SCAN_ALLOWED_ROOTS: ${SCOPESMITH_SCAN_ALLOWED_ROOTS:-/workspace}
+
+      # Integrations (optional)
+      GITHUB_TOKEN:    ${GITHUB_TOKEN:-}
+      GITHUB_REPO:     ${GITHUB_REPO:-}
+      JIRA_URL:        ${JIRA_URL:-}
+      JIRA_EMAIL:      ${JIRA_EMAIL:-}
+      JIRA_API_TOKEN:  ${JIRA_API_TOKEN:-}
+
+      # Feature flags (off by default)
+      MANAGED_AGENT_ENABLED:  ${MANAGED_AGENT_ENABLED:-false}
+      SELF_ASSISTANT_ENABLED: ${SELF_ASSISTANT_ENABLED:-false}
+
+      # Tuning
+      LOG_LEVEL:    ${LOG_LEVEL:-INFO}
+      SESSION_TIMEOUT: ${SESSION_TIMEOUT:-30m}
+
+      # CORS — set to your actual frontend domain(s)
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}    # required in prod
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - internal
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ── Frontend ─────────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: scopesmith-frontend
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - internal
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  internal:
+    driver: bridge

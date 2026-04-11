@@ -57,6 +57,8 @@ public class SecurityConfig {
                                 "geolocation=(), microphone=(), camera=()"))
                 )
                 .authorizeHttpRequests(auth -> auth
+                        // Health check — used by Docker / load-balancers (no auth needed)
+                        .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                         // Login endpoint is public
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         // Admin-only endpoints
@@ -64,7 +66,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/settings/**").hasRole("ADMIN")
                         // Everything else requires authentication
                         .requestMatchers("/api/v1/**").authenticated()
-                        .anyRequest().permitAll()
+                        // Non-API paths (static resources, actuator health) default to deny
+                        .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
