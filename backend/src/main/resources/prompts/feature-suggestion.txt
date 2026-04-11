@@ -18,6 +18,12 @@ Focus on:
 - Common patterns in similar projects that are missing
 - Security or performance improvements based on the tech stack
 - UX improvements based on the architecture
+- Avoid near-duplicate suggestions; each suggestion should be materially different.
+- Prefer practical, shippable ideas over speculative R&D items.
 
 Return a JSON object with a "suggestions" array.
 Return all text in Turkish. Keep JSON field names and enum values in English.
+
+IMPORTANT:
+- Use only these category enums: ENHANCEMENT, NEW_FEATURE, PERFORMANCE, SECURITY, UX, INTEGRATION, OTHER
+- Return 3-5 items.

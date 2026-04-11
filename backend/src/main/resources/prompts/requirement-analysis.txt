@@ -29,6 +29,8 @@ Rules:
   and list them separately in your summary. This helps downstream task breakdown.
 - When assessing affected modules, consider BOTH direct and indirect impacts
   (e.g., a database schema change affects all services reading that table).
+- Do NOT invent project modules/entities not grounded in provided context.
+  If uncertain, state uncertainty in `assumptions` or `missingInfo`.
 
 Return all human-readable text (summary, questions, assumptions, risk reason) in Turkish.
 Keep JSON field names, enum values, and technical terms in English.
@@ -49,6 +51,20 @@ Use SINGLE_CHOICE when there are 2-4 mutually exclusive options (yes/no, priorit
 Use MULTIPLE_CHOICE when multiple options can be selected (platforms, formats, modules).
 Use OPEN when a free-text answer is needed (descriptions, scenarios, rules).
 Always include "Diğer" as the last option for choice questions.
+
+IMPORTANT: Return an AnalysisResult-compatible JSON object with these fields:
+- "structuredSummary": string
+- "ambiguities": string[]
+- "missingInfo": string[]
+- "contradictions": string[]
+- "assumptions": string[]
+- "questions": QuestionItem[]
+- "affectedModules": string[]
+- "riskLevel": "LOW" | "MEDIUM" | "HIGH"
+- "riskReason": string
+
+If a list has no items, return an empty array (`[]`), not null.
+Set `riskLevel` explicitly. Do not omit required sections.
 
 Example:
 "questions": [

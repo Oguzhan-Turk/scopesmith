@@ -8,3 +8,4 @@ Focus on the key points that would be relevant for software requirement analysis
 
 Keep the summary factual and brief. Do not add opinions or suggestions.
 Output only the summary text, nothing else.
+If the document has insufficient relevant content, return a short Turkish sentence stating that explicitly.

@@ -22,11 +22,13 @@ public class PromptController {
     private final PromptLoader promptLoader;
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public List<Prompt> listAll() {
         return promptRepository.findAll();
     }
 
     @GetMapping("/{name}")
+    @PreAuthorize("hasRole('ADMIN')")
     public Prompt getByName(@PathVariable String name) {
         return promptRepository.findByName(name)
                 .orElseThrow(() -> new EntityNotFoundException("Prompt not found: " + name));

@@ -7,8 +7,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
-import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
@@ -27,13 +25,19 @@ public class PromptSeeder implements ApplicationRunner {
     private static final String[] PROMPT_NAMES = {
             "requirement-analysis",
             "bug-analysis",
+            "analysis-refine",
             "task-breakdown",
+            "task-breakdown-bug",
             "task-breakdown-refine",
+            "sp-suggestion",
             "stakeholder-summary",
             "stakeholder-summary-refine",
             "change-impact",
+            "document-summary",
+            "feature-suggestion",
             "project-context",
-            "project-context-structured"
+            "project-context-structured",
+            "self-assistant-hybrid"
     };
 
     @Override

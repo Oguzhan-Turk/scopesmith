@@ -10,6 +10,8 @@ import com.scopesmith.dto.TaskResponse;
 import com.scopesmith.util.StructuredContextFormatter;
 import com.scopesmith.entity.*;
 import com.scopesmith.repository.AnalysisRepository;
+import com.scopesmith.repository.ProjectServiceNodeRepository;
+import com.scopesmith.repository.ServiceDependencyRepository;
 import com.scopesmith.repository.TaskRepository;
 import com.scopesmith.service.validation.AiResultValidationService;
 import com.scopesmith.service.validation.ValidationContext;
@@ -34,6 +36,9 @@ public class TaskBreakdownService {
     private final CodeIntelligenceService codeIntelligenceService;
     private final JiraService jiraService;
     private final GitHubService gitHubService;
+    private final TaskSyncRefService taskSyncRefService;
+    private final ProjectServiceNodeRepository projectServiceNodeRepository;
+    private final ServiceDependencyRepository serviceDependencyRepository;
     private final PromptLoader promptLoader;
     private final AiResultValidationService validationService;
 
@@ -134,7 +139,13 @@ public class TaskBreakdownService {
         for (Task task : analysis.getTasks()) {
             int sp = task.getSpFinal() != null ? task.getSpFinal() :
                     (task.getSpSuggestion() != null ? task.getSpSuggestion() : 0);
-            String synced = task.getJiraKey() != null ? ", SYNCED:" + task.getJiraKey() : "";
+            String syncLabel = task.getSyncRefs() != null && !task.getSyncRefs().isEmpty()
+                    ? task.getSyncRefs().stream()
+                    .filter(r -> "SYNCED".equalsIgnoreCase(r.getSyncState()))
+                    .map(r -> r.getProvider().name() + ":" + r.getExternalRef())
+                    .findFirst().orElse(task.getJiraKey())
+                    : task.getJiraKey();
+            String synced = syncLabel != null ? ", SYNCED:" + syncLabel : "";
             String cat = task.getCategory() != null ? ", " + task.getCategory() : "";
             userMessage.append(String.format("- [ID:%d] %s (%d SP, %s priority%s%s): %s\n",
                     task.getId(), task.getTitle(), sp, task.getPriority().name(), cat, synced, task.getDescription()));
@@ -230,14 +241,28 @@ public class TaskBreakdownService {
             }
 
             Task saved = taskRepository.save(task);
+            if (oldMatch != null && oldMatch.getSyncRefs() != null) {
+                oldMatch.getSyncRefs().stream()
+                        .filter(r -> "SYNCED".equalsIgnoreCase(r.getSyncState()))
+                        .forEach(r -> taskSyncRefService.upsert(saved, r.getProvider(), r.getTarget(), r.getExternalRef()));
+            }
             savedTasks.put(saved.getTitle(), saved);
             analysis.getTasks().add(saved);
         }
 
-        // Find orphaned issues — old tasks with jiraKey that weren't matched
+        // Find orphaned issues — unmatched old tasks' synced refs (fallback: jiraKey)
         List<String> orphanedIssues = oldTasksById.values().stream()
-                .filter(t -> t.getJiraKey() != null && !matchedOldIds.contains(t.getId()))
-                .map(Task::getJiraKey)
+                .filter(t -> !matchedOldIds.contains(t.getId()))
+                .flatMap(t -> {
+                    List<String> refs = t.getSyncRefs() == null ? List.of()
+                            : t.getSyncRefs().stream()
+                            .filter(r -> "SYNCED".equalsIgnoreCase(r.getSyncState()))
+                            .map(com.scopesmith.entity.TaskSyncRef::getExternalRef)
+                            .toList();
+                    if (!refs.isEmpty()) return refs.stream();
+                    return t.getJiraKey() != null ? java.util.stream.Stream.of(t.getJiraKey()) : java.util.stream.Stream.empty();
+                })
+                .distinct()
                 .toList();
 
         // Auto-close orphaned issues
@@ -340,6 +365,8 @@ public class TaskBreakdownService {
         message.append("## Original Requirement\n");
         message.append(requirement.getRawText());
         message.append("\n\n");
+
+        appendServiceRegistryContext(message, requirement.getProject());
 
         // Analysis summary
         message.append("## Analysis Summary\n");
@@ -476,6 +503,39 @@ public class TaskBreakdownService {
         message.append("Break this down into development tasks with story point estimates.");
 
         return message.toString();
+    }
+
+    private void appendServiceRegistryContext(StringBuilder message, Project project) {
+        List<ProjectServiceNode> services = projectServiceNodeRepository.findByProjectIdOrderByNameAsc(project.getId());
+        if (services.isEmpty()) return;
+
+        message.append("## Workspace Service Registry\n");
+        message.append("Project has ").append(services.size()).append(" registered services.\n");
+        for (ProjectServiceNode service : services) {
+            message.append("- ")
+                    .append(service.getName())
+                    .append(" [").append(service.getServiceType()).append("]");
+            if (service.getOwnerTeam() != null && !service.getOwnerTeam().isBlank()) {
+                message.append(" team=").append(service.getOwnerTeam());
+            }
+            if (service.getLastScannedAt() != null) {
+                message.append(" contextVersion=").append(service.getContextVersion());
+            }
+            message.append("\n");
+        }
+
+        List<ServiceDependency> dependencies = serviceDependencyRepository.findByProjectIdOrderByIdAsc(project.getId());
+        if (!dependencies.isEmpty()) {
+            message.append("Service dependencies:\n");
+            dependencies.forEach(dep -> message.append("- ")
+                    .append(dep.getFromService().getName())
+                    .append(" -> ")
+                    .append(dep.getToService().getName())
+                    .append(" (").append(dep.getDependencyType()).append(")\n"));
+        }
+
+        message.append("Task decomposition guidance: split by deployable service boundaries first; ")
+                .append("avoid splitting a single service change into micro-steps.\n\n");
     }
 
     @Transactional(readOnly = true)

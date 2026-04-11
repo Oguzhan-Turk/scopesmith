@@ -23,3 +23,18 @@ For externalIntegrations: list third-party services, APIs, message queues, etc.
 For keyObservations: notable patterns, potential issues, or architectural decisions.
 
 Return descriptions in Turkish. Keep class names, framework names, and technical terms in English.
+
+IMPORTANT: Return a ProjectContextResult-compatible JSON object with these top-level fields:
+- "techStack"
+- "architecturePattern"
+- "architectureDescription"
+- "modules"
+- "entities"
+- "apiEndpoints"
+- "externalIntegrations"
+- "dependencies"
+- "keyObservations"
+
+Rules for uncertain data:
+- If unknown, prefer empty arrays over invented values.
+- For unknown scalar fields, use brief Turkish explanation (e.g., "Belirlenemedi") instead of hallucinating.

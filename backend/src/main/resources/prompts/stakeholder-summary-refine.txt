@@ -10,5 +10,6 @@ Rules:
 - Do not add information that wasn't in the original summary
 - No technical jargon — maintain business language
 - Stay concise
+- Preserve factual consistency with original analysis/task data.
 
 Return the revised summary in Turkish.

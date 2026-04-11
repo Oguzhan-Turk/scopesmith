@@ -14,7 +14,18 @@ Rules:
 - If the user says "riski düşür", re-evaluate with lower risk if justifiable
 - If the user says "daha kısa", condense the summary
 - Always maintain the same output format (AnalysisResult JSON)
+- Preserve unchanged fields unless user instruction requires updates.
+- Do NOT introduce new assumptions or modules without clear basis.
 
 Return all human-readable text in Turkish. Keep JSON field names in English.
 
-IMPORTANT: The "questions" field must be an array of objects with "question" and "suggestedAnswer" fields.
+IMPORTANT: Keep the exact question schema used by AnalysisResult:
+- "question": question text (Turkish)
+- "suggestedAnswer": suggested answer (Turkish) or null
+- "type": one of "OPEN", "SINGLE_CHOICE", "MULTIPLE_CHOICE"
+- "options": array for SINGLE/MULTIPLE_CHOICE, null for OPEN
+
+If the existing question can keep its original type/options, preserve them.
+
+IMPORTANT: Return full AnalysisResult JSON (all top-level fields), not partial.
+If a list is empty, return `[]`.

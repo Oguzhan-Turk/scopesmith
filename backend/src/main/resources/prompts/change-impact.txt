@@ -19,6 +19,19 @@ Rules:
 - Quantify scope change when possible ("scope grew by approximately 30%")
 - Flag if the change invalidates previous assumptions or decisions
 - Highlight if the change introduces new dependencies or integration points
+- Do NOT overstate certainty. If confidence is low, state it in `riskReason`.
 
 Return all human-readable text in Turkish.
 Keep technical terms, class names, and framework names in English.
+
+IMPORTANT: Return a ChangeImpactResult-compatible JSON object:
+- "changeSummary": string
+- "changes": string[]
+- "affectedTasks": string[]
+- "newTasksNeeded": string[]
+- "scopeImpact": string
+- "newRiskLevel": "LOW" | "MEDIUM" | "HIGH"
+- "riskReason": string
+- "stakeholderSummary": string
+
+If a list is empty, return `[]`, not null.

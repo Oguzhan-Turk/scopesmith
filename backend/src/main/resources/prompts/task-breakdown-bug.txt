@@ -40,3 +40,6 @@ Rules:
 - Accept the risk level from analysis — don't downgrade it in SP.
 
 Return all human-readable text (title, descriptions, acceptance criteria, rationale) in Turkish.
+Keep technical terms, class names, and framework names in English.
+
+IMPORTANT: Return a JSON object with a "tasks" array (TaskBreakdownResult format).

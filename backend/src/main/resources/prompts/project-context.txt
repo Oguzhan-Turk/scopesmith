@@ -16,6 +16,7 @@ Rules:
 - Use actual class/module/service names from the code.
 - If you can't determine something from the provided files, say so.
 - Return plain text, not JSON. This will be stored as project context.
+- Use explicit section headers for readability.
 
 Return all human-readable text in Turkish.
 Keep technical terms, class names, and framework names in English.

@@ -35,17 +35,38 @@ Rules:
 - Tasks should be independently deliverable when possible
 - Each task should be completable within one sprint
 - If a task is larger than 8 SP, break it down further
+- Each task must represent a meaningful, testable outcome (vertical slice), not a micro-step
+  (bad: "endpoint aç", "DTO ekle", "service method yaz"; good: "ödeme akışında indirim kodu doğrulaması ve uygulaması")
 - SP reflects COMPLEXITY, not time. Consider: number of services affected,
   DB schema changes, external integrations, business logic complexity,
   testing requirements, and requirement clarity
 - Order tasks by dependency and priority
-- Include testing tasks where integration/edge cases warrant separate effort
+- Keep testing work inside the feature task by default.
+  Create a separate TESTING task only when there is distinct, non-trivial test scope
+  (e.g. dedicated E2E suite, contract test matrix, performance test plan).
 - If historical data shows the team consistently rates higher/lower than your
   estimate, ADJUST your suggestion to match the team's calibration and explain why.
 - Do NOT create generic "monitoring" or "error handling" tasks unless the
   requirement explicitly asks for them. Error handling should be part of each task.
-- Keep task count reasonable (5-10 tasks typically). Don't over-decompose.
-  A 3 SP task doesn't need to be broken into three 1 SP tasks.
+- Keep task count strict and outcome-oriented:
+  - Default target: 4-8 tasks
+  - Hard upper bound: 10 tasks
+  - If you produced more than 10, merge the most coupled tasks
+  - If the requirement is small/clear, prefer 3-5 tasks
+  A 3 SP task must NOT be broken into multiple 1 SP micro-tasks.
+- Avoid "phase-based" decomposition for a single component
+  (e.g. separate tasks for "analysis", "implementation", "test", "cleanup").
+  Prefer component/outcome-based decomposition.
+- If architecture is multi-service:
+  - Split primarily by deployable service boundaries (backend-api, frontend-web, mobile-app, gateway)
+  - Inside one service, do not over-split internal coding steps.
+- Before finalizing, run this self-check:
+  1. Is every task independently demoable/verifiable?
+  2. Would a senior engineer consider any task "too small to track"?
+  3. Can one agent complete each task end-to-end without 3+ handoffs?
+  If any answer is bad, merge/simplify.
 
 Return all human-readable text (title, descriptions, acceptance criteria, rationale) in Turkish.
 Keep technical terms, class names, and framework names in English.
+
+IMPORTANT: Return a JSON object with a "tasks" array only (no extra commentary/markdown).

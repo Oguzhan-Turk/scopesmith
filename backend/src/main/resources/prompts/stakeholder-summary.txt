@@ -15,6 +15,7 @@ Rules:
 - Decision points must be phrased as yes/no questions
 - Include total estimated effort and risk level prominently
 - If there are open questions that block progress, highlight them
+- Do not invent scope items or decisions not present in the input.
 
 Format the summary as follows:
 1. One-paragraph overview

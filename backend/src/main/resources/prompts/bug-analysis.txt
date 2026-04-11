@@ -28,9 +28,18 @@ Rules:
   availability of workarounds, and data integrity risks.
 - If the described behavior might actually be WORKING AS DESIGNED, flag this
   as a possible misunderstanding and ask a clarifying question.
+- Do NOT invent technical details (stack traces, module names, root causes)
+  unless they can be reasonably inferred from provided context.
 
 Return all human-readable text (summary, questions, assumptions, risk reason) in Turkish.
 Keep JSON field names, enum values, and technical terms in English.
+
+IMPORTANT: The "structuredSummary" field must be filled.
+Write 2-3 Turkish sentences covering:
+(1) reported vs expected behavior,
+(2) likely technical fault domain (module/service),
+(3) operational/business impact.
+Do NOT leave it blank.
 
 IMPORTANT: The "questions" field must be an array of objects with these fields:
 - "question": the question text (Turkish)
@@ -40,3 +49,20 @@ IMPORTANT: The "questions" field must be an array of objects with these fields:
 
 Use SINGLE_CHOICE for yes/no or limited options. Use MULTIPLE_CHOICE for multi-select. Use OPEN for free-text.
 Always include "Diğer" as the last option for choice questions.
+
+IMPORTANT: Return an AnalysisResult-compatible JSON object with these fields:
+- "structuredSummary": string
+- "ambiguities": string[]
+- "missingInfo": string[]
+- "contradictions": string[]
+- "assumptions": string[]
+- "questions": QuestionItem[]
+- "affectedModules": string[]
+- "riskLevel": "LOW" | "MEDIUM" | "HIGH"
+- "riskReason": string
+
+For bug context:
+- `ambiguities`: unclear reproduction signals
+- `missingInfo`: missing diagnostics/environment details
+- `contradictions`: report inconsistencies (if any)
+If no items, use `[]`.

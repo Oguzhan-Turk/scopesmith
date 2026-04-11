@@ -12,6 +12,14 @@ Rules:
 - Each task must have: title, description, acceptanceCriteria, spSuggestion (integer), spRationale, priority (HIGH/MEDIUM/LOW), category (BACKEND/FRONTEND/MOBILE/DATABASE/DEVOPS/TESTING/FULLSTACK), previousTaskId (integer or null), dependsOn (optional, title of dependency)
 - Story point estimates should use Fibonacci: 1, 2, 3, 5, 8, 13
 - Keep acceptance criteria specific and testable
+- Keep decomposition outcome-oriented, not micro-step oriented:
+  - avoid splitting one logical deliverable into "endpoint", "service", "test" unless explicitly requested
+  - each task should be independently verifiable
+- If user instruction does NOT explicitly request finer granularity, preserve current granularity
+  or simplify by merging overly coupled micro tasks.
+- Prefer 4-8 tasks for typical feature refinements; avoid exceeding 10 tasks unless instruction requires it.
+- Keep testing work in the owning feature task by default.
+  Create separate TESTING task only for distinct test tracks (E2E/perf/contract matrix).
 
 Task ID tracking (IMPORTANT):
 Each current task has a unique ID shown as [ID:N]. When you output tasks:
@@ -22,4 +30,4 @@ Each current task has a unique ID shown as [ID:N]. When you output tasks:
 
 Return all text content in Turkish.
 
-Return a JSON object with a "tasks" array.
+Return a JSON object with a "tasks" array only (no extra commentary/markdown).
