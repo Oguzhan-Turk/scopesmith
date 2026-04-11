@@ -1,12 +1,15 @@
 package com.scopesmith.config;
 
 import jakarta.persistence.EntityNotFoundException;
+import com.scopesmith.service.SyncPolicyViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -44,6 +47,26 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.CONFLICT)
     public Map<String, Object> handleConflict(IllegalStateException ex) {
         return buildError(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
+    @ExceptionHandler(SyncPolicyViolationException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public Map<String, Object> handleSyncPolicyViolation(SyncPolicyViolationException ex) {
+        Map<String, Object> response = buildError(HttpStatus.CONFLICT, ex.getMessage());
+        response.put("code", "SYNC_POLICY_FAILED");
+        response.put("policyCheck", ex.getReport());
+        return response;
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<Map<String, Object>> handleResponseStatusException(ResponseStatusException ex) {
+        HttpStatus status = HttpStatus.resolve(ex.getStatusCode().value());
+        if (status == null) {
+            status = HttpStatus.INTERNAL_SERVER_ERROR;
+        }
+
+        String message = ex.getReason() != null ? ex.getReason() : status.getReasonPhrase();
+        return ResponseEntity.status(ex.getStatusCode()).body(buildError(status, message));
     }
 
     /**
