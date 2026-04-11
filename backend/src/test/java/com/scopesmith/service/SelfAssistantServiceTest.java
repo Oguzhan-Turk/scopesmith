@@ -4,6 +4,7 @@ import com.scopesmith.config.PromptLoader;
 import com.scopesmith.dto.ContextFreshnessResponse;
 import com.scopesmith.dto.SelfAssistantAiResult;
 import com.scopesmith.dto.SelfAssistantResponse;
+import com.scopesmith.entity.ModelTier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
@@ -52,7 +54,8 @@ class SelfAssistantServiceTest {
         action.setTarget("/projects/:id?tab=tasks");
         ai.setActions(List.of(action));
 
-        when(aiService.chatWithStructuredOutput(eq("prompt"), any(String.class), eq(SelfAssistantAiResult.class)))
+        when(aiService.chatWithStructuredOutput(eq("prompt"), any(String.class), eq(SelfAssistantAiResult.class),
+                isNull(), isNull(), eq(ModelTier.LIGHT)))
                 .thenReturn(ai);
 
         SelfAssistantResponse response = service.answer("Managed agent ne zaman kullanılır?", null);
@@ -74,7 +77,8 @@ class SelfAssistantServiceTest {
         action.setTarget("https://evil.example.com");
         ai.setActions(List.of(action));
 
-        when(aiService.chatWithStructuredOutput(eq("prompt"), any(String.class), eq(SelfAssistantAiResult.class)))
+        when(aiService.chatWithStructuredOutput(eq("prompt"), any(String.class), eq(SelfAssistantAiResult.class),
+                isNull(), isNull(), eq(ModelTier.LIGHT)))
                 .thenReturn(ai);
 
         SelfAssistantResponse response = service.answer("jira sync nasıl olur", null);
@@ -139,11 +143,13 @@ class SelfAssistantServiceTest {
 
     private void assertNoEnglishJargon(String answer) {
         String lower = answer.toLowerCase(Locale.ENGLISH);
+        // Only truly internal terms that must never reach end users.
+        // Product names (Jira, GitHub) and UI labels (Task'lar, Bağlam) are intentionally allowed.
         List<String> disallowed = List.of(
-                "managed agent", "context", "sync", "fallback", "dispatch", "review",
-                "workflow", "prompt", "guardrail", "policy", "feature flag", "roadmap", "backlog"
+                "feature flag", "guardrail", "router", "backlog", "roadmap",
+                "managed_agent", "in_progress", "no_baseline", "partial_refresh", "full_refresh"
         );
         assertTrue(disallowed.stream().noneMatch(lower::contains),
-                () -> "Yanıtta teknik/İngilizce jargon bulundu: " + answer);
+                () -> "Yanıtta iç teknik jargon bulundu: " + answer);
     }
 }

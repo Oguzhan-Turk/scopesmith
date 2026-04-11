@@ -1,5 +1,6 @@
 package com.scopesmith.service;
 
+import com.scopesmith.entity.ModelTier;
 import com.scopesmith.config.PromptLoader;
 import com.scopesmith.dto.ContextFreshnessResponse;
 import com.scopesmith.dto.SelfAssistantAiResult;
@@ -34,10 +35,10 @@ public class SelfAssistantService {
     );
 
     private static final Set<String> ALLOWED_CONFIDENCE = Set.of("HIGH", "MEDIUM", "LOW");
+    // Only truly internal terms that must never appear in user-facing text.
+    // Do NOT add natural-language or product words here — fix them in the prompt instead.
     private static final Set<String> DISALLOWED_JARGON = Set.of(
-            "dispatch", "review", "context", "sync", "fallback", "router",
-            "workflow", "prompt", "guardrail", "policy", "feature flag",
-            "stale", "freshness", "roadmap", "backlog"
+            "feature flag", "guardrail", "router", "prompt", "backlog", "roadmap"
     );
 
     private final AiService aiService;
@@ -89,13 +90,16 @@ public class SelfAssistantService {
         SelfAssistantAiResult aiResult = aiService.chatWithStructuredOutput(
                 systemPrompt,
                 userMessage,
-                SelfAssistantAiResult.class
+                SelfAssistantAiResult.class,
+                null,
+                null,
+                ModelTier.LIGHT
         );
 
         if (aiResult == null) {
             return null;
         }
-        String safeAnswer = sanitizeAnswerLanguage(aiResult.getAnswer());
+        String safeAnswer = sanitizeAnswer(aiResult.getAnswer());
         if (!isValidAiAnswer(safeAnswer)) return null;
 
         String confidence = normalizeConfidence(aiResult.getConfidence(), deterministic.getConfidence());
@@ -282,16 +286,23 @@ public class SelfAssistantService {
         return true;
     }
 
-    private String sanitizeAnswerLanguage(String answer) {
+    /**
+     * Security sanitizer: removes genuinely dangerous internal terms that must never
+     * reach the user (leaked enum/config names). Does NOT do language translation —
+     * that responsibility belongs to the prompt.
+     */
+    private String sanitizeAnswer(String answer) {
         if (answer == null) return "";
         String fixed = answer.trim();
-        fixed = fixed.replaceAll("(?i)\\bmanaged agent\\b", "Yönetilen Ajan");
-        fixed = fixed.replaceAll("(?i)\\btask\\b", "iş");
-        fixed = fixed.replaceAll("(?i)\\bcontext\\b", "bağlam");
-        fixed = fixed.replaceAll("(?i)\\bsync\\b", "eşitleme");
-        fixed = fixed.replaceAll("(?i)\\bdispatch\\b", "gönderim");
-        fixed = fixed.replaceAll("(?i)\\breview\\b", "kontrol");
-        fixed = fixed.replaceAll("(?i)\\bfallback\\b", "yedek yanıt");
+        // Leaked enum names → human-readable Turkish equivalents
+        fixed = fixed.replaceAll("\\bMANAGED_AGENT\\b", "Yönetilen Ajan");
+        fixed = fixed.replaceAll("\\bIN_PROGRESS\\b", "devam ediyor");
+        fixed = fixed.replaceAll("\\bCOMPLETED\\b", "tamamlandı");
+        fixed = fixed.replaceAll("\\bFAILED\\b", "başarısız");
+        fixed = fixed.replaceAll("\\bNO_BASELINE\\b", "henüz ölçülmedi");
+        fixed = fixed.replaceAll("\\bPARTIAL_REFRESH\\b", "kısmi güncelleme");
+        fixed = fixed.replaceAll("\\bFULL_REFRESH\\b", "tam güncelleme");
+        fixed = fixed.replaceAll("\\bNO_ACTION\\b", "ek işlem gerekmiyor");
         return fixed.replaceAll("\\s+", " ").trim();
     }
 
