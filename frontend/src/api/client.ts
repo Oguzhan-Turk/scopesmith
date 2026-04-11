@@ -84,6 +84,13 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   }
 }
 
+// Features
+export interface Features {
+  managedAgentEnabled: boolean;
+  selfAssistantEnabled: boolean;
+}
+export const getFeatures = () => request<Features>("/features");
+
 // Projects
 export const getProjects = () => request<Project[]>("/projects");
 export const getProject = (id: number) => request<Project>(`/projects/${id}`);

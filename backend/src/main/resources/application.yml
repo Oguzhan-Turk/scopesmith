@@ -69,6 +69,7 @@ scopesmith:
 
   features:
     managed-agent-enabled: ${MANAGED_AGENT_ENABLED:false}
+    self-assistant-enabled: ${SELF_ASSISTANT_ENABLED:false}
   scan:
     allowed-roots: ${SCOPESMITH_SCAN_ALLOWED_ROOTS:${user.home}}
   insights:

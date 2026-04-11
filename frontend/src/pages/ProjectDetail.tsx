@@ -80,6 +80,7 @@ import ConfirmDialog from "@/components/project/dialogs/ConfirmDialog";
 import ReqDialog from "@/components/project/dialogs/ReqDialog";
 import DocDialog from "@/components/project/dialogs/DocDialog";
 import ScopeSmithAssistantWidget from "@/components/project/ScopeSmithAssistantWidget";
+import { getFeatures } from "@/api/client";
 
 const LOADING_LABELS: Record<string, string> = {
   scan: "Proje taranıyor... Bu birkaç dakika sürebilir.",
@@ -143,6 +144,7 @@ export default function ProjectDetail() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [usageSummary, setUsageSummary] = useState<UsageSummary | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selfAssistantEnabled, setSelfAssistantEnabled] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -207,7 +209,7 @@ export default function ProjectDetail() {
     async function loadProject() {
       const currentLoadId = ++loadIdRef.current;
       try {
-        const [proj, reqs, config, usage, docs, freshness, refreshStatus, refreshHistory, traceabilityResult, services, graph] = await Promise.all([
+        const [proj, reqs, config, usage, docs, freshness, refreshStatus, refreshHistory, traceabilityResult, services, graph, features] = await Promise.all([
           getProject(projectId),
           getRequirements(projectId),
           getIntegrationConfig(projectId).catch(() => ({})),
@@ -219,6 +221,7 @@ export default function ProjectDetail() {
           getTraceability(projectId).catch(() => null),
           getProjectServices(projectId).catch(() => []),
           getServiceGraph(projectId).catch(() => null),
+          getFeatures().catch(() => ({ managedAgentEnabled: false, selfAssistantEnabled: false })),
         ]);
         // Stale response guard — discard if user navigated away
         if (currentLoadId !== loadIdRef.current) return;
@@ -236,6 +239,7 @@ export default function ProjectDetail() {
         setTraceability(traceabilityResult);
         setProjectServices(services);
         setServiceGraph(graph);
+        setSelfAssistantEnabled(features.selfAssistantEnabled);
         if (!scanFieldsInitialized) {
           if (proj.repoUrl) { setGitUrl(proj.repoUrl); setScanMode("git"); }
           else if (proj.localPath) { setScanPath(proj.localPath); setScanMode("local"); }
@@ -1321,10 +1325,12 @@ export default function ProjectDetail() {
         loading={actionLoading === "add-doc"}
       />
 
-      <ScopeSmithAssistantWidget
-        projectId={projectId}
-        showToast={showToast}
-      />
+      {selfAssistantEnabled && (
+        <ScopeSmithAssistantWidget
+          projectId={projectId}
+          showToast={showToast}
+        />
+      )}
     </div>
   );
 }
