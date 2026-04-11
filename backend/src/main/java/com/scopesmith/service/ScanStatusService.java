@@ -26,6 +26,10 @@ public class ScanStatusService {
         states.put(projectId, ScanState.scanning());
     }
 
+    public boolean trySetScanning(Long projectId) {
+        return states.putIfAbsent(projectId, ScanState.scanning()) == null;
+    }
+
     public void setDone(Long projectId) {
         states.remove(projectId);
     }
@@ -36,5 +40,9 @@ public class ScanStatusService {
 
     public ScanState getState(Long projectId) {
         return states.getOrDefault(projectId, ScanState.idle());
+    }
+
+    public boolean isScanning(Long projectId) {
+        return getState(projectId).status() == Status.SCANNING;
     }
 }
