@@ -25,15 +25,15 @@ export default function ScopeSmithAssistantWidget({ projectId, showToast }: Scop
       {
         id: "welcome",
         role: "assistant",
-        text: "Merhaba, ben ScopeSmith Asistanı. Yönetilen Ajan, bağlam güncelliği, iş eşitleme veya ScopeSmith farkı hakkında sorabilirsin.",
+        text: "Merhaba! ScopeSmith hakkında aklına takılan bir şey var mı? Bağlam güncelliği, Jira/GitHub eşitleme veya ScopeSmith'in nasıl çalıştığı gibi konularda yardımcı olabilirim.",
       },
     ]);
 
   const quickPrompts = useMemo(
     () => [
-      "Yönetilen Ajan ne zaman önerilir?",
+      "Jira ile eşitlemeyi nasıl yapabilirim?",
       "Bağlam güncelliği durumunu nasıl yorumlamalıyım?",
-      "Neden ScopeSmith kullanmalıyız?",
+      "ScopeSmith ne işe yarıyor?",
     ],
     []
   );

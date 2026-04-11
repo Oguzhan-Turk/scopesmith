@@ -25,8 +25,10 @@ public class SelfAssistantService {
             "requirements", "tasks", "context", "integrations", "usage"
     );
 
+    // Always include a tab param so navigation lands on a predictable screen.
+    // "/projects/:id" without a tab is intentionally excluded — it defaults to
+    // the requirements tab which is rarely the useful landing spot for assistant actions.
     private static final Set<String> ALLOWED_ACTION_TARGETS = Set.of(
-            "/projects/:id",
             "/projects/:id?tab=requirements",
             "/projects/:id?tab=tasks",
             "/projects/:id?tab=context",
