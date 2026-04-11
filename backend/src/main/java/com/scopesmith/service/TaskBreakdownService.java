@@ -7,7 +7,6 @@ import com.scopesmith.dto.SpSuggestionResult;
 import com.scopesmith.dto.TaskBreakdownResult;
 import com.scopesmith.dto.TaskRefineResponse;
 import com.scopesmith.dto.TaskResponse;
-import com.scopesmith.util.StructuredContextFormatter;
 import com.scopesmith.entity.*;
 import com.scopesmith.repository.AnalysisRepository;
 import com.scopesmith.repository.ProjectServiceNodeRepository;
@@ -41,6 +40,7 @@ public class TaskBreakdownService {
     private final ServiceDependencyRepository serviceDependencyRepository;
     private final PromptLoader promptLoader;
     private final AiResultValidationService validationService;
+    private final PromptContextBuilder promptContextBuilder;
 
     private static final long MIN_TASKS_FOR_CALIBRATION = 20;
 
@@ -325,27 +325,9 @@ public class TaskBreakdownService {
         StringBuilder message = new StringBuilder();
         Requirement requirement = analysis.getRequirement();
 
-        // Project context
-        String techContext = requirement.getProject().getTechContext();
-        if (techContext != null && !techContext.isBlank()) {
-            message.append("## Project Context\n");
-            message.append(techContext);
-            message.append("\n\n");
-        }
-
-        // Structured context (modules, entities, tech stack, etc.)
-        String structuredSection = StructuredContextFormatter.format(requirement.getProject().getStructuredContext());
-        if (!structuredSection.isEmpty()) {
-            message.append(structuredSection);
-        }
-
-        // CLAUDE.md content
-        String claudeMd = requirement.getProject().getClaudeMdContent();
-        if (claudeMd != null && !claudeMd.isBlank()) {
-            message.append("## Project Developer Notes (CLAUDE.md)\n");
-            message.append(claudeMd);
-            message.append("\n\n");
-        }
+        // Project + service context — relevance-filtered by affected modules
+        message.append(promptContextBuilder.buildContextBlock(
+                requirement.getProject(), analysis.getAffectedModules()));
 
         // Document context
         String docContext = documentService.getProjectDocumentContext(requirement.getProject().getId());

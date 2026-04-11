@@ -14,12 +14,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.IOException;
-import java.nio.file.*;
-import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.stream.Collectors;
+
 
 @Service
 @RequiredArgsConstructor
@@ -33,57 +32,7 @@ public class ProjectContextService {
     private final ObjectMapper objectMapper;
     private final AiResultValidationService validationService;
     private final DependencyParsingService dependencyParsingService;
-    private final SecretRedactionService secretRedactionService;
-
-    /**
-     * Key files that reveal project structure.
-     * We don't send the entire codebase — just the files that matter most.
-     */
-    private static final Set<String> KEY_FILENAMES = Set.of(
-            "pom.xml", "build.gradle", "build.gradle.kts",
-            "package.json", "requirements.txt", "go.mod", "Cargo.toml",
-            "README.md", "README", "readme.md",
-            "docker-compose.yml", "docker-compose.yaml", "Dockerfile",
-            "application.yml", "application.yaml", "application.properties"
-    );
-
-    /**
-     * File extensions that contain domain/business logic we want Claude to understand.
-     */
-    private static final Set<String> CODE_EXTENSIONS = Set.of(
-            ".java", ".kt", ".py", ".ts", ".js", ".go", ".rs", ".cs"
-    );
-
-    /**
-     * Directories to skip — no value for context understanding.
-     */
-    private static final Set<String> SKIP_DIRS = Set.of(
-            "node_modules", "target", "build", "dist", ".git", ".idea",
-            ".vscode", "__pycache__", ".gradle", "bin", "obj", ".mvn"
-    );
-
-    /**
-     * Maximum file size to read (50KB). Larger files are likely generated or data files.
-     */
-    private static final long MAX_FILE_SIZE = 50 * 1024;
-
-    /**
-     * Maximum total content to send to Claude (150KB).
-     * Prevents token explosion on large projects.
-     */
-    private static final long MAX_TOTAL_CONTENT = 150 * 1024;
-
-    /**
-     * Maximum number of files to include in context.
-     */
-    private static final int MAX_FILES = 50;
-
-    /**
-     * Maximum file tree depth to prevent scanning deeply nested directories.
-     */
-    private static final int MAX_TREE_DEPTH = 8;
-
-    // Prompt loaded from resources/prompts/project-context.txt via PromptLoader
+    private final FileScanHelper fileScanHelper;
 
     /**
      * Scan a local folder and generate project context using AI.
@@ -100,15 +49,15 @@ public class ProjectContextService {
         log.info("Scanning local folder for project #{}: {}", projectId, folderPath);
 
         // Read CLAUDE.md if present (developer notes, conventions)
-        String claudeMd = readClaudeMd(root);
+        String claudeMd = fileScanHelper.readClaudeMd(root);
         project.setClaudeMdContent(claudeMd);
 
         // Build file tree
-        String fileTree = buildFileTree(root);
+        String fileTree = fileScanHelper.buildFileTree(root);
 
         // Read key files (also collects build file contents for dependency parsing)
         Map<String, String> buildFileContents = new HashMap<>();
-        String keyFileContents = readKeyFiles(root, buildFileContents);
+        String keyFileContents = fileScanHelper.readKeyFiles(root, buildFileContents);
 
         // Build message for Claude
         String userMessage = "## File Tree\n```\n" + fileTree + "\n```\n\n" +
@@ -156,194 +105,12 @@ public class ProjectContextService {
         project.setContextVersion(project.getContextVersion() + 1);
 
         // Try to get git commit hash if it's a git repo
-        try {
-            Path gitHead = root.resolve(".git/HEAD");
-            if (Files.exists(gitHead)) {
-                String headContent = Files.readString(gitHead).trim();
-                if (headContent.startsWith("ref: ")) {
-                    Path refPath = root.resolve(".git/" + headContent.substring(5));
-                    if (Files.exists(refPath)) {
-                        project.setLastScannedCommitHash(Files.readString(refPath).trim());
-                    }
-                }
-            }
-        } catch (IOException e) {
-            log.debug("Could not read git commit hash for project #{}", projectId);
+        String commitHash = fileScanHelper.extractCommitHash(root);
+        if (commitHash != null) {
+            project.setLastScannedCommitHash(commitHash);
         }
 
         return projectRepository.save(project);
     }
 
-    /**
-     * Build a file tree string, respecting skip directories.
-     */
-    private String buildFileTree(Path root) {
-        List<String> entries = new ArrayList<>();
-
-        try {
-            Files.walkFileTree(root, new SimpleFileVisitor<>() {
-                @Override
-                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
-                    String dirName = dir.getFileName().toString();
-                    if (SKIP_DIRS.contains(dirName) && !dir.equals(root)) {
-                        return FileVisitResult.SKIP_SUBTREE;
-                    }
-                    // Depth limit
-                    int depth = root.relativize(dir).getNameCount();
-                    if (depth > MAX_TREE_DEPTH) {
-                        return FileVisitResult.SKIP_SUBTREE;
-                    }
-                    String relative = root.relativize(dir).toString();
-                    if (!relative.isEmpty()) {
-                        entries.add(relative + "/");
-                    }
-                    return FileVisitResult.CONTINUE;
-                }
-
-                @Override
-                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-                    if (entries.size() < 500) { // prevent file tree explosion
-                        entries.add(root.relativize(file).toString());
-                    }
-                    return FileVisitResult.CONTINUE;
-                }
-            });
-        } catch (IOException e) {
-            log.error("Error building file tree for {}", root, e);
-        }
-
-        return entries.stream()
-                .sorted()
-                .collect(Collectors.joining("\n"));
-    }
-
-    /**
-     * Read CLAUDE.md from the project root — developer notes, conventions, decisions.
-     * Checks: CLAUDE.md, .claude/CLAUDE.md
-     */
-    private String readClaudeMd(Path root) {
-        for (String candidate : List.of("CLAUDE.md", ".claude/CLAUDE.md")) {
-            Path path = root.resolve(candidate);
-            if (Files.exists(path) && Files.isRegularFile(path)) {
-                try {
-                    String content = Files.readString(path);
-                    if (content.length() > MAX_FILE_SIZE) {
-                        content = content.substring(0, (int) MAX_FILE_SIZE);
-                        log.warn("CLAUDE.md truncated to {}KB for project at {}", MAX_FILE_SIZE / 1024, root);
-                    }
-                    log.info("Found CLAUDE.md ({} chars) at {}", content.length(), path);
-                    return content;
-                } catch (IOException e) {
-                    log.warn("Failed to read CLAUDE.md at {}: {}", path, e.getMessage());
-                }
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Read contents of key files — config files, entity/model files, README.
-     * Respects MAX_FILE_SIZE per file and MAX_TOTAL_CONTENT total.
-     */
-    /**
-     * Build file names that contain dependency declarations.
-     */
-    private static final Set<String> BUILD_FILENAMES = Set.of(
-            "pom.xml", "build.gradle", "build.gradle.kts",
-            "package.json", "requirements.txt", "go.mod"
-    );
-
-    private String readKeyFiles(Path root, Map<String, String> buildFileContents) {
-        StringBuilder content = new StringBuilder();
-        long totalSize = 0;
-        int totalRedactions = 0;
-
-        try {
-            List<Path> filesToRead = new ArrayList<>();
-
-            Files.walkFileTree(root, new SimpleFileVisitor<>() {
-                @Override
-                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
-                    String dirName = dir.getFileName().toString();
-                    if (SKIP_DIRS.contains(dirName) && !dir.equals(root)) {
-                        return FileVisitResult.SKIP_SUBTREE;
-                    }
-                    return FileVisitResult.CONTINUE;
-                }
-
-                @Override
-                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-                    String fileName = file.getFileName().toString();
-
-                    // Always read key config files
-                    if (KEY_FILENAMES.contains(fileName)) {
-                        filesToRead.add(file);
-                        return FileVisitResult.CONTINUE;
-                    }
-
-                    // Read entity/model/domain files
-                    String extension = getExtension(fileName);
-                    if (CODE_EXTENSIONS.contains(extension)) {
-                        String pathStr = file.toString().toLowerCase(java.util.Locale.ENGLISH);
-                        if (pathStr.contains("entity") || pathStr.contains("model") ||
-                                pathStr.contains("domain") || pathStr.contains("controller") ||
-                                pathStr.contains("service") && !pathStr.contains("test")) {
-                            filesToRead.add(file);
-                        }
-                    }
-
-                    return FileVisitResult.CONTINUE;
-                }
-            });
-
-            // Sort and limit file count, then read
-            List<Path> sortedFiles = filesToRead.stream().sorted().limit(MAX_FILES).toList();
-            log.info("Reading {} key files (of {} found)", sortedFiles.size(), filesToRead.size());
-            for (Path file : sortedFiles) {
-                if (totalSize >= MAX_TOTAL_CONTENT) {
-                    content.append("\n--- (content limit reached, remaining files omitted) ---\n");
-                    break;
-                }
-
-                try {
-                    long fileSize = Files.size(file);
-                    if (fileSize > MAX_FILE_SIZE) {
-                        content.append("\n### ").append(root.relativize(file)).append(" (skipped — too large)\n");
-                        continue;
-                    }
-
-                    String fileContent = Files.readString(file);
-                    SecretRedactionService.RedactionResult redaction = secretRedactionService.redact(fileContent);
-                    String sanitized = redaction.content();
-                    totalRedactions += redaction.redactionCount();
-
-                    content.append("\n### ").append(root.relativize(file)).append("\n```\n");
-                    content.append(sanitized);
-                    content.append("\n```\n");
-                    totalSize += fileSize;
-
-                    // Collect build file contents for dependency parsing
-                    String fn = file.getFileName().toString();
-                    if (BUILD_FILENAMES.contains(fn)) {
-                        buildFileContents.put(root.relativize(file).toString(), fileContent);
-                    }
-                } catch (IOException e) {
-                    log.debug("Could not read file: {}", file);
-                }
-            }
-        } catch (IOException e) {
-            log.error("Error reading key files from {}", root, e);
-        }
-
-        if (totalRedactions > 0) {
-            log.info("Secret redaction applied before AI context scan: {} replacements", totalRedactions);
-        }
-
-        return content.toString();
-    }
-
-    private String getExtension(String filename) {
-        int lastDot = filename.lastIndexOf('.');
-        return lastDot >= 0 ? filename.substring(lastDot) : "";
-    }
 }

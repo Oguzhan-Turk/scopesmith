@@ -23,25 +23,15 @@ public class FeatureSuggestionService {
     private final ProjectService projectService;
     private final PromptLoader promptLoader;
     private final AiResultValidationService validationService;
+    private final PromptContextBuilder promptContextBuilder;
 
     public FeatureSuggestionResult suggestFeatures(Long projectId) {
         Project project = projectService.getProjectOrThrow(projectId);
 
         StringBuilder message = new StringBuilder();
 
-        // Project context
-        if (project.getTechContext() != null) {
-            message.append("## Project Context\n");
-            message.append(project.getTechContext());
-            message.append("\n\n");
-        }
-
-        // CLAUDE.md
-        if (project.getClaudeMdContent() != null) {
-            message.append("## Developer Notes\n");
-            message.append(project.getClaudeMdContent());
-            message.append("\n\n");
-        }
+        // Project + service context (single-repo or federated)
+        message.append(promptContextBuilder.buildContextBlock(project));
 
         // Existing requirements
         List<Requirement> requirements = project.getRequirements();

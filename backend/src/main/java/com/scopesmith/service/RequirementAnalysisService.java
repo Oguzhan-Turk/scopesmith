@@ -14,7 +14,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.scopesmith.util.StructuredContextFormatter;
 
 import java.util.List;
 import java.util.Objects;
@@ -33,6 +32,7 @@ public class RequirementAnalysisService {
     private final PromptLoader promptLoader;
     private final AiResultValidationService validationService;
     private final QuestionDeduplicationService questionDeduplicationService;
+    private final PromptContextBuilder promptContextBuilder;
 
     /**
      * Analyze a requirement. AI call is made OUTSIDE the transaction
@@ -179,19 +179,9 @@ public class RequirementAnalysisService {
     private String buildReAnalysisMessage(Requirement requirement, Analysis previousAnalysis) {
         StringBuilder message = new StringBuilder();
 
-        // Project context
-        String techContext = requirement.getProject().getTechContext();
-        if (techContext != null && !techContext.isBlank()) {
-            message.append("## Project Context\n");
-            message.append(techContext);
-            message.append("\n\n");
-        }
-
-        // Add structured context for re-analysis
-        String structuredSection = StructuredContextFormatter.format(requirement.getProject().getStructuredContext());
-        if (!structuredSection.isEmpty()) {
-            message.append(structuredSection);
-        }
+        // Project + service context — relevance-filtered using previous analysis modules
+        message.append(promptContextBuilder.buildContextBlock(
+                requirement.getProject(), previousAnalysis.getAffectedModules()));
 
         message.append("## Raw Requirement\n");
         message.append(requirement.getRawText());
@@ -250,27 +240,8 @@ public class RequirementAnalysisService {
     private String buildUserMessage(Requirement requirement) {
         StringBuilder message = new StringBuilder();
 
-        // Add project context if available
-        String techContext = requirement.getProject().getTechContext();
-        if (techContext != null && !techContext.isBlank()) {
-            message.append("## Project Context\n");
-            message.append(techContext);
-            message.append("\n\n");
-        }
-
-        // Add structured context (modules, entities, tech stack, etc.)
-        String structuredSection = StructuredContextFormatter.format(requirement.getProject().getStructuredContext());
-        if (!structuredSection.isEmpty()) {
-            message.append(structuredSection);
-        }
-
-        // Add CLAUDE.md content if available (developer notes, conventions)
-        String claudeMd = requirement.getProject().getClaudeMdContent();
-        if (claudeMd != null && !claudeMd.isBlank()) {
-            message.append("## Project Developer Notes (CLAUDE.md)\n");
-            message.append(claudeMd);
-            message.append("\n\n");
-        }
+        // Project + service context (single-repo or federated)
+        message.append(promptContextBuilder.buildContextBlock(requirement.getProject()));
 
         // Add project-level document context (Feature F)
         String docContext = documentService.getProjectDocumentContext(requirement.getProject().getId());

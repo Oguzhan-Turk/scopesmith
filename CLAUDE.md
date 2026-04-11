@@ -19,6 +19,8 @@ Controller → Service → Repository → Entity (Layered)
 - **Multi-tenancy Seviye 1:** Organization entity, `app_users` ve `projects` tablosunda `organization_id` FK. Proje oluşturma otomatik org atar
 - **Organizational Memory:** pgvector (`pgvector/pgvector:pg17` Docker image), `requirement_embeddings` tablosu, OpenAI text-embedding-3-small (1536 dim). `OPENAI_API_KEY` yoksa graceful degrade (embedding skip edilir)
 - **Managed Agent (altyapı hazır, UX askıda):** Feature flag (`MANAGED_AGENT_ENABLED=false` default). `ManagedAgentService` interface → `CliAgentService`. Backend endpoint'leri var, frontend tetikleme butonu yok (ADR-007). Entity: `agentSessionId/agentStatus/agentBranch`
+- **Self-Assistant:** Feature flag (`SELF_ASSISTANT_ENABLED=false` default). `GET /api/v1/features` endpoint'i flag durumunu frontend'e iletir. Kapalıyken `/api/v1/assistant/self-help` 404 döner, widget render edilmez.
+- **Context Resolution (ADR-008):** `ContextResolutionService` → tek nokta. Tek-repo projede project-level context (eski davranış korunur). Workspace servisleri taranmışsa federated (proje + her servis contexti). `PromptContextBuilder` tüm AI servislerinde 3-blok pattern'i replace eder. `FileScanHelper` scan kodunu tek yerde tutar, her iki scan servisinde reuse edilir.
 
 ## Çalıştırma
 ```bash
@@ -43,7 +45,11 @@ Backend: http://localhost:8080 | Frontend: http://localhost:5173 | Users: admin/
 | RequirementAnalysisService | Talep analizi, soru üretimi, refine |
 | TaskBreakdownService | Task üretimi, SP tahmini, Learning SP, refine |
 | StakeholderSummaryService | Yönetici özeti üretimi/iyileştirme |
-| ProjectContextService | Kod tarama (local/git), CLAUDE.md okuma |
+| ProjectContextService | Kod tarama (local/git), CLAUDE.md okuma — FileScanHelper kullanır |
+| ServiceContextScanService | Workspace servis tarama — FileScanHelper kullanır |
+| ContextResolutionService | Hangi context inject edilecek: single-repo vs federated (ADR-008) |
+| PromptContextBuilder | AI prompt'larına context bloğu ekler (tüm AI servisleri kullanır) |
+| FileScanHelper | Ortak dosya tarama yardımcısı (buildFileTree, readKeyFiles, extractCommitHash) |
 | CodeIntelligenceService | Token'sız kod analizi (regex + JGit) |
 | DocumentService | Belge yönetimi, AI özet (LIGHT tier) |
 | ClaudeCodeService | Task'tan Claude Code prompt üretimi |
@@ -61,7 +67,7 @@ Backend: http://localhost:8080 | Frontend: http://localhost:5173 | Users: admin/
 - **Re-analiz soru üretmez:** Son soru cevaplanınca re-analiz `questions: []` döner (sonsuz döngü önlemi)
 - **AI validation:** `AiResultValidationService` — SP fibonacci'ye düzeltilir, modules doğrulanır, sorular dedup'lanır
 - **Enum fallback:** `@JsonCreator` ile AI geçersiz değer → fallback + WARN log
-- **Structured context injection:** modules/entities/endpoints tüm AI çağrılarına enjekte (StructuredContextFormatter)
+- **Structured context injection:** modules/entities/endpoints tüm AI çağrılarına enjekte (`PromptContextBuilder` → `ContextResolutionService` → `StructuredContextFormatter`)
 - **Dependency parsing:** Build file parse (Maven/npm/Gradle/Python/Go), token harcanmaz
 - **Module dependency graph:** Import-based (dependsOn/consumedBy), token harcanmaz
 - **SP refetch yok:** `task.spSuggestion` doluysa API çağrılmaz, tab geçişlerinde kaybolmaz

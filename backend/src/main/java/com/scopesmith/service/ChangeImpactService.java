@@ -26,6 +26,7 @@ public class ChangeImpactService {
     private final AnalysisRepository analysisRepository;
     private final PromptLoader promptLoader;
     private final AiResultValidationService validationService;
+    private final PromptContextBuilder promptContextBuilder;
 
     /**
      * Compare the current requirement text against the latest analysis
@@ -78,13 +79,9 @@ public class ChangeImpactService {
     private String buildImpactMessage(Requirement requirement, Analysis latestAnalysis) {
         StringBuilder message = new StringBuilder();
 
-        // Project context
-        String techContext = requirement.getProject().getTechContext();
-        if (techContext != null && !techContext.isBlank()) {
-            message.append("## Project Context\n");
-            message.append(techContext);
-            message.append("\n\n");
-        }
+        // Project + service context — relevance-filtered by modules from the previous analysis
+        message.append(promptContextBuilder.buildContextBlock(
+                requirement.getProject(), latestAnalysis.getAffectedModules()));
 
         // Original requirement (from the analysis)
         message.append("## Original Requirement (v").append(latestAnalysis.getRequirementVersion()).append(")\n");

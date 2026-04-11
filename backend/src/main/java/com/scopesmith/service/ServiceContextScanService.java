@@ -16,15 +16,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.IOException;
-import java.nio.file.FileVisitResult;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.stream.Collectors;
+
 
 @Service
 @RequiredArgsConstructor
@@ -38,33 +33,7 @@ public class ServiceContextScanService {
     private final ObjectMapper objectMapper;
     private final AiResultValidationService validationService;
     private final DependencyParsingService dependencyParsingService;
-
-    private static final Set<String> KEY_FILENAMES = Set.of(
-            "pom.xml", "build.gradle", "build.gradle.kts",
-            "package.json", "requirements.txt", "go.mod", "Cargo.toml",
-            "README.md", "README", "readme.md",
-            "docker-compose.yml", "docker-compose.yaml", "Dockerfile",
-            "application.yml", "application.yaml", "application.properties"
-    );
-
-    private static final Set<String> CODE_EXTENSIONS = Set.of(
-            ".java", ".kt", ".py", ".ts", ".js", ".go", ".rs", ".cs"
-    );
-
-    private static final Set<String> SKIP_DIRS = Set.of(
-            "node_modules", "target", "build", "dist", ".git", ".idea",
-            ".vscode", "__pycache__", ".gradle", "bin", "obj", ".mvn"
-    );
-
-    private static final Set<String> BUILD_FILENAMES = Set.of(
-            "pom.xml", "build.gradle", "build.gradle.kts",
-            "package.json", "requirements.txt", "go.mod"
-    );
-
-    private static final long MAX_FILE_SIZE = 50 * 1024;
-    private static final long MAX_TOTAL_CONTENT = 150 * 1024;
-    private static final int MAX_FILES = 50;
-    private static final int MAX_TREE_DEPTH = 8;
+    private final FileScanHelper fileScanHelper;
 
     @Transactional
     public ServiceScanResponse scanService(Long projectId, Long serviceId, String folderPath) {
@@ -79,13 +48,12 @@ public class ServiceContextScanService {
         String safePath = scanSecurityService.validateLocalFolderPath(pathInput);
         Path root = Path.of(safePath);
 
-        String fileTree = buildFileTree(root);
+        String fileTree = fileScanHelper.buildFileTree(root);
         Map<String, String> buildFileContents = new HashMap<>();
-        String keyFileContents = readKeyFiles(root, buildFileContents);
+        String keyFileContents = fileScanHelper.readKeyFiles(root, buildFileContents);
         String userMessage = "## File Tree\n```\n" + fileTree + "\n```\n\n" +
                 "## Key File Contents\n" + keyFileContents;
 
-        // TODO: [TECH-DEBT] ProjectContextService ile ortak scan helper'a taşınıp tekrar eden kod azaltılmalı.
         String context = aiService.chat(
                 promptLoader.load("project-context"),
                 userMessage,
@@ -121,7 +89,7 @@ public class ServiceContextScanService {
         service.setLocalPath(safePath);
         service.setLastScannedAt(LocalDateTime.now());
         service.setContextVersion((service.getContextVersion() != null ? service.getContextVersion() : 0) + 1);
-        service.setLastScannedCommitHash(extractCommitHash(root));
+        service.setLastScannedCommitHash(fileScanHelper.extractCommitHash(root));
 
         projectServiceNodeRepository.save(service);
 
@@ -135,125 +103,4 @@ public class ServiceContextScanService {
                 .build();
     }
 
-    private String extractCommitHash(Path root) {
-        try {
-            Path gitHead = root.resolve(".git/HEAD");
-            if (Files.exists(gitHead)) {
-                String headContent = Files.readString(gitHead).trim();
-                if (headContent.startsWith("ref: ")) {
-                    Path refPath = root.resolve(".git/" + headContent.substring(5));
-                    if (Files.exists(refPath)) {
-                        return Files.readString(refPath).trim();
-                    }
-                }
-            }
-        } catch (IOException e) {
-            log.debug("Could not read git commit hash for service path {}", root);
-        }
-        return null;
-    }
-
-    private String buildFileTree(Path root) {
-        List<String> entries = new ArrayList<>();
-        try {
-            Files.walkFileTree(root, new SimpleFileVisitor<>() {
-                @Override
-                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
-                    String dirName = dir.getFileName().toString();
-                    if (SKIP_DIRS.contains(dirName) && !dir.equals(root)) {
-                        return FileVisitResult.SKIP_SUBTREE;
-                    }
-                    int depth = root.relativize(dir).getNameCount();
-                    if (depth > MAX_TREE_DEPTH) {
-                        return FileVisitResult.SKIP_SUBTREE;
-                    }
-                    String relative = root.relativize(dir).toString();
-                    if (!relative.isEmpty()) {
-                        entries.add(relative + "/");
-                    }
-                    return FileVisitResult.CONTINUE;
-                }
-
-                @Override
-                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-                    if (entries.size() < 500) {
-                        entries.add(root.relativize(file).toString());
-                    }
-                    return FileVisitResult.CONTINUE;
-                }
-            });
-        } catch (IOException e) {
-            log.error("Error building file tree for {}", root, e);
-        }
-        return entries.stream().sorted().collect(Collectors.joining("\n"));
-    }
-
-    private String readKeyFiles(Path root, Map<String, String> buildFileContents) {
-        StringBuilder content = new StringBuilder();
-        long totalSize = 0;
-
-        try {
-            List<Path> filesToRead = new ArrayList<>();
-            Files.walkFileTree(root, new SimpleFileVisitor<>() {
-                @Override
-                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
-                    String dirName = dir.getFileName().toString();
-                    if (SKIP_DIRS.contains(dirName) && !dir.equals(root)) {
-                        return FileVisitResult.SKIP_SUBTREE;
-                    }
-                    return FileVisitResult.CONTINUE;
-                }
-
-                @Override
-                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-                    String fileName = file.getFileName().toString();
-                    if (KEY_FILENAMES.contains(fileName)) {
-                        filesToRead.add(file);
-                        return FileVisitResult.CONTINUE;
-                    }
-                    String lower = fileName.toLowerCase(Locale.ENGLISH);
-                    for (String ext : CODE_EXTENSIONS) {
-                        if (lower.endsWith(ext)) {
-                            Path rel = root.relativize(file);
-                            String path = rel.toString().replace('\\', '/');
-                            if (path.contains("/entity/")
-                                    || path.contains("/model/")
-                                    || path.contains("/controller/")
-                                    || path.contains("/service/")) {
-                                filesToRead.add(file);
-                            }
-                            break;
-                        }
-                    }
-                    return FileVisitResult.CONTINUE;
-                }
-            });
-
-            filesToRead.sort(Comparator.comparing(p -> root.relativize(p).toString()));
-            int included = 0;
-            for (Path file : filesToRead) {
-                if (content.length() > MAX_TOTAL_CONTENT || included >= MAX_FILES) break;
-                String rel = root.relativize(file).toString();
-                long size = Files.size(file);
-                if (size > MAX_FILE_SIZE) continue;
-                String text = Files.readString(file);
-                if (text.isBlank()) continue;
-                if (totalSize + text.length() > MAX_TOTAL_CONTENT) break;
-
-                content.append("\n### ").append(rel).append("\n```\n")
-                        .append(text.length() > 4000 ? text.substring(0, 4000) : text)
-                        .append("\n```\n");
-                totalSize += text.length();
-                included++;
-
-                if (BUILD_FILENAMES.contains(file.getFileName().toString())) {
-                    buildFileContents.put(rel, text);
-                }
-            }
-        } catch (IOException e) {
-            log.error("Error reading key files for {}", root, e);
-        }
-
-        return content.toString();
-    }
 }
