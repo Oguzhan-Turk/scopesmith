@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import {
   getProject,
@@ -24,6 +24,18 @@ import {
   scanProject,
   scanProjectGit,
   getScanStatus,
+  getContextFreshness,
+  runPartialRefresh,
+  getPartialRefreshStatus,
+  getPartialRefreshJobs,
+  getTraceability,
+  getProjectServices,
+  createProjectService,
+  deleteProjectService,
+  scanProjectService,
+  getServiceGraph,
+  addServiceDependency,
+  deleteServiceDependency,
   getIntegrationConfig,
   updateIntegrationConfig,
   getProjectUsage,
@@ -43,8 +55,13 @@ import {
   type Analysis,
   type Task,
   type Document,
+  type ContextFreshness,
+  type PartialRefreshResult,
+  type TraceabilityReport,
+  type ProjectService,
+  type ServiceGraph,
+  type ServiceType,
 } from "@/api/client";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/hooks/useToast";
@@ -62,6 +79,7 @@ import ManualTaskDialog from "@/components/project/dialogs/ManualTaskDialog";
 import ConfirmDialog from "@/components/project/dialogs/ConfirmDialog";
 import ReqDialog from "@/components/project/dialogs/ReqDialog";
 import DocDialog from "@/components/project/dialogs/DocDialog";
+import ScopeSmithAssistantWidget from "@/components/project/ScopeSmithAssistantWidget";
 
 const LOADING_LABELS: Record<string, string> = {
   scan: "Proje taranıyor... Bu birkaç dakika sürebilir.",
@@ -70,6 +88,7 @@ const LOADING_LABELS: Record<string, string> = {
   "refine-summary": "Özet iyileştiriliyor...",
   "refine-tasks": "Task'lar iyileştiriliyor...",
   "re-analyze": "Tüm sorular cevaplandı, yeniden analiz yapılıyor...",
+  "partial-refresh": "Etkilenen talepler için kısmi yeniden analiz yapılıyor...",
 };
 
 export default function ProjectDetail() {
@@ -83,7 +102,7 @@ export default function ProjectDetail() {
   const [project, setProject] = useState<Project | null>(null);
   const [requirements, setRequirements] = useState<Requirement[]>([]);
   const [selectedRequirementId, setSelectedRequirementId] = useState<number | null>(null);
-  const [_analyses, setAnalyses] = useState<Analysis[]>([]);
+  const [, setAnalyses] = useState<Analysis[]>([]);
   const [selectedAnalysis, setSelectedAnalysis] = useState<Analysis | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
 
@@ -98,6 +117,28 @@ export default function ProjectDetail() {
   const [summaryInstruction, setSummaryInstruction] = useState("");
   const [taskInstruction, setTaskInstruction] = useState("");
   const [integrationConfig, setIntegrationConfig] = useState<IntegrationConfig>({});
+  const [projectServices, setProjectServices] = useState<ProjectService[]>([]);
+  const [serviceGraph, setServiceGraph] = useState<ServiceGraph | null>(null);
+  const [newServiceForm, setNewServiceForm] = useState<{
+    name: string;
+    serviceType: ServiceType;
+    repoUrl: string;
+    localPath: string;
+    defaultBranch: string;
+    ownerTeam: string;
+  }>({
+    name: "",
+    serviceType: "OTHER",
+    repoUrl: "",
+    localPath: "",
+    defaultBranch: "main",
+    ownerTeam: "",
+  });
+  const [dependencyForm, setDependencyForm] = useState<{ fromServiceId: number | ""; toServiceId: number | ""; dependencyType: string }>({
+    fromServiceId: "",
+    toServiceId: "",
+    dependencyType: "SYNC",
+  });
   const [confirmDialog, setConfirmDialog] = useState<{ message: string; onConfirm: () => void } | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [usageSummary, setUsageSummary] = useState<UsageSummary | null>(null);
@@ -106,7 +147,7 @@ export default function ProjectDetail() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [manualTaskDialog, setManualTaskDialog] = useState(false);
-  const [manualTaskForm, setManualTaskForm] = useState({ title: "", description: "", priority: "MEDIUM", category: "" });
+  const [manualTaskForm, setManualTaskForm] = useState({ title: "", description: "", priority: "MEDIUM", category: "", serviceId: "" as number | "" });
   const [expandedTasks, setExpandedTasks] = useState<Set<number>>(new Set());
   const [documents, setDocuments] = useState<Document[]>([]);
   const [docForm, setDocForm] = useState({ filename: "", content: "", docType: "OTHER" });
@@ -116,6 +157,30 @@ export default function ProjectDetail() {
   const [docDialog, setDocDialog] = useState<{ type: "project" } | { type: "requirement"; reqId: number } | null>(null);
   const [reqDocs, setReqDocs] = useState<Record<number, Document[]>>({});
   const [featureSuggestions, setFeatureSuggestions] = useState<FeatureSuggestionResult | null>(null);
+  const [contextFreshness, setContextFreshness] = useState<ContextFreshness | null>(null);
+  const [partialRefreshStatus, setPartialRefreshStatus] = useState<PartialRefreshResult | null>(null);
+  const [partialRefreshHistory, setPartialRefreshHistory] = useState<PartialRefreshResult[]>([]);
+  const [partialRefreshHistoryPage, setPartialRefreshHistoryPage] = useState(0);
+  const [partialRefreshHistoryTotalPages, setPartialRefreshHistoryTotalPages] = useState(0);
+  const [partialRefreshLoadingMore, setPartialRefreshLoadingMore] = useState(false);
+  const [traceability, setTraceability] = useState<TraceabilityReport | null>(null);
+
+  function normalizeHistoryResponse(
+    value: unknown,
+  ): { page: number; totalPages: number; items: PartialRefreshResult[] } {
+    if (Array.isArray(value)) {
+      return { page: 0, totalPages: 1, items: value as PartialRefreshResult[] };
+    }
+    if (value && typeof value === "object") {
+      const maybe = value as { page?: number; totalPages?: number; items?: PartialRefreshResult[] };
+      return {
+        page: maybe.page ?? 0,
+        totalPages: maybe.totalPages ?? 0,
+        items: Array.isArray(maybe.items) ? maybe.items : [],
+      };
+    }
+    return { page: 0, totalPages: 0, items: [] };
+  }
 
   // Guard against stale responses when navigating between projects
   const loadIdRef = useRef(0);
@@ -139,48 +204,65 @@ export default function ProjectDetail() {
   }
 
   useEffect(() => {
-    loadProject();
-  }, [projectId]);
-
-  // Restore requirement selection from URL
-  useEffect(() => {
-    const reqId = searchParams.get("req");
-    if (reqId && requirements.length > 0 && !selectedRequirementId) {
-      handleSelectRequirement(Number(reqId));
-    }
-  }, [requirements]);
-
-  async function loadProject() {
-    const currentLoadId = ++loadIdRef.current;
-    try {
-      const [proj, reqs, config, usage, docs] = await Promise.all([
-        getProject(projectId),
-        getRequirements(projectId),
-        getIntegrationConfig(projectId).catch(() => ({})),
-        getProjectUsage(projectId).catch(() => null),
-        getDocuments(projectId).catch(() => []),
-      ]);
-      // Stale response guard — discard if user navigated away
-      if (currentLoadId !== loadIdRef.current) return;
-      setProject(proj);
-      setRequirements(reqs);
-      setIntegrationConfig(config);
-      setUsageSummary(usage);
-      setDocuments(docs);
-      if (!scanFieldsInitialized) {
-        if (proj.repoUrl) { setGitUrl(proj.repoUrl); setScanMode("git"); }
-        else if (proj.localPath) { setScanPath(proj.localPath); setScanMode("local"); }
-        setScanFieldsInitialized(true);
+    async function loadProject() {
+      const currentLoadId = ++loadIdRef.current;
+      try {
+        const [proj, reqs, config, usage, docs, freshness, refreshStatus, refreshHistory, traceabilityResult, services, graph] = await Promise.all([
+          getProject(projectId),
+          getRequirements(projectId),
+          getIntegrationConfig(projectId).catch(() => ({})),
+          getProjectUsage(projectId).catch(() => null),
+          getDocuments(projectId).catch(() => []),
+          getContextFreshness(projectId).catch(() => null),
+          getPartialRefreshStatus(projectId).catch(() => null),
+          getPartialRefreshJobs(projectId, 0, 5).catch(() => ({ page: 0, size: 5, totalElements: 0, totalPages: 0, items: [] })),
+          getTraceability(projectId).catch(() => null),
+          getProjectServices(projectId).catch(() => []),
+          getServiceGraph(projectId).catch(() => null),
+        ]);
+        // Stale response guard — discard if user navigated away
+        if (currentLoadId !== loadIdRef.current) return;
+        setProject(proj);
+        setRequirements(reqs);
+        setIntegrationConfig(config);
+        setUsageSummary(usage);
+        setDocuments(docs);
+        setContextFreshness(freshness);
+        setPartialRefreshStatus(refreshStatus);
+        const normalizedHistory = normalizeHistoryResponse(refreshHistory);
+        setPartialRefreshHistory(normalizedHistory.items);
+        setPartialRefreshHistoryPage(normalizedHistory.page);
+        setPartialRefreshHistoryTotalPages(normalizedHistory.totalPages);
+        setTraceability(traceabilityResult);
+        setProjectServices(services);
+        setServiceGraph(graph);
+        if (!scanFieldsInitialized) {
+          if (proj.repoUrl) { setGitUrl(proj.repoUrl); setScanMode("git"); }
+          else if (proj.localPath) { setScanPath(proj.localPath); setScanMode("local"); }
+          setScanFieldsInitialized(true);
+        }
+      } catch (e) {
+        showToast("Proje yüklenemedi. Lütfen sayfayı yenileyin.");
+        console.error("Failed to load project:", e);
+      } finally {
+        setLoading(false);
       }
-    } catch (e) {
-      showToast("Proje yüklenemedi. Lütfen sayfayı yenileyin.");
-      console.error("Failed to load project:", e);
-    } finally {
-      setLoading(false);
     }
-  }
 
-  async function loadAnalyses(requirementId: number) {
+    void loadProject();
+  }, [projectId, scanFieldsInitialized, showToast]);
+
+  const loadTasks = useCallback(async (analysisId: number) => {
+    try {
+      const result = await getTasksByAnalysis(analysisId);
+      setTasks(result);
+    } catch (e) {
+      showToast("Task'lar yüklenemedi.");
+      console.error("Failed to load tasks:", e);
+    }
+  }, [showToast]);
+
+  const loadAnalyses = useCallback(async (requirementId: number) => {
     try {
       const result = await getAnalysesByRequirement(requirementId);
       setAnalyses(result);
@@ -196,19 +278,9 @@ export default function ProjectDetail() {
       showToast("Analizler yüklenemedi.");
       console.error("Failed to load analyses:", e);
     }
-  }
+  }, [loadTasks, showToast]);
 
-  async function loadTasks(analysisId: number) {
-    try {
-      const result = await getTasksByAnalysis(analysisId);
-      setTasks(result);
-    } catch (e) {
-      showToast("Task'lar yüklenemedi.");
-      console.error("Failed to load tasks:", e);
-    }
-  }
-
-  function handleSelectRequirement(reqId: number) {
+  const handleSelectRequirement = useCallback((reqId: number) => {
     if (reqId === -1) {
       // deselect
       setSelectedRequirementId(null);
@@ -223,8 +295,16 @@ export default function ProjectDetail() {
       next.set("req", String(reqId));
       return next;
     }, { replace: true });
-    loadAnalyses(reqId);
-  }
+    void loadAnalyses(reqId);
+  }, [loadAnalyses, setSearchParams]);
+
+  // Restore requirement selection from URL
+  useEffect(() => {
+    const reqId = searchParams.get("req");
+    if (reqId && requirements.length > 0 && !selectedRequirementId) {
+      handleSelectRequirement(Number(reqId));
+    }
+  }, [handleSelectRequirement, requirements, searchParams, selectedRequirementId]);
 
   async function handleDeleteRequirement(reqId: number) {
     setConfirmDialog({
@@ -287,6 +367,14 @@ export default function ProjectDetail() {
       // Scan done — reload project + usage
       const updated = await getProject(projectId);
       setProject(updated);
+      getContextFreshness(projectId).then(setContextFreshness).catch(() => {});
+      getPartialRefreshStatus(projectId).then(setPartialRefreshStatus).catch(() => {});
+      getPartialRefreshJobs(projectId, 0, 5).then((res) => {
+        const normalized = normalizeHistoryResponse(res);
+        setPartialRefreshHistory(normalized.items);
+        setPartialRefreshHistoryPage(normalized.page);
+        setPartialRefreshHistoryTotalPages(normalized.totalPages);
+      }).catch(() => {});
       getProjectUsage(projectId).then(setUsageSummary).catch(() => {});
       showToast("Proje başarıyla tarandı.", "success");
     } catch (e: unknown) {
@@ -423,9 +511,15 @@ export default function ProjectDetail() {
         description: manualTaskForm.description || undefined,
         priority: manualTaskForm.priority,
         category: manualTaskForm.category || undefined,
+        serviceId: manualTaskForm.serviceId === "" ? undefined : manualTaskForm.serviceId,
       });
-      setTasks((prev) => [...prev, created]);
-      setManualTaskForm({ title: "", description: "", priority: "MEDIUM", category: "" });
+      if (manualTaskForm.serviceId !== "" && created.serviceId !== manualTaskForm.serviceId) {
+        const updated = await updateTask(created.id, { serviceId: manualTaskForm.serviceId });
+        setTasks((prev) => [...prev, updated]);
+      } else {
+        setTasks((prev) => [...prev, created]);
+      }
+      setManualTaskForm({ title: "", description: "", priority: "MEDIUM", category: "", serviceId: "" });
       setManualTaskDialog(false);
       showToast("Task eklendi.", "success");
     } catch (e) {
@@ -467,8 +561,10 @@ export default function ProjectDetail() {
         showToast(`${result.created} issue GitHub'da oluşturuldu!`, "success");
       }
       await loadTasks(selectedAnalysis.id);
+      getTraceability(projectId).then(setTraceability).catch(() => {});
     } catch (e) {
-      showToast("GitHub sync başarısız oldu.");
+      const msg = e instanceof Error ? e.message : "GitHub sync başarısız oldu.";
+      showToast(msg);
       console.error("GitHub sync failed:", e);
     } finally {
       setActionLoading(null);
@@ -484,11 +580,12 @@ export default function ProjectDetail() {
         acceptanceCriteria: editingTask.acceptanceCriteria,
         priority: editingTask.priority,
         category: editingTask.category ?? "",
+        serviceId: editingTask.serviceId ?? 0,
       });
       setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
       setEditingTask(null);
       showToast("Task güncellendi.", "success");
-    } catch (e) {
+    } catch {
       showToast("Task güncellenemedi.");
     }
   }
@@ -528,10 +625,10 @@ export default function ProjectDetail() {
   function handleRefineTasks() {
     if (!selectedAnalysis || !taskInstruction.trim()) return;
 
-    const hasSynced = tasks.some((t) => t.jiraKey);
+    const hasSynced = tasks.some((t) => (t.syncRefs?.some((r) => r.syncState === "SYNCED") ?? false) || !!t.jiraKey);
     if (hasSynced) {
       setConfirmDialog({
-        message: `${tasks.filter((t) => t.jiraKey).length} task Jira/GitHub'da oluşturulmuş. İyileştirme sonrası aynı başlıklı task'ların bağlantısı korunur, değişen task'ların issue'ları yetim kalır. Devam?`,
+        message: `${tasks.filter((t) => (t.syncRefs?.some((r) => r.syncState === "SYNCED") ?? false) || !!t.jiraKey).length} task Jira/GitHub'da oluşturulmuş. İyileştirme sonrası aynı başlıklı task'ların bağlantısı korunur, değişen task'ların issue'ları yetim kalır. Devam?`,
         onConfirm: () => executeRefineTasks(),
       });
     } else {
@@ -610,8 +707,10 @@ export default function ProjectDetail() {
         showToast(`${result.created} issue Jira'da oluşturuldu! (${key})`, "success");
       }
       await loadTasks(selectedAnalysis.id);
+      getTraceability(projectId).then(setTraceability).catch(() => {});
     } catch (e) {
-      showToast("Jira sync başarısız oldu.");
+      const msg = e instanceof Error ? e.message : "Jira sync başarısız oldu.";
+      showToast(msg);
       console.error("Jira sync failed:", e);
     } finally {
       setActionLoading(null);
@@ -629,6 +728,201 @@ export default function ProjectDetail() {
       console.error("Save config failed:", e);
     } finally {
       setActionLoading(null);
+    }
+  }
+
+  async function refreshServiceRegistry() {
+    const [services, graph] = await Promise.all([
+      getProjectServices(projectId).catch(() => []),
+      getServiceGraph(projectId).catch(() => null),
+    ]);
+    setProjectServices(services);
+    setServiceGraph(graph);
+  }
+
+  async function handleCreateService() {
+    if (!newServiceForm.name.trim()) {
+      showToast("Service adı zorunlu.");
+      return;
+    }
+    setActionLoading("create-service");
+    try {
+      await createProjectService(projectId, {
+        name: newServiceForm.name.trim(),
+        serviceType: newServiceForm.serviceType,
+        repoUrl: newServiceForm.repoUrl.trim() || undefined,
+        localPath: newServiceForm.localPath.trim() || undefined,
+        defaultBranch: newServiceForm.defaultBranch.trim() || undefined,
+        ownerTeam: newServiceForm.ownerTeam.trim() || undefined,
+      });
+      setNewServiceForm({
+        name: "",
+        serviceType: "OTHER",
+        repoUrl: "",
+        localPath: "",
+        defaultBranch: "main",
+        ownerTeam: "",
+      });
+      await refreshServiceRegistry();
+      showToast("Service eklendi.", "success");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Service eklenemedi.";
+      showToast(msg);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleDeleteService(serviceId: number) {
+    setActionLoading(`delete-service-${serviceId}`);
+    try {
+      await deleteProjectService(projectId, serviceId);
+      await refreshServiceRegistry();
+      showToast("Service silindi.", "success");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Service silinemedi.";
+      showToast(msg);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleScanService(serviceId: number) {
+    const service = projectServices.find((s) => s.id === serviceId);
+    if (!service) return;
+    setActionLoading(`scan-service-${serviceId}`);
+    try {
+      await scanProjectService(projectId, serviceId, service.localPath || undefined);
+      await refreshServiceRegistry();
+      showToast(`${service.name} için service context güncellendi.`, "success");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Service scan başarısız.";
+      showToast(msg);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleAddDependency() {
+    if (!dependencyForm.fromServiceId || !dependencyForm.toServiceId) {
+      showToast("Kaynak ve hedef service seçin.");
+      return;
+    }
+    setActionLoading("add-service-dependency");
+    try {
+      await addServiceDependency(projectId, {
+        fromServiceId: Number(dependencyForm.fromServiceId),
+        toServiceId: Number(dependencyForm.toServiceId),
+        dependencyType: dependencyForm.dependencyType,
+      });
+      setDependencyForm({ fromServiceId: "", toServiceId: "", dependencyType: "SYNC" });
+      await refreshServiceRegistry();
+      showToast("Service bağımlılığı eklendi.", "success");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Bağımlılık eklenemedi.";
+      showToast(msg);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleDeleteDependency(dependencyId: number) {
+    setActionLoading(`delete-dependency-${dependencyId}`);
+    try {
+      await deleteServiceDependency(projectId, dependencyId);
+      await refreshServiceRegistry();
+      showToast("Service bağımlılığı silindi.", "success");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Bağımlılık silinemedi.";
+      showToast(msg);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handlePartialRefresh() {
+    setActionLoading("partial-refresh");
+    try {
+      const started = await runPartialRefresh(projectId, { maxAnalyses: 5 });
+      setPartialRefreshStatus(started);
+
+      if (started.status !== "RUNNING") {
+        if (started.status === "DONE" && (started.recommendation === "NO_ACTION" || started.totalAnalyses === 0)) {
+          showToast("Partial refresh gerektiren etkilenmiş analiz bulunmadı.", "info");
+        } else if (started.status === "FAILED") {
+          showToast(started.error || "Partial refresh başlatılamadı.");
+        }
+        return;
+      }
+
+      await new Promise<void>((resolve, reject) => {
+        const interval = setInterval(async () => {
+          try {
+            const status = await getPartialRefreshStatus(projectId);
+            setPartialRefreshStatus(status);
+
+            if (status.status === "DONE") {
+              clearInterval(interval);
+              resolve();
+            } else if (status.status === "FAILED") {
+              clearInterval(interval);
+              reject(new Error(status.error || "Partial refresh başarısız."));
+            }
+          } catch {
+            clearInterval(interval);
+            reject(new Error("Partial refresh durumu alınamadı."));
+          }
+        }, 2500);
+      });
+
+      const [proj, reqs, freshness] = await Promise.all([
+        getProject(projectId),
+        getRequirements(projectId),
+        getContextFreshness(projectId).catch(() => null),
+      ]);
+      setProject(proj);
+      setRequirements(reqs);
+      setContextFreshness(freshness);
+      const latest = await getPartialRefreshStatus(projectId).catch(() => null);
+      if (latest) setPartialRefreshStatus(latest);
+      getPartialRefreshJobs(projectId, 0, 5).then((res) => {
+        const normalized = normalizeHistoryResponse(res);
+        setPartialRefreshHistory(normalized.items);
+        setPartialRefreshHistoryPage(normalized.page);
+        setPartialRefreshHistoryTotalPages(normalized.totalPages);
+      }).catch(() => {});
+
+      const refreshed = latest?.refreshedCount ?? 0;
+      showToast(
+        refreshed > 0
+          ? `${refreshed} talep için kısmi yeniden analiz tamamlandı.`
+          : "Etkilenen analiz bulunamadı, kısmi refresh yapılmadı.",
+        refreshed > 0 ? "success" : "info",
+      );
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Partial refresh başarısız.");
+      console.error("Partial refresh failed:", e);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleLoadMorePartialRefreshHistory() {
+    if (partialRefreshLoadingMore) return;
+    const nextPage = partialRefreshHistoryPage + 1;
+    if (nextPage >= partialRefreshHistoryTotalPages) return;
+
+    setPartialRefreshLoadingMore(true);
+    try {
+      const res = await getPartialRefreshJobs(projectId, nextPage, 5);
+      const normalized = normalizeHistoryResponse(res);
+      setPartialRefreshHistory((prev) => [...prev, ...normalized.items]);
+      setPartialRefreshHistoryPage(normalized.page);
+      setPartialRefreshHistoryTotalPages(normalized.totalPages);
+    } catch {
+      showToast("Geçmiş job kayıtları yüklenemedi.");
+    } finally {
+      setPartialRefreshLoadingMore(false);
     }
   }
 
@@ -876,6 +1170,7 @@ export default function ProjectDetail() {
             setTaskInstruction={setTaskInstruction}
             setManualTaskDialog={setManualTaskDialog}
             setEditingTask={setEditingTask}
+            projectServices={projectServices}
             setConfirmDialog={setConfirmDialog}
             setActiveTab={setActiveTab}
             loadTasks={loadTasks}
@@ -899,6 +1194,14 @@ export default function ProjectDetail() {
             gitToken={gitToken}
             setGitToken={setGitToken}
             handleScan={handleScan}
+            contextFreshness={contextFreshness}
+            partialRefreshStatus={partialRefreshStatus}
+            partialRefreshHistory={partialRefreshHistory}
+            partialRefreshHasMore={partialRefreshHistoryPage + 1 < partialRefreshHistoryTotalPages}
+            partialRefreshLoadingMore={partialRefreshLoadingMore}
+            traceability={traceability}
+            onPartialRefresh={handlePartialRefresh}
+            onLoadMorePartialRefreshHistory={handleLoadMorePartialRefreshHistory}
             documents={documents}
             setDocDialog={setDocDialog}
             handleDeleteDocument={handleDeleteDocument}
@@ -919,6 +1222,17 @@ export default function ProjectDetail() {
             setIntegrationConfig={setIntegrationConfig}
             handleSaveIntegrationConfig={handleSaveIntegrationConfig}
             handleUpdateProject={handleUpdateProject}
+            projectServices={projectServices}
+            serviceGraph={serviceGraph}
+            newServiceForm={newServiceForm}
+            setNewServiceForm={setNewServiceForm}
+            handleCreateService={handleCreateService}
+            handleDeleteService={handleDeleteService}
+            handleScanService={handleScanService}
+            dependencyForm={dependencyForm}
+            setDependencyForm={setDependencyForm}
+            handleAddDependency={handleAddDependency}
+            handleDeleteDependency={handleDeleteDependency}
             onDeleteProject={() => setDeleteDialogOpen(true)}
           />
         </TabsContent>
@@ -942,6 +1256,7 @@ export default function ProjectDetail() {
         onSave={handleSaveTask}
         onChange={setEditingTask}
         loading={actionLoading === "save-task"}
+        projectServices={projectServices}
       />
 
       <ManualTaskDialog
@@ -951,6 +1266,7 @@ export default function ProjectDetail() {
         onChange={setManualTaskForm}
         onSubmit={handleCreateManualTask}
         loading={actionLoading === "manual-task"}
+        projectServices={projectServices}
       />
 
       <ConfirmDialog
@@ -1003,6 +1319,11 @@ export default function ProjectDetail() {
         onDeleteDoc={handleDeleteDocument}
         onSubmit={handleAddDocument}
         loading={actionLoading === "add-doc"}
+      />
+
+      <ScopeSmithAssistantWidget
+        projectId={projectId}
+        showToast={showToast}
       />
     </div>
   );

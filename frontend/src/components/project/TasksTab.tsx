@@ -1,11 +1,11 @@
-import { useState, useRef, useEffect, useCallback, type ReactNode } from "react";
-import { ArrowLeft, Send, Pencil, ChevronDown, ChevronRight, Copy, RefreshCw, Plus, Settings2, Check, Download, ExternalLink } from "lucide-react";
+import { useState, useRef, useEffect, type ReactNode } from "react";
+import { ArrowLeft, Send, Pencil, ChevronDown, ChevronRight, Copy, RefreshCw, Plus, Settings2, Check, Download, ExternalLink, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip } from "@/components/ui/tooltip";
-import { syncToJira, syncToGitHub, suggestSp, getClaudeCodePrompt } from "@/api/client";
+import { syncToJira, syncToGitHub, suggestSp, getClaudeCodePrompt, updateTask } from "@/api/client";
 
 import { categoryColor, priorityColor } from "./utils";
 import type { TasksTabProps } from "./types";
@@ -13,7 +13,6 @@ import type { TasksTabProps } from "./types";
 // ─── Integration Menu ─────────────────────────────────────────────────────────
 
 interface IntegrationMenuProps {
-  tasks: TasksTabProps["tasks"];
   syncedCount: number;
   unsyncedCount: number;
   allSynced: boolean;
@@ -25,6 +24,34 @@ interface IntegrationMenuProps {
   handleExportCsv: TasksTabProps["handleExportCsv"];
   handleVerifySync: TasksTabProps["handleVerifySync"];
   askConfirm: (message: string, onConfirm: () => void) => void;
+}
+
+interface IntegrationMenuItemProps {
+  onClick: () => void;
+  closeMenu: () => void;
+  disabled?: boolean;
+  children: ReactNode;
+}
+
+function IntegrationMenuItem({
+  onClick,
+  closeMenu,
+  disabled,
+  children,
+}: IntegrationMenuItemProps) {
+  return (
+    <button
+      onClick={() => { onClick(); closeMenu(); }}
+      disabled={disabled}
+      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+    >
+      {children}
+    </button>
+  );
+}
+
+function IntegrationMenuDivider() {
+  return <div className="my-1 border-t border-border/60" />;
 }
 
 function IntegrationMenu({
@@ -55,26 +82,6 @@ function IntegrationMenu({
   const hasGitHub = !!(integrationConfig.github?.repo);
   const hasAny = hasJira || hasGitHub;
 
-  const Item = ({
-    onClick,
-    disabled,
-    children,
-  }: {
-    onClick: () => void;
-    disabled?: boolean;
-    children: ReactNode;
-  }) => (
-    <button
-      onClick={() => { onClick(); setOpen(false); }}
-      disabled={disabled}
-      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-    >
-      {children}
-    </button>
-  );
-
-  const Divider = () => <div className="my-1 border-t border-border/60" />;
-
   return (
     <div className="relative" ref={ref}>
       <button
@@ -96,7 +103,8 @@ function IntegrationMenu({
           {hasAny ? (
             <>
               {hasJira && (
-                <Item
+                <IntegrationMenuItem
+                  closeMenu={() => setOpen(false)}
                   disabled={allSynced || !!actionLoading}
                   onClick={() =>
                     askConfirm(
@@ -110,10 +118,11 @@ function IntegrationMenu({
                   {unsyncedCount > 0 && (
                     <span className="ml-auto text-xs text-muted-foreground">{unsyncedCount} bekliyor</span>
                   )}
-                </Item>
+                </IntegrationMenuItem>
               )}
               {hasGitHub && (
-                <Item
+                <IntegrationMenuItem
+                  closeMenu={() => setOpen(false)}
                   disabled={allSynced || !!actionLoading}
                   onClick={() =>
                     askConfirm(
@@ -127,33 +136,33 @@ function IntegrationMenu({
                   {unsyncedCount > 0 && (
                     <span className="ml-auto text-xs text-muted-foreground">{unsyncedCount} bekliyor</span>
                   )}
-                </Item>
+                </IntegrationMenuItem>
               )}
-              <Divider />
-              <Item onClick={handleExportCsv}>
+              <IntegrationMenuDivider />
+              <IntegrationMenuItem closeMenu={() => setOpen(false)} onClick={handleExportCsv}>
                 <Download className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
                 <span>CSV İndir</span>
-              </Item>
+              </IntegrationMenuItem>
               {syncedCount > 0 && (
-                <Item onClick={handleVerifySync} disabled={!!actionLoading}>
+                <IntegrationMenuItem closeMenu={() => setOpen(false)} onClick={handleVerifySync} disabled={!!actionLoading}>
                   <Check className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
                   <span>Task Sync</span>
                   <span className="ml-auto text-xs text-muted-foreground">{syncedCount} senkronize</span>
-                </Item>
+                </IntegrationMenuItem>
               )}
             </>
           ) : (
             <>
-              <Item onClick={handleExportCsv}>
+              <IntegrationMenuItem closeMenu={() => setOpen(false)} onClick={handleExportCsv}>
                 <Download className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
                 <span>CSV İndir</span>
-              </Item>
-              <Divider />
-              <Item onClick={() => setActiveTab("integrations")}>
+              </IntegrationMenuItem>
+              <IntegrationMenuDivider />
+              <IntegrationMenuItem closeMenu={() => setOpen(false)} onClick={() => setActiveTab("integrations")}>
                 <Settings2 className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
                 <span>Entegrasyon Ayarla</span>
                 <ChevronRight className="w-3.5 h-3.5 ml-auto text-muted-foreground" />
-              </Item>
+              </IntegrationMenuItem>
             </>
           )}
         </div>
@@ -168,6 +177,7 @@ export default function TasksTab({
   selectedRequirementId,
   selectedAnalysis,
   tasks,
+  setTasks,
   expandedTasks,
   toggleTask,
   integrationConfig,
@@ -189,9 +199,12 @@ export default function TasksTab({
   setActionLoading,
   showToast,
   isAdmin,
+  projectServices,
 }: TasksTabProps) {
   const [spLoading, setSpLoading] = useState<Set<number>>(new Set());
   const [feedbackOpen, setFeedbackOpen] = useState<Set<number>>(new Set());
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<number>>(new Set());
+  const [bulkServiceId, setBulkServiceId] = useState<number | "">("");
 
   useEffect(() => {
     // Only fetch for tasks that have no spSuggestion AND no spFinal yet
@@ -207,6 +220,18 @@ export default function TasksTab({
       finally {
         setSpLoading(prev => { const n = new Set(prev); n.delete(task.id); return n; });
       }
+    });
+  }, [tasks, setTasks]);
+
+  useEffect(() => {
+    setSelectedTaskIds((prev) => {
+      if (prev.size === 0) return prev;
+      const validIds = new Set(tasks.map((t) => t.id));
+      const next = new Set<number>();
+      prev.forEach((id) => {
+        if (validIds.has(id)) next.add(id);
+      });
+      return next;
     });
   }, [tasks]);
 
@@ -236,11 +261,103 @@ export default function TasksTab({
     setConfirmDialog({ message, onConfirm });
   };
 
-  const syncedCount = tasks.filter((t) => t.jiraKey).length;
+  const isTaskSynced = (task: { jiraKey: string | null; syncRefs?: Array<{ syncState: string }> }) =>
+    (task.syncRefs?.some((r) => r.syncState === "SYNCED") ?? false) || !!task.jiraKey;
+
+  const visibleSyncRefs = (task: {
+    jiraKey: string | null;
+    syncRefs?: Array<{ provider: "JIRA" | "GITHUB"; externalRef: string; target: string | null; syncState: string }>;
+  }) => {
+    if (task.syncRefs && task.syncRefs.length > 0) return task.syncRefs;
+    if (task.jiraKey) {
+      return [{
+        provider: "JIRA" as const,
+        externalRef: task.jiraKey,
+        target: null,
+        syncState: "SYNCED",
+      }];
+    }
+    return [];
+  };
+
+  const syncRefUrl = (ref: { provider: "JIRA" | "GITHUB"; externalRef: string; target: string | null }) => {
+    if (ref.provider === "GITHUB") {
+      if (!ref.target || !ref.externalRef.startsWith("#")) return null;
+      return `https://github.com/${ref.target}/issues/${ref.externalRef.replace("#", "")}`;
+    }
+    return null;
+  };
+
+  const selectedCount = selectedTaskIds.size;
+  const selectableTaskIds = tasks.map((task) => task.id);
+  const allSelected = selectedCount > 0 && selectedCount === selectableTaskIds.length;
+
+  const toggleTaskSelection = (taskId: number, checked: boolean) => {
+    setSelectedTaskIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(taskId);
+      else next.delete(taskId);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = (checked: boolean) => {
+    if (checked) setSelectedTaskIds(new Set(selectableTaskIds));
+    else setSelectedTaskIds(new Set());
+  };
+
+  const handleBulkAssignService = async () => {
+    if (!selectedAnalysis || bulkServiceId === "" || selectedTaskIds.size === 0) return;
+    setActionLoading("bulk-service-assign");
+    try {
+      await Promise.all(
+        Array.from(selectedTaskIds).map((taskId) =>
+          updateTask(taskId, { serviceId: bulkServiceId })
+        )
+      );
+      await loadTasks(selectedAnalysis.id);
+      showToast(`${selectedTaskIds.size} task için service ataması güncellendi.`, "success");
+      setSelectedTaskIds(new Set());
+      setBulkServiceId("");
+    } catch {
+      showToast("Toplu service ataması başarısız oldu.");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const syncedCount = tasks.filter((t) => isTaskSynced(t)).length;
   // SP-approved and not yet synced — these are eligible for bulk sync
-  const spApprovedUnsyncedCount = tasks.filter((t) => !t.jiraKey && t.spFinal != null).length;
+  const spApprovedUnsyncedCount = tasks.filter((t) => !isTaskSynced(t) && t.spFinal != null).length;
   const unsyncedCount = spApprovedUnsyncedCount;
   const allSynced = spApprovedUnsyncedCount === 0;
+  const tinyTaskCount = tasks.filter((t) => {
+    const sp = t.spFinal ?? t.spSuggestion ?? 0;
+    return sp > 0 && sp <= 2;
+  }).length;
+  const overSplitRisk =
+    tasks.length > 10 ||
+    (tasks.length >= 8 && tasks.length > 0 && tinyTaskCount / tasks.length >= 0.5);
+  const unassignedServiceCount =
+    projectServices.length > 1 ? tasks.filter((t) => !t.serviceId).length : 0;
+  const evaluateAgentFit = (task: TasksTabProps["tasks"][number]) => {
+    const sp = task.spFinal ?? task.spSuggestion ?? 0;
+    const hasFinalSp = task.spFinal != null;
+    const inExecutableRange = sp >= 3 && sp <= 8;
+    const hasAcceptance = !!task.acceptanceCriteria && task.acceptanceCriteria.split("\n").filter(Boolean).length >= 2;
+    const serviceAligned = projectServices.length <= 1 || !!task.serviceId;
+    const synced = isTaskSynced(task);
+
+    const ready = hasFinalSp && inExecutableRange && hasAcceptance && serviceAligned;
+    const recommended = ready && synced;
+    const manualPreferred = sp > 0 && sp <= 2;
+
+    return { ready, recommended, manualPreferred, synced, hasFinalSp, inExecutableRange, hasAcceptance, serviceAligned };
+  };
+  const agentAssessments = tasks.map((task) => ({ taskId: task.id, ...evaluateAgentFit(task) }));
+  const readyForAgentCount = agentAssessments.filter((a) => a.ready).length;
+  const recommendedAgentCount = agentAssessments.filter((a) => a.recommended).length;
+  const manualPreferredCount = agentAssessments.filter((a) => a.manualPreferred).length;
 
   return (
     <div className="space-y-4">
@@ -277,7 +394,6 @@ export default function TasksTab({
           {/* Entegrasyon dropdown — sadece admin + task varken */}
           {isAdmin && tasks.length > 0 && (
             <IntegrationMenu
-              tasks={tasks}
               syncedCount={syncedCount}
               unsyncedCount={unsyncedCount}
               allSynced={allSynced}
@@ -293,6 +409,117 @@ export default function TasksTab({
           )}
         </div>
       </div>
+      {isAdmin && tasks.length > 0 && (
+        <Card>
+          <CardContent className="pt-4 pb-4 flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-sm text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={(e) => toggleSelectAll(e.target.checked)}
+                className="h-4 w-4 rounded border-border"
+              />
+              Tümünü seç
+            </label>
+            <span className="text-sm text-muted-foreground">{selectedCount} task seçili</span>
+            <select
+              value={bulkServiceId}
+              onChange={(e) => setBulkServiceId(e.target.value ? Number(e.target.value) : "")}
+              className="h-8 min-w-[220px] rounded-md border border-input bg-background px-2 text-sm"
+            >
+              <option value="">Service seçin</option>
+              {projectServices.map((service) => (
+                <option key={service.id} value={service.id}>
+                  {service.name} ({service.serviceType})
+                </option>
+              ))}
+            </select>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleBulkAssignService}
+              disabled={selectedCount === 0 || bulkServiceId === "" || !!actionLoading}
+            >
+              {actionLoading === "bulk-service-assign" ? "Atanıyor..." : "Seçililere Service Ata"}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+      {tasks.length > 0 && (
+        <Card>
+          <CardContent className="pt-4 pb-4 space-y-2">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="font-medium">Task Quality Guardrail</span>
+              {overSplitRisk ? (
+                <Badge variant="outline" className="border-amber-300/70 text-amber-700 dark:text-amber-300">Mikro-split riski</Badge>
+              ) : (
+                <Badge variant="outline" className="border-emerald-300/70 text-emerald-700 dark:text-emerald-300">Denge iyi</Badge>
+              )}
+              {projectServices.length > 1 && unassignedServiceCount > 0 && (
+                <Badge variant="outline" className="border-blue-300/70 text-blue-700 dark:text-blue-300">
+                  {unassignedServiceCount} task service atanmamış
+                </Badge>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Hedef: outcome odaklı 4-8 task. Aynı deliverable içindeki endpoint/DTO/test mikro adımlarını ayrı task yapmayın.
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                "Mikro task'ları birleştir, 4-8 outcome odaklı task bırak",
+                "Task'ları service sınırına göre grupla (backend-api/frontend-web/gateway)",
+                "Test adımlarını ilgili feature task'larına göm, gereksiz ayrı test task'larını kaldır",
+              ].map((chip) => (
+                <button
+                  key={chip}
+                  onClick={() => setTaskInstruction(chip)}
+                  className="px-2.5 py-1 text-xs rounded-full border bg-muted hover:bg-muted/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {chip}
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      {tasks.length > 0 && (
+        <Card>
+          <CardContent className="pt-4 pb-4 space-y-2">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="font-medium flex items-center gap-1.5">
+                <Bot className="w-3.5 h-3.5 text-muted-foreground" />
+                Managed Agent Karar Rehberi
+              </span>
+              <Badge variant="outline">{recommendedAgentCount} task önerilen aday</Badge>
+              <Badge variant="outline">{readyForAgentCount} task teknik olarak hazır</Badge>
+              {manualPreferredCount > 0 && (
+                <Badge variant="outline" className="border-amber-300/70 text-amber-700 dark:text-amber-300">
+                  {manualPreferredCount} task hızlı manuel daha uygun
+                </Badge>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Önerilen kullanım: SP onaylı (3-8), net kabul kriterli, service sınırı belli ve sync/ref hazır task'lar.
+              Düşük kapsamlı (1-2 SP) veya belirsiz task'larda manuel ilerleyin.
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                "Task'ı agent-executable hale getir (tek service, net acceptance criteria)",
+                "Bu task'ı manuelde tut, agent gerektirmiyor",
+                "Task'ı 2 deliverable'a ayır: biri agent, biri manuel",
+              ].map((chip) => (
+                <button
+                  key={chip}
+                  onClick={() => setTaskInstruction(chip)}
+                  className="px-2.5 py-1 text-xs rounded-full border bg-muted hover:bg-muted/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {chip}
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {tasks.length === 0 ? (
         <div className="text-center py-12 border border-dashed rounded-lg">
@@ -319,6 +546,16 @@ export default function TasksTab({
                     {isExpanded
                       ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
                       : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />}
+                    {isAdmin && (
+                      <input
+                        type="checkbox"
+                        checked={selectedTaskIds.has(task.id)}
+                        onChange={(e) => toggleTaskSelection(task.id, e.target.checked)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="h-4 w-4 rounded border-border"
+                        aria-label="Task seç"
+                      />
+                    )}
 
                     {/* Title */}
                     <span className="text-sm font-medium truncate flex-1 min-w-0">{task.title}</span>
@@ -331,6 +568,29 @@ export default function TasksTab({
                           {task.category}
                         </span>
                       )}
+                      {task.serviceName && (
+                        <Badge variant="outline" className="text-[11px] font-normal">
+                          {task.serviceName}
+                        </Badge>
+                      )}
+                      {(() => {
+                        const fit = evaluateAgentFit(task);
+                        if (fit.recommended) {
+                          return (
+                            <Badge variant="outline" className="text-[11px] border-emerald-300/70 text-emerald-700 dark:text-emerald-300">
+                              Agent önerilir
+                            </Badge>
+                          );
+                        }
+                        if (fit.manualPreferred) {
+                          return (
+                            <Badge variant="outline" className="text-[11px] border-amber-300/70 text-amber-700 dark:text-amber-300">
+                              Manual hızlı
+                            </Badge>
+                          );
+                        }
+                        return null;
+                      })()}
 
                       {/* SP — final takes precedence */}
                       {task.spFinal ? (
@@ -345,26 +605,28 @@ export default function TasksTab({
                         </span>
                       ) : null}
 
-                      {/* Tracking key */}
-                      {task.jiraKey && (() => {
-                        const isGH = task.jiraKey.startsWith("#");
-                        const jiraBaseUrl = integrationConfig.jira?.url?.replace(/\/$/, "");
-                        const url = isGH
-                          ? `https://github.com/${integrationConfig.github?.repo || ""}/issues/${task.jiraKey.replace("#", "")}`
-                          : jiraBaseUrl ? `${jiraBaseUrl}/browse/${task.jiraKey}` : null;
-                        const keyEl = (
-                          <code className="text-xs font-mono text-muted-foreground/70 bg-muted px-1.5 py-0.5 rounded">
-                            {task.jiraKey}
-                          </code>
+                      {/* Sync refs */}
+                      {visibleSyncRefs(task).slice(0, 2).map((ref) => {
+                        const url = syncRefUrl(ref);
+                        const refEl = (
+                          <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground" title={ref.target || undefined}>
+                            <span>{ref.provider === "JIRA" ? "JR" : "GH"}</span>
+                            <code className="font-mono">{ref.externalRef}</code>
+                          </span>
                         );
-                        return url
-                          ? <a href={url} target="_blank" rel="noopener noreferrer" className="hover:opacity-80">{keyEl}</a>
-                          : keyEl;
-                      })()}
+                        return (
+                          <span key={`${ref.provider}-${ref.externalRef}`}>
+                            {url ? <a href={url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>{refEl}</a> : refEl}
+                          </span>
+                        );
+                      })}
+                      {visibleSyncRefs(task).length > 2 && (
+                        <span className="text-[11px] text-muted-foreground">+{visibleSyncRefs(task).length - 2}</span>
+                      )}
 
                       {/* Actions */}
                       <div className="flex items-center gap-0.5 opacity-0 group-hover/card:opacity-100 transition-opacity">
-                        {!task.jiraKey && task.spFinal != null && isAdmin && (integrationConfig.jira?.projectKey || integrationConfig.github?.repo) && (
+                        {!isTaskSynced(task) && task.spFinal != null && isAdmin && (integrationConfig.jira?.projectKey || integrationConfig.github?.repo) && (
                           <button
                             onClick={async () => {
                               setActionLoading(`sync-${task.id}`);
@@ -376,7 +638,10 @@ export default function TasksTab({
                                 }
                                 await loadTasks(selectedAnalysis!.id);
                                 showToast("Gönderildi.", "success");
-                              } catch { showToast("Gönderilemedi."); }
+                              } catch (e) {
+                                const msg = e instanceof Error ? e.message : "Gönderilemedi.";
+                                showToast(msg);
+                              }
                               finally { setActionLoading(null); }
                             }}
                             disabled={!!actionLoading}
@@ -560,7 +825,8 @@ export default function TasksTab({
               <div className="flex flex-wrap gap-1.5">
                 {[
                   "Frontend ve backend'e ayır",
-                  "Daha küçük parçalara böl",
+                  "Mikro task'ları birleştir (4-8 hedefi)",
+                  "Service sınırına göre grupla",
                   "Test task'ları ekle",
                   "Öncelikleri yükselt",
                   "Database task'larını ayır",

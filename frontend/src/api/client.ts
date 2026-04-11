@@ -1,13 +1,67 @@
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8080/api/v1";
 const DEFAULT_TIMEOUT_MS = 60_000;
+const CSRF_COOKIE_NAME = "XSRF-TOKEN";
+const CSRF_HEADER_NAME = "X-XSRF-TOKEN";
+const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+let csrfInitPromise: Promise<void> | null = null;
+let csrfTokenCache: string | null = null;
+
+function readCookie(name: string): string | null {
+  const prefixed = `${name}=`;
+  return document.cookie
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(prefixed))
+    ?.slice(prefixed.length) ?? null;
+}
+
+async function ensureCsrfToken(force = false): Promise<string | null> {
+  const cookieToken = readCookie(CSRF_COOKIE_NAME);
+  if (!force && (csrfTokenCache || cookieToken)) {
+    return csrfTokenCache || cookieToken;
+  }
+  if (!csrfInitPromise) {
+    csrfInitPromise = fetch(`${API_BASE}/auth/csrf`, {
+      method: "GET",
+      credentials: "include",
+    }).then(async (res) => {
+      let tokenFromBody: string | null = null;
+      try {
+        const data = (await res.json()) as { token?: string };
+        tokenFromBody = data?.token ?? null;
+      } catch {
+        tokenFromBody = null;
+      }
+      csrfTokenCache = tokenFromBody || readCookie(CSRF_COOKIE_NAME);
+    });
+  }
+  try {
+    await csrfInitPromise;
+    return csrfTokenCache || readCookie(CSRF_COOKIE_NAME);
+  } finally {
+    csrfInitPromise = null;
+  }
+}
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+  const method = (options?.method ?? "GET").toUpperCase();
+  const headers = new Headers(options?.headers ?? { "Content-Type": "application/json" });
 
   try {
+    if (MUTATING_METHODS.has(method)) {
+      // Always refresh CSRF token before mutating calls.
+      // This avoids stale token/session mismatches causing false "invalid credentials" UX.
+      const csrfToken = await ensureCsrfToken(true);
+      if (csrfToken) {
+        headers.set(CSRF_HEADER_NAME, csrfToken);
+      }
+    }
+
     const res = await fetch(`${API_BASE}${path}`, {
-      headers: { "Content-Type": "application/json" },
+      headers,
       credentials: "include",
       ...options,
       signal: controller.signal,
@@ -49,6 +103,49 @@ export const scanProjectGit = (id: number, gitUrl: string, token?: string) =>
   });
 export const getScanStatus = (id: number) =>
   request<{ status: "IDLE" | "SCANNING" | "FAILED"; error: string }>(`/projects/${id}/scan-status`);
+export const getContextFreshness = (id: number) =>
+  request<ContextFreshness>(`/projects/${id}/context-freshness`);
+export const getProjectServices = (id: number) =>
+  request<ProjectService[]>(`/projects/${id}/services`);
+export const createProjectService = (id: number, data: ProjectServiceRequest) =>
+  request<ProjectService>(`/projects/${id}/services`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+export const updateProjectService = (id: number, serviceId: number, data: Partial<ProjectServiceRequest>) =>
+  request<ProjectService>(`/projects/${id}/services/${serviceId}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+export const deleteProjectService = (id: number, serviceId: number) =>
+  request<void>(`/projects/${id}/services/${serviceId}`, { method: "DELETE" });
+export const getServiceGraph = (id: number) =>
+  request<ServiceGraph>(`/projects/${id}/services/graph`);
+export const getFederatedContext = (id: number) =>
+  request<FederatedContext>(`/projects/${id}/services/federated-context`);
+export const scanProjectService = (id: number, serviceId: number, folderPath?: string) =>
+  request<ServiceScanResult>(`/projects/${id}/services/${serviceId}/scan`, {
+    method: "POST",
+    body: JSON.stringify(folderPath ? { folderPath } : {}),
+  });
+export const addServiceDependency = (id: number, data: ServiceDependencyRequest) =>
+  request<ServiceDependency>(`/projects/${id}/services/dependencies`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+export const deleteServiceDependency = (id: number, dependencyId: number) =>
+  request<void>(`/projects/${id}/services/dependencies/${dependencyId}`, { method: "DELETE" });
+export const runPartialRefresh = (id: number, data?: { maxAnalyses?: number; force?: boolean }) =>
+  request<PartialRefreshResult>(`/projects/${id}/context-freshness/partial-refresh`, {
+    method: "POST",
+    body: JSON.stringify(data ?? {}),
+  });
+export const getPartialRefreshStatus = (id: number) =>
+  request<PartialRefreshResult>(`/projects/${id}/context-freshness/partial-refresh-status`);
+export const getPartialRefreshJobs = (id: number, page: number = 0, size: number = 5) =>
+  request<PartialRefreshHistory | PartialRefreshResult[]>(`/projects/${id}/context-freshness/partial-refresh-jobs?page=${page}&size=${size}`);
+export const getTraceability = (id: number) =>
+  request<TraceabilityReport>(`/projects/${id}/traceability`);
 export const getDeleteSummary = (id: number) =>
   request<{ requirements: number; documents: number; aiCalls: number }>(`/projects/${id}/delete-summary`);
 export const deleteProject = (id: number, confirmName: string) =>
@@ -73,6 +170,29 @@ export interface AuthUser {
 export const getCredentials = () => request<Record<string, string>>("/settings/credentials");
 export const updateCredentials = (data: Record<string, string>) =>
   request<Record<string, string>>("/settings/credentials", {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+
+// AI Model Registry
+export type ModelTier = "LIGHT" | "STANDARD" | "PREMIUM";
+
+export interface AiModelConfig {
+  id: number;
+  tier: ModelTier;
+  provider: string;
+  modelName: string;
+  active: boolean;
+  inputPerMillion: number | null;
+  outputPerMillion: number | null;
+  latencyClass: string | null;
+  qualityClass: string | null;
+  updatedAt: string;
+}
+
+export const getModelConfigs = () => request<AiModelConfig[]>("/settings/models");
+export const updateModelConfig = (tier: ModelTier, data: Partial<AiModelConfig>) =>
+  request<AiModelConfig>(`/settings/models/${tier}`, {
     method: "PUT",
     body: JSON.stringify(data),
   });
@@ -171,7 +291,10 @@ export const dismissQuestion = (id: number) =>
 // Tasks
 export const generateTasks = (analysisId: number) =>
   request<Task[]>(`/analyses/${analysisId}/tasks`, { method: "POST" });
-export const updateTask = (taskId: number, data: Partial<Pick<Task, "title" | "description" | "acceptanceCriteria" | "priority" | "category">>) =>
+export const updateTask = (
+  taskId: number,
+  data: Partial<Pick<Task, "title" | "description" | "acceptanceCriteria" | "priority" | "category" | "serviceId">>
+) =>
   request<Task>(`/tasks/${taskId}`, { method: "PUT", body: JSON.stringify(data) });
 export const setSpDecision = (taskId: number, spFinal: number, divergenceReason?: string) =>
   request<Task>(`/tasks/${taskId}/sp-decision`, {
@@ -225,7 +348,7 @@ export const refineTasks = (analysisId: number, instruction: string) =>
 
 export const createManualTask = (
   analysisId: number,
-  data: { title: string; description?: string; priority?: string; category?: string }
+  data: { title: string; description?: string; priority?: string; category?: string; serviceId?: number | null }
 ) =>
   request<Task>(`/analyses/${analysisId}/tasks/manual`, {
     method: "POST",
@@ -323,21 +446,31 @@ export const addDocument = (
 export const deleteDocument = (id: number) =>
   request<void>(`/documents/${id}`, { method: "DELETE" });
 export const uploadDocument = async (projectId: number, file: File, docType: string): Promise<Document> => {
+  await ensureCsrfToken();
+  const csrfToken = readCookie(CSRF_COOKIE_NAME);
   const form = new FormData();
   form.append("file", file);
   form.append("docType", docType);
   const res = await fetch(`${API_BASE}/projects/${projectId}/documents/upload`, {
-    method: "POST", body: form, credentials: "include",
+    method: "POST",
+    body: form,
+    credentials: "include",
+    headers: csrfToken ? { [CSRF_HEADER_NAME]: csrfToken } : undefined,
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 };
 export const uploadRequirementDocument = async (reqId: number, file: File, docType: string): Promise<Document> => {
+  await ensureCsrfToken();
+  const csrfToken = readCookie(CSRF_COOKIE_NAME);
   const form = new FormData();
   form.append("file", file);
   form.append("docType", docType);
   const res = await fetch(`${API_BASE}/requirements/${reqId}/documents/upload`, {
-    method: "POST", body: form, credentials: "include",
+    method: "POST",
+    body: form,
+    credentials: "include",
+    headers: csrfToken ? { [CSRF_HEADER_NAME]: csrfToken } : undefined,
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
@@ -358,6 +491,38 @@ export const addRequirementDocument = (
 // AI Health
 export const checkAiHealth = () =>
   request<{ status: string; response: string }>("/ai/health");
+
+// ScopeSmith Self Assistant
+export interface SelfAssistantRequest {
+  question: string;
+  projectId?: number;
+}
+
+export interface SelfAssistantEvidence {
+  sourceType: string;
+  sourceRef: string;
+  detail: string;
+}
+
+export interface SelfAssistantAction {
+  label: string;
+  actionType: string;
+  target: string;
+}
+
+export interface SelfAssistantResponse {
+  answer: string;
+  confidence: "HIGH" | "MEDIUM" | "LOW" | string;
+  fallbackUsed: boolean;
+  evidence: SelfAssistantEvidence[];
+  actions: SelfAssistantAction[];
+}
+
+export const askSelfAssistant = (data: SelfAssistantRequest) =>
+  request<SelfAssistantResponse>("/assistant/self-help", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
 
 // Types
 export interface Project {
@@ -393,6 +558,12 @@ export interface IntegrationConfig {
   };
   github?: { repo?: string };
   preferredProvider?: "JIRA" | "GITHUB";
+  serviceRouting?: Record<string, {
+    preferredProvider?: "JIRA" | "GITHUB";
+    jiraProjectKey?: string;
+    githubRepo?: string;
+    defaultIssueType?: string;
+  }>;
 }
 
 export interface Requirement {
@@ -447,8 +618,18 @@ export interface Task {
   spDivergenceReason?: string;
   priority: string;
   category: string | null;
+  serviceId?: number | null;
+  serviceName?: string | null;
   dependencyTitle: string | null;
   jiraKey: string | null;
+  syncRefs?: Array<{
+    id: number;
+    provider: "JIRA" | "GITHUB";
+    externalRef: string;
+    target: string | null;
+    syncState: string;
+    lastVerifiedAt: string | null;
+  }>;
   agentSessionId: string | null;
   agentStatus: string | null;
   agentBranch: string | null;
@@ -464,6 +645,155 @@ export interface ChangeImpact {
   newRiskLevel: string;
   riskReason: string;
   stakeholderSummary: string;
+}
+
+export interface ContextFreshness {
+  status: "NO_BASELINE" | "FRESH" | "STALE";
+  commitsBehind: number | null;
+  changedFiles: number;
+  impactedModules: string[];
+  analysisFreshnessScore: number;
+  contextConfidence: number;
+  recommendation: "NO_ACTION" | "PARTIAL_REFRESH" | "FULL_REFRESH";
+  reason: string;
+}
+
+export interface PartialRefreshResult {
+  jobId?: number;
+  status: "IDLE" | "RUNNING" | "DONE" | "FAILED";
+  recommendation?: "NO_ACTION" | "PARTIAL_REFRESH" | "FULL_REFRESH";
+  reason?: string;
+  totalAnalyses?: number;
+  processedAnalyses?: number;
+  refreshedCount: number;
+  refreshedRequirementIds?: number[];
+  error?: string;
+  startedAt?: string;
+  completedAt?: string;
+}
+
+export interface PartialRefreshHistory {
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  items: PartialRefreshResult[];
+}
+
+export type ServiceType = "BACKEND" | "FRONTEND" | "MOBILE" | "GATEWAY" | "DATA" | "PLATFORM" | "SHARED" | "OTHER";
+
+export interface ProjectServiceRequest {
+  name: string;
+  serviceType?: ServiceType;
+  repoUrl?: string;
+  localPath?: string;
+  defaultBranch?: string;
+  ownerTeam?: string;
+  active?: boolean;
+}
+
+export interface ProjectService {
+  id: number;
+  projectId: number;
+  name: string;
+  serviceType: ServiceType;
+  repoUrl: string | null;
+  localPath: string | null;
+  defaultBranch: string | null;
+  ownerTeam: string | null;
+  active: boolean;
+  contextVersion: number;
+  lastScannedAt: string | null;
+  lastScannedCommitHash: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ServiceDependencyRequest {
+  fromServiceId: number;
+  toServiceId: number;
+  dependencyType?: string;
+}
+
+export interface ServiceDependency {
+  id: number;
+  projectId: number;
+  fromServiceId: number;
+  fromServiceName: string;
+  toServiceId: number;
+  toServiceName: string;
+  dependencyType: string;
+  createdAt: string;
+}
+
+export interface ServiceGraph {
+  projectId: number;
+  services: ProjectService[];
+  dependencies: ServiceDependency[];
+}
+
+export interface ServiceScanResult {
+  serviceId: number;
+  serviceName: string;
+  status: "DONE";
+  contextVersion: number;
+  lastScannedAt: string | null;
+  lastScannedCommitHash: string | null;
+}
+
+export interface FederatedContext {
+  projectId: number;
+  generatedAt: string;
+  serviceCount: number;
+  services: Array<{
+    serviceId: number;
+    name: string;
+    serviceType: ServiceType;
+    contextVersion: number;
+    lastScannedAt: string | null;
+    hasContext: boolean;
+  }>;
+  combinedContext: string;
+}
+
+export interface TraceabilityReport {
+  projectId: number;
+  generatedAt: string;
+  summary: {
+    totalRequirements: number;
+    analyzedRequirements: number;
+    requirementsWithTasks: number;
+    totalTasks: number;
+    approvedTasks: number;
+    syncedTasks: number;
+    syncCoveragePercent: number;
+  };
+  items: Array<{
+    requirementId: number;
+    requirementSeq: number | null;
+    requirementType: string;
+    requirementPreview: string;
+    analysisId: number | null;
+    analysisCreatedAt: string | null;
+    taskCount: number;
+    approvedTaskCount: number;
+    syncedTaskCount: number;
+    syncTargets: string[];
+    tasks: Array<{
+      taskId: number;
+      title: string;
+      spFinal: number | null;
+      syncRef: string | null;
+      syncTarget: string | null;
+      syncStatus: "DRAFT" | "READY" | "SYNCED";
+      syncRefs?: Array<{
+        provider: "JIRA" | "GITHUB";
+        externalRef: string;
+        target: string | null;
+        syncState: string;
+      }>;
+    }>;
+  }>;
 }
 
 export interface Document {
