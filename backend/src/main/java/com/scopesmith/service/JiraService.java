@@ -4,9 +4,12 @@ import com.scopesmith.config.JiraConfig;
 import com.scopesmith.dto.IntegrationConfigDTO;
 import com.scopesmith.entity.Analysis;
 import com.scopesmith.entity.RequirementType;
+import com.scopesmith.entity.SyncProviderType;
 import com.scopesmith.entity.Task;
+import com.scopesmith.entity.TaskSyncRef;
 import com.scopesmith.repository.AnalysisRepository;
 import com.scopesmith.repository.TaskRepository;
+import com.scopesmith.repository.TaskSyncRefRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -28,13 +31,20 @@ public class JiraService {
     private final JiraConfig jiraConfig;
     private final TaskRepository taskRepository;
     private final AnalysisRepository analysisRepository;
+    private final TaskSyncRefRepository taskSyncRefRepository;
+    private final TaskSyncRefService taskSyncRefService;
     private final RestTemplate restTemplate;
 
     public JiraService(JiraConfig jiraConfig, TaskRepository taskRepository,
-                       AnalysisRepository analysisRepository, RestTemplateBuilder restTemplateBuilder) {
+                       AnalysisRepository analysisRepository,
+                       TaskSyncRefRepository taskSyncRefRepository,
+                       TaskSyncRefService taskSyncRefService,
+                       RestTemplateBuilder restTemplateBuilder) {
         this.jiraConfig = jiraConfig;
         this.taskRepository = taskRepository;
         this.analysisRepository = analysisRepository;
+        this.taskSyncRefRepository = taskSyncRefRepository;
+        this.taskSyncRefService = taskSyncRefService;
         this.restTemplate = restTemplateBuilder
                 .connectTimeout(Duration.ofSeconds(10))
                 .readTimeout(Duration.ofSeconds(30))
@@ -80,12 +90,9 @@ public class JiraService {
         String configKey = projectConfig != null && projectConfig.getJira() != null
                 ? projectConfig.getJira().getProjectKey() : null;
 
-        String project = firstNonBlank(projectKey, configKey, jiraConfig.getProjectKey());
-
         String defaultType = analysis.getRequirement().getType() == RequirementType.BUG ? "Bug" : "Task";
         String projectDefaultType = projectConfig != null && projectConfig.getJira() != null
                 ? projectConfig.getJira().getDefaultIssueType() : null;
-        String type = firstNonBlank(issueType, projectDefaultType, defaultType);
 
         List<Map<String, String>> created = new ArrayList<>();
         List<Map<String, String>> failed = new ArrayList<>();
@@ -99,11 +106,22 @@ public class JiraService {
 
             try {
                 IntegrationConfigDTO.JiraSettings jiraSettings = projectConfig != null ? projectConfig.getJira() : null;
-                String jiraKey = createJiraIssue(task, project, type, jiraSettings);
+                String routedProject = resolveJiraProjectKey(task, projectConfig, projectKey, configKey, jiraConfig.getProjectKey());
+                String routedType = resolveIssueType(task, projectConfig, issueType, projectDefaultType, defaultType);
+                if (routedProject == null || routedProject.isBlank()) {
+                    throw new IllegalStateException("Jira target project key could not be resolved for task #" + task.getId());
+                }
+
+                String jiraKey = createJiraIssue(task, routedProject, routedType, jiraSettings);
                 task.setJiraKey(jiraKey);
                 taskRepository.save(task);
-                created.add(Map.of("taskId", task.getId().toString(), "jiraKey", jiraKey, "status", "created"));
-                log.info("Created Jira issue {} for task #{} '{}'", jiraKey, task.getId(), task.getTitle());
+                taskSyncRefService.upsert(task, SyncProviderType.JIRA, routedProject, jiraKey);
+                created.add(Map.of(
+                        "taskId", task.getId().toString(),
+                        "jiraKey", jiraKey,
+                        "targetProject", routedProject,
+                        "status", "created"));
+                log.info("Created Jira issue {} for task #{} '{}' on {}", jiraKey, task.getId(), task.getTitle(), routedProject);
             } catch (Exception e) {
                 log.error("Failed to create Jira issue for task #{}: {}", task.getId(), e.getMessage(), e);
                 failed.add(Map.of("taskId", task.getId().toString(), "title", task.getTitle(), "error", e.getMessage()));
@@ -128,19 +146,19 @@ public class JiraService {
      */
     @Transactional
     public Map<String, Object> verifySyncStatus(Long analysisId) {
-        List<Task> tasks = taskRepository.findByAnalysisId(analysisId);
-        List<Task> syncedTasks = tasks.stream()
-                .filter(t -> t.getJiraKey() != null && !t.getJiraKey().startsWith("#"))
+        List<TaskSyncRef> refs = taskSyncRefRepository.findByAnalysisIdAndProvider(analysisId, SyncProviderType.JIRA).stream()
+                .filter(r -> "SYNCED".equalsIgnoreCase(r.getSyncState()))
                 .toList();
 
-        if (syncedTasks.isEmpty()) {
+        if (refs.isEmpty()) {
             return Map.of("checked", 0, "cleared", 0);
         }
 
         int cleared = 0;
-        for (Task task : syncedTasks) {
+        for (TaskSyncRef ref : refs) {
+            Task task = ref.getTask();
             try {
-                String url = jiraConfig.getUrl() + "/rest/api/3/issue/" + task.getJiraKey();
+                String url = jiraConfig.getUrl() + "/rest/api/3/issue/" + ref.getExternalRef();
                 HttpHeaders headers = new HttpHeaders();
                 headers.setBasicAuth(jiraConfig.getEmail(), jiraConfig.getApiToken(), StandardCharsets.UTF_8);
 
@@ -150,20 +168,26 @@ public class JiraService {
                 String statusCategory = (String) ((Map) status.get("statusCategory")).get("key");
 
                 if ("done".equals(statusCategory)) {
-                    task.setJiraKey(null);
-                    taskRepository.save(task);
+                    taskSyncRefService.markCleared(ref);
+                    if (task.getJiraKey() != null && task.getJiraKey().equals(ref.getExternalRef())) {
+                        task.setJiraKey(null);
+                        taskRepository.save(task);
+                    }
                     cleared++;
-                    log.info("Cleared sync for task #{} — Jira issue {} is done", task.getId(), task.getJiraKey());
+                    log.info("Cleared sync for task #{} — Jira issue {} is done", task.getId(), ref.getExternalRef());
                 }
             } catch (Exception e) {
-                task.setJiraKey(null);
-                taskRepository.save(task);
+                taskSyncRefService.markCleared(ref);
+                if (task.getJiraKey() != null && task.getJiraKey().equals(ref.getExternalRef())) {
+                    task.setJiraKey(null);
+                    taskRepository.save(task);
+                }
                 cleared++;
                 log.info("Cleared sync for task #{} — Jira issue not accessible: {}", task.getId(), e.getMessage());
             }
         }
 
-        return Map.of("checked", syncedTasks.size(), "cleared", cleared, "stillSynced", syncedTasks.size() - cleared);
+        return Map.of("checked", refs.size(), "cleared", cleared, "stillSynced", refs.size() - cleared);
     }
 
     private String createJiraIssue(Task task, String projectKey, String issueType,
@@ -305,6 +329,54 @@ public class JiraService {
         }
         // Default: use category name with first letter uppercase (e.g., "Backend")
         return category.substring(0, 1).toUpperCase(java.util.Locale.ENGLISH) + category.substring(1).toLowerCase(java.util.Locale.ENGLISH);
+    }
+
+    private String resolveJiraProjectKey(
+            Task task,
+            IntegrationConfigDTO projectConfig,
+            String requestProjectKey,
+            String globalConfigKey,
+            String envDefaultKey) {
+        if (requestProjectKey != null && !requestProjectKey.isBlank()) {
+            return requestProjectKey;
+        }
+        IntegrationConfigDTO.ServiceRouting route = findServiceRouting(projectConfig, task);
+        if (route != null && route.getJiraProjectKey() != null && !route.getJiraProjectKey().isBlank()) {
+            return route.getJiraProjectKey();
+        }
+        return firstNonBlank(globalConfigKey, envDefaultKey);
+    }
+
+    private String resolveIssueType(
+            Task task,
+            IntegrationConfigDTO projectConfig,
+            String requestIssueType,
+            String globalDefaultIssueType,
+            String fallbackType) {
+        if (requestIssueType != null && !requestIssueType.isBlank()) {
+            return requestIssueType;
+        }
+        IntegrationConfigDTO.ServiceRouting route = findServiceRouting(projectConfig, task);
+        if (route != null && route.getDefaultIssueType() != null && !route.getDefaultIssueType().isBlank()) {
+            return route.getDefaultIssueType();
+        }
+        return firstNonBlank(globalDefaultIssueType, fallbackType);
+    }
+
+    private IntegrationConfigDTO.ServiceRouting findServiceRouting(IntegrationConfigDTO projectConfig, Task task) {
+        if (projectConfig == null || projectConfig.getServiceRouting() == null
+                || task.getService() == null || task.getService().getName() == null) {
+            return null;
+        }
+        String serviceName = task.getService().getName();
+        IntegrationConfigDTO.ServiceRouting exact = projectConfig.getServiceRouting().get(serviceName);
+        if (exact != null) return exact;
+        for (var entry : projectConfig.getServiceRouting().entrySet()) {
+            if (entry.getKey() != null && entry.getKey().equalsIgnoreCase(serviceName)) {
+                return entry.getValue();
+            }
+        }
+        return null;
     }
 
     private IntegrationConfigDTO parseIntegrationConfig(String json) {

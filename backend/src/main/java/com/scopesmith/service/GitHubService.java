@@ -4,9 +4,12 @@ import com.scopesmith.config.GitHubConfig;
 import com.scopesmith.dto.IntegrationConfigDTO;
 import com.scopesmith.entity.Analysis;
 import com.scopesmith.entity.RequirementType;
+import com.scopesmith.entity.SyncProviderType;
 import com.scopesmith.entity.Task;
+import com.scopesmith.entity.TaskSyncRef;
 import com.scopesmith.repository.AnalysisRepository;
 import com.scopesmith.repository.TaskRepository;
+import com.scopesmith.repository.TaskSyncRefRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -27,13 +30,20 @@ public class GitHubService {
     private final GitHubConfig gitHubConfig;
     private final TaskRepository taskRepository;
     private final AnalysisRepository analysisRepository;
+    private final TaskSyncRefRepository taskSyncRefRepository;
+    private final TaskSyncRefService taskSyncRefService;
     private final RestTemplate restTemplate;
 
     public GitHubService(GitHubConfig gitHubConfig, TaskRepository taskRepository,
-                         AnalysisRepository analysisRepository, RestTemplateBuilder restTemplateBuilder) {
+                         AnalysisRepository analysisRepository,
+                         TaskSyncRefRepository taskSyncRefRepository,
+                         TaskSyncRefService taskSyncRefService,
+                         RestTemplateBuilder restTemplateBuilder) {
         this.gitHubConfig = gitHubConfig;
         this.taskRepository = taskRepository;
         this.analysisRepository = analysisRepository;
+        this.taskSyncRefRepository = taskSyncRefRepository;
+        this.taskSyncRefService = taskSyncRefService;
         this.restTemplate = restTemplateBuilder
                 .connectTimeout(Duration.ofSeconds(10))
                 .readTimeout(Duration.ofSeconds(30))
@@ -73,14 +83,11 @@ public class GitHubService {
         IntegrationConfigDTO projectConfig = parseIntegrationConfig(analysis.getRequirement().getProject().getIntegrationConfig());
         String configRepo = projectConfig != null && projectConfig.getGithub() != null
                 ? projectConfig.getGithub().getRepo() : null;
-        String targetRepo = firstNonBlank(repo, configRepo, gitHubConfig.getRepo());
         boolean isBug = analysis.getRequirement().getType() == RequirementType.BUG;
-
-        // Ensure labels exist
-        ensureLabelsExist(targetRepo, isBug);
 
         List<Map<String, String>> created = new ArrayList<>();
         List<Map<String, String>> failed = new ArrayList<>();
+        Set<String> preparedRepos = new HashSet<>();
 
         for (Task task : tasks) {
             if (task.getJiraKey() != null && task.getJiraKey().startsWith("#")) {
@@ -90,11 +97,24 @@ public class GitHubService {
             }
 
             try {
+                String targetRepo = resolveTargetRepo(task, projectConfig, repo, configRepo, gitHubConfig.getRepo());
+                if (targetRepo == null || targetRepo.isBlank()) {
+                    throw new IllegalStateException("GitHub target repo could not be resolved for task #" + task.getId());
+                }
+                if (preparedRepos.add(targetRepo)) {
+                    ensureLabelsExist(targetRepo, isBug);
+                }
+
                 String issueNumber = createGitHubIssue(task, targetRepo, isBug);
                 task.setJiraKey(issueNumber); // Reuse jiraKey field for GitHub issue number
                 taskRepository.save(task);
-                created.add(Map.of("taskId", task.getId().toString(), "issueNumber", issueNumber, "status", "created"));
-                log.info("Created GitHub issue {} for task #{} '{}'", issueNumber, task.getId(), task.getTitle());
+                taskSyncRefService.upsert(task, SyncProviderType.GITHUB, targetRepo, issueNumber);
+                created.add(Map.of(
+                        "taskId", task.getId().toString(),
+                        "issueNumber", issueNumber,
+                        "targetRepo", targetRepo,
+                        "status", "created"));
+                log.info("Created GitHub issue {} for task #{} '{}' on {}", issueNumber, task.getId(), task.getTitle(), targetRepo);
             } catch (Exception e) {
                 log.error("Failed to create GitHub issue for task #{}: {}", task.getId(), e.getMessage(), e);
                 failed.add(Map.of("taskId", task.getId().toString(), "title", task.getTitle(), "error", e.getMessage()));
@@ -119,12 +139,11 @@ public class GitHubService {
      */
     @Transactional
     public Map<String, Object> verifySyncStatus(Long analysisId) {
-        List<Task> tasks = taskRepository.findByAnalysisId(analysisId);
-        List<Task> syncedTasks = tasks.stream()
-                .filter(t -> t.getJiraKey() != null && t.getJiraKey().startsWith("#"))
+        List<TaskSyncRef> syncedRefs = taskSyncRefRepository.findByAnalysisIdAndProvider(analysisId, SyncProviderType.GITHUB).stream()
+                .filter(r -> "SYNCED".equalsIgnoreCase(r.getSyncState()))
                 .toList();
 
-        if (syncedTasks.isEmpty()) {
+        if (syncedRefs.isEmpty()) {
             return Map.of("checked", 0, "cleared", 0);
         }
 
@@ -138,10 +157,12 @@ public class GitHubService {
         );
 
         int cleared = 0;
-        for (Task task : syncedTasks) {
-            String issueNumber = task.getJiraKey().replace("#", "");
+        for (TaskSyncRef ref : syncedRefs) {
+            Task task = ref.getTask();
+            String issueNumber = ref.getExternalRef().replace("#", "");
             try {
-                String url = "https://api.github.com/repos/" + repo + "/issues/" + issueNumber;
+                String effectiveRepo = firstNonBlank(ref.getTarget(), repo);
+                String url = "https://api.github.com/repos/" + effectiveRepo + "/issues/" + issueNumber;
                 HttpHeaders headers = new HttpHeaders();
                 headers.setBearerAuth(gitHubConfig.getToken());
                 headers.set("Accept", "application/vnd.github+json");
@@ -150,21 +171,27 @@ public class GitHubService {
                 String state = (String) response.getBody().get("state");
 
                 if ("closed".equals(state)) {
-                    task.setJiraKey(null);
-                    taskRepository.save(task);
+                    taskSyncRefService.markCleared(ref);
+                    if (task.getJiraKey() != null && task.getJiraKey().equals(ref.getExternalRef())) {
+                        task.setJiraKey(null);
+                        taskRepository.save(task);
+                    }
                     cleared++;
-                    log.info("Cleared sync for task #{} — GitHub issue {} is closed", task.getId(), task.getJiraKey());
+                    log.info("Cleared sync for task #{} — GitHub issue {} is closed", task.getId(), ref.getExternalRef());
                 }
             } catch (Exception e) {
                 // Issue not found (404) or other error — clear sync
-                task.setJiraKey(null);
-                taskRepository.save(task);
+                taskSyncRefService.markCleared(ref);
+                if (task.getJiraKey() != null && task.getJiraKey().equals(ref.getExternalRef())) {
+                    task.setJiraKey(null);
+                    taskRepository.save(task);
+                }
                 cleared++;
                 log.info("Cleared sync for task #{} — GitHub issue not accessible: {}", task.getId(), e.getMessage());
             }
         }
 
-        return Map.of("checked", syncedTasks.size(), "cleared", cleared, "stillSynced", syncedTasks.size() - cleared);
+        return Map.of("checked", syncedRefs.size(), "cleared", cleared, "stillSynced", syncedRefs.size() - cleared);
     }
 
     private String createGitHubIssue(Task task, String repo, boolean isBug) {
@@ -290,6 +317,38 @@ public class GitHubService {
     private String firstNonBlank(String... values) {
         for (String v : values) {
             if (v != null && !v.isBlank()) return v;
+        }
+        return null;
+    }
+
+    private String resolveTargetRepo(
+            Task task,
+            IntegrationConfigDTO projectConfig,
+            String requestRepo,
+            String globalConfigRepo,
+            String envDefaultRepo) {
+        if (requestRepo != null && !requestRepo.isBlank()) {
+            return requestRepo;
+        }
+        IntegrationConfigDTO.ServiceRouting route = findServiceRouting(projectConfig, task);
+        if (route != null && route.getGithubRepo() != null && !route.getGithubRepo().isBlank()) {
+            return route.getGithubRepo();
+        }
+        return firstNonBlank(globalConfigRepo, envDefaultRepo);
+    }
+
+    private IntegrationConfigDTO.ServiceRouting findServiceRouting(IntegrationConfigDTO projectConfig, Task task) {
+        if (projectConfig == null || projectConfig.getServiceRouting() == null
+                || task.getService() == null || task.getService().getName() == null) {
+            return null;
+        }
+        String serviceName = task.getService().getName();
+        IntegrationConfigDTO.ServiceRouting exact = projectConfig.getServiceRouting().get(serviceName);
+        if (exact != null) return exact;
+        for (var entry : projectConfig.getServiceRouting().entrySet()) {
+            if (entry.getKey() != null && entry.getKey().equalsIgnoreCase(serviceName)) {
+                return entry.getValue();
+            }
         }
         return null;
     }

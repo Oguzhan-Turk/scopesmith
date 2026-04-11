@@ -1,11 +1,13 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import type { ProjectService } from "@/api/client";
 
 interface ManualTaskForm {
   title: string;
   description: string;
   priority: string;
   category: string;
+  serviceId: number | "";
 }
 
 interface ManualTaskDialogProps {
@@ -15,9 +17,10 @@ interface ManualTaskDialogProps {
   onChange: (f: ManualTaskForm) => void;
   onSubmit: () => void;
   loading: boolean;
+  projectServices: ProjectService[];
 }
 
-export default function ManualTaskDialog({ open, onClose, form, onChange, onSubmit, loading }: ManualTaskDialogProps) {
+export default function ManualTaskDialog({ open, onClose, form, onChange, onSubmit, loading, projectServices }: ManualTaskDialogProps) {
   return (
     <Dialog open={open} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent>
@@ -74,6 +77,22 @@ export default function ManualTaskDialog({ open, onClose, form, onChange, onSubm
                 placeholder="Opsiyonel"
               />
             </div>
+          </div>
+          <div>
+            <label htmlFor="manual-task-service" className="text-sm font-medium mb-1 block">Service</label>
+            <select
+              id="manual-task-service"
+              value={form.serviceId}
+              onChange={(e) => onChange({ ...form, serviceId: e.target.value ? Number(e.target.value) : "" })}
+              className="w-full px-3 py-2 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <option value="">Atanmadı</option>
+              {projectServices.map((service) => (
+                <option key={service.id} value={service.id}>
+                  {service.name} ({service.serviceType})
+                </option>
+              ))}
+            </select>
           </div>
           <div className="flex justify-end gap-2 pt-1">
             <Button size="sm" variant="outline" onClick={onClose}>İptal</Button>

@@ -13,4 +13,5 @@ public class TaskUpdateRequest {
     private String priority;
     private String category;
     private String spRationale;
+    private Long serviceId;
 }

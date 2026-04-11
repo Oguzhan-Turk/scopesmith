@@ -5,6 +5,8 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "tasks")
@@ -75,6 +77,14 @@ public class Task {
     private Task dependency;
 
     /**
+     * Which project service this task primarily belongs to.
+     * Null means not yet assigned (legacy or generic tasks).
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "service_id")
+    private ProjectServiceNode service;
+
+    /**
      * Jira issue key after sync (e.g., "SCOPE-123").
      * Null if not yet synced to Jira.
      */
@@ -84,6 +94,10 @@ public class Task {
     private String agentSessionId;
     private String agentStatus;
     private String agentBranch;
+
+    @Builder.Default
+    @OneToMany(mappedBy = "task", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<TaskSyncRef> syncRefs = new ArrayList<>();
 
     @CreationTimestamp
     @Column(updatable = false)

@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { type Task } from "@/api/client";
+import { type ProjectService, type Task } from "@/api/client";
 
 interface EditTaskDialogProps {
   task: Task | null;
@@ -9,9 +9,10 @@ interface EditTaskDialogProps {
   onSave: () => void;
   onChange: (t: Task) => void;
   loading: boolean;
+  projectServices: ProjectService[];
 }
 
-export default function EditTaskDialog({ task, onClose, onSave, onChange }: EditTaskDialogProps) {
+export default function EditTaskDialog({ task, onClose, onSave, onChange, projectServices }: EditTaskDialogProps) {
   return (
     <Dialog open={!!task} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent>
@@ -76,6 +77,21 @@ export default function EditTaskDialog({ task, onClose, onSave, onChange }: Edit
                   <option value="FULLSTACK">FULLSTACK</option>
                 </select>
               </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Service</label>
+              <select
+                value={task.serviceId ?? ""}
+                onChange={(e) => onChange({ ...task, serviceId: e.target.value ? Number(e.target.value) : null })}
+                className="w-full px-3 py-2 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <option value="">Atanmadı</option>
+                {projectServices.map((service) => (
+                  <option key={service.id} value={service.id}>
+                    {service.name} ({service.serviceType})
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="flex justify-end gap-2">
               <Button size="sm" variant="outline" onClick={onClose}>İptal</Button>
