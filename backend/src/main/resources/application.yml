@@ -69,9 +69,23 @@ scopesmith:
 
   features:
     managed-agent-enabled: ${MANAGED_AGENT_ENABLED:false}
+  scan:
+    allowed-roots: ${SCOPESMITH_SCAN_ALLOWED_ROOTS:${user.home}}
+  insights:
+    cross-project-enabled: ${SCOPESMITH_INSIGHTS_CROSS_PROJECT_ENABLED:false}
+  assistant:
+    ai-enabled: ${SCOPESMITH_ASSISTANT_AI_ENABLED:true}
+    ai-min-question-length: ${SCOPESMITH_ASSISTANT_AI_MIN_QUESTION_LENGTH:10}
+    ai-max-question-length: ${SCOPESMITH_ASSISTANT_AI_MAX_QUESTION_LENGTH:600}
 
 server:
   port: 8080
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        same-site: Lax
+        secure: ${SCOPESMITH_SESSION_COOKIE_SECURE:false}
 
 logging:
   level:

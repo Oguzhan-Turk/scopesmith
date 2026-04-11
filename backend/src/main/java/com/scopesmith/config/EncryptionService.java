@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Locale;
 
 /**
  * AES encryption for sensitive data (credentials).
@@ -28,7 +29,7 @@ public class EncryptionService {
             @Value("${scopesmith.encryption-key:" + DEFAULT_KEY + "}") String secret,
             @Value("${spring.profiles.active:default}") String activeProfile) {
         if (DEFAULT_KEY.equals(secret)) {
-            if (activeProfile.contains("prod")) {
+            if (isProductionProfile(activeProfile)) {
                 throw new IllegalStateException(
                         "CRITICAL: Default encryption key cannot be used in production. " +
                         "Set 'scopesmith.encryption-key' environment variable.");
@@ -71,5 +72,12 @@ public class EncryptionService {
             log.error("Decryption failed — returning raw value", e);
             return encryptedText; // Fallback for corrupted data
         }
+    }
+
+    private boolean isProductionProfile(String activeProfile) {
+        if (activeProfile == null || activeProfile.isBlank()) return false;
+        return Arrays.stream(activeProfile.split(","))
+                .map(p -> p.trim().toLowerCase(Locale.ENGLISH))
+                .anyMatch(p -> p.equals("prod") || p.equals("production"));
     }
 }

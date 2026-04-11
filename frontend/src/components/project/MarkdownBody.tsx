@@ -1,4 +1,5 @@
 import { Separator } from "@/components/ui/separator";
+import type { ReactNode } from "react";
 
 /**
  * Lightweight markdown renderer for AI-generated content.
@@ -31,6 +32,17 @@ export default function MarkdownBody({ text }: { text: string }) {
     return <div className="px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap">{text}</div>;
   }
 
+  const renderInline = (raw: string): ReactNode[] => {
+    const parts = raw.split(/(\*\*.*?\*\*)/g);
+    return parts.filter(Boolean).map((part, idx) => {
+      const boldMatch = part.match(/^\*\*(.*?)\*\*$/);
+      if (boldMatch) {
+        return <strong key={idx}>{boldMatch[1]}</strong>;
+      }
+      return <span key={idx}>{part}</span>;
+    });
+  };
+
   return (
     <>
       {sections.map((sec, i) => {
@@ -58,14 +70,12 @@ export default function MarkdownBody({ text }: { text: string }) {
                     return (
                       <div key={j} className="flex items-start gap-2">
                         <span className="mt-1.5 w-1 h-1 rounded-full bg-foreground/40 flex-shrink-0" />
-                        <span dangerouslySetInnerHTML={{ __html: bulletMatch[1].replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>") }} />
+                        <span>{renderInline(bulletMatch[1])}</span>
                       </div>
                     );
                   }
                   if (!line.trim()) return <div key={j} className="h-1" />;
-                  return (
-                    <p key={j} dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>") }} />
-                  );
+                  return <p key={j}>{renderInline(line)}</p>;
                 })}
               </div>
             </div>

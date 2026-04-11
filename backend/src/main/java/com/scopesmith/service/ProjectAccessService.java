@@ -65,6 +65,20 @@ public class ProjectAccessService {
     }
 
     /**
+     * Can this user manage project members? (OWNER or ADMIN only)
+     */
+    public boolean canManageMembers(Long projectId) {
+        return getCurrentUser().map(user -> canManageMembers(user, projectId)).orElse(false);
+    }
+
+    public boolean canManageMembers(AppUser user, Long projectId) {
+        if (user.getRole() == Role.ADMIN) return true;
+        return membershipRepository.findByUserIdAndProjectId(user.getId(), projectId)
+                .map(m -> m.getRole() == ProjectRole.OWNER)
+                .orElse(false);
+    }
+
+    /**
      * Get project IDs accessible by current user.
      * Admin: null (means all). Others: membership-based list.
      */
@@ -88,6 +102,19 @@ public class ProjectAccessService {
      * Add member by username — for admin/owner use.
      */
     public void addMemberByUsername(String username, Long projectId, ProjectRole role) {
+        AppUser actor = getCurrentUser()
+                .orElseThrow(() -> new RuntimeException("Authenticated user not found"));
+        if (!canManageMembers(actor, projectId)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN,
+                    "Bu projede üye yönetimi için OWNER veya ADMIN rolü gerekir");
+        }
+        if (role == ProjectRole.OWNER && actor.getRole() != Role.ADMIN) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN,
+                    "OWNER rolü sadece ADMIN tarafından atanabilir");
+        }
+
         AppUser user = appUserRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı: " + username));
         addMembership(user.getId(), projectId, role);
@@ -97,6 +124,11 @@ public class ProjectAccessService {
      * List project members.
      */
     public List<java.util.Map<String, String>> getProjectMembers(Long projectId) {
+        if (!canAccess(projectId)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN,
+                    "Bu projeye erişim yetkiniz yok");
+        }
         return membershipRepository.findByProjectId(projectId).stream()
                 .map(m -> java.util.Map.of(
                         "username", m.getUser().getUsername(),
