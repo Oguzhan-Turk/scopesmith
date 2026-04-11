@@ -33,6 +33,7 @@ public class ProjectContextService {
     private final ObjectMapper objectMapper;
     private final AiResultValidationService validationService;
     private final DependencyParsingService dependencyParsingService;
+    private final SecretRedactionService secretRedactionService;
 
     /**
      * Key files that reveal project structure.
@@ -255,6 +256,7 @@ public class ProjectContextService {
     private String readKeyFiles(Path root, Map<String, String> buildFileContents) {
         StringBuilder content = new StringBuilder();
         long totalSize = 0;
+        int totalRedactions = 0;
 
         try {
             List<Path> filesToRead = new ArrayList<>();
@@ -311,8 +313,12 @@ public class ProjectContextService {
                     }
 
                     String fileContent = Files.readString(file);
+                    SecretRedactionService.RedactionResult redaction = secretRedactionService.redact(fileContent);
+                    String sanitized = redaction.content();
+                    totalRedactions += redaction.redactionCount();
+
                     content.append("\n### ").append(root.relativize(file)).append("\n```\n");
-                    content.append(fileContent);
+                    content.append(sanitized);
                     content.append("\n```\n");
                     totalSize += fileSize;
 
@@ -327,6 +333,10 @@ public class ProjectContextService {
             }
         } catch (IOException e) {
             log.error("Error reading key files from {}", root, e);
+        }
+
+        if (totalRedactions > 0) {
+            log.info("Secret redaction applied before AI context scan: {} replacements", totalRedactions);
         }
 
         return content.toString();

@@ -5,6 +5,7 @@ import com.scopesmith.repository.AnalysisRepository;
 import com.scopesmith.repository.QuestionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +35,8 @@ public class InsightService {
     private final AnalysisRepository analysisRepository;
     private final QuestionRepository questionRepository;
     private final EmbeddingService embeddingService;
+    @Value("${scopesmith.insights.cross-project-enabled:false}")
+    private boolean crossProjectInsightsEnabled;
 
     private static final int STALENESS_THRESHOLD_DAYS = 7;
     private static final int MAX_ANSWERED_QUESTIONS = 15;
@@ -92,7 +95,7 @@ public class InsightService {
         }
 
         // 5. Cross-Project Learning
-        String crossProject = buildCrossProjectInsight(project.getId(), currentType);
+        String crossProject = buildCrossProjectInsight(project, currentType);
         if (crossProject != null) {
             insights.append(crossProject);
             hasContent = true;
@@ -256,8 +259,17 @@ public class InsightService {
         return sb.toString();
     }
 
-    private String buildCrossProjectInsight(Long currentProjectId, RequirementType type) {
-        List<Analysis> otherAnalyses = analysisRepository.findByOtherProjectsAndType(currentProjectId, type);
+    private String buildCrossProjectInsight(Project project, RequirementType type) {
+        if (!crossProjectInsightsEnabled) {
+            return null;
+        }
+
+        if (project == null || project.getOrganization() == null || project.getOrganization().getId() == null) {
+            return null;
+        }
+
+        List<Analysis> otherAnalyses = analysisRepository.findByOtherProjectsInOrganizationAndType(
+                project.getId(), project.getOrganization().getId(), type);
         if (otherAnalyses.isEmpty()) return null;
 
         StringBuilder sb = new StringBuilder();
