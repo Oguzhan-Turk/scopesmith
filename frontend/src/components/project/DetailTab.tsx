@@ -207,7 +207,8 @@ export default function DetailTab({
                                         const nowActive = !digerActive.has(q.id);
                                         setDigerActive((prev) => {
                                           const next = new Set(prev);
-                                          nowActive ? next.add(q.id) : next.delete(q.id);
+                                          if (nowActive) next.add(q.id);
+                                          else next.delete(q.id);
                                           return next;
                                         });
                                         if (!nowActive) {
