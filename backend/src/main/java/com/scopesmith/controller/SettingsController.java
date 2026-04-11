@@ -1,9 +1,13 @@
 package com.scopesmith.controller;
 
+import com.scopesmith.dto.AiModelConfigDTO;
+import com.scopesmith.entity.ModelTier;
+import com.scopesmith.service.AiModelConfigService;
 import com.scopesmith.service.CredentialService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -12,6 +16,7 @@ import java.util.Map;
 public class SettingsController {
 
     private final CredentialService credentialService;
+    private final AiModelConfigService aiModelConfigService;
 
     @GetMapping("/credentials")
     public Map<String, String> getCredentials() {
@@ -29,5 +34,18 @@ public class SettingsController {
             }
         }
         return credentialService.getAllMasked();
+    }
+
+    @GetMapping("/models")
+    public List<AiModelConfigDTO> getModels() {
+        return aiModelConfigService.findAll();
+    }
+
+    @PutMapping("/models/{tier}")
+    public AiModelConfigDTO upsertModel(
+            @PathVariable String tier,
+            @RequestBody AiModelConfigDTO request) {
+        ModelTier parsedTier = ModelTier.valueOf(tier.toUpperCase(java.util.Locale.ENGLISH));
+        return aiModelConfigService.upsert(parsedTier, request);
     }
 }
