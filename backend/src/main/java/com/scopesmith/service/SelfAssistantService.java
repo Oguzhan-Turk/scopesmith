@@ -173,13 +173,15 @@ public class SelfAssistantService {
     }
 
     private SelfAssistantResponse managedAgentAnswer() {
-        String status = managedAgentEnabled ? "açık" : "kapalı";
+        String statusText = managedAgentEnabled
+                ? "Otomatik kod üretimi şu an aktif."
+                : "Otomatik kod üretimi şu an kapalı.";
         return SelfAssistantResponse.builder()
-                .answer("Yönetilen Ajan şu anda " + status + ". En güvenli kullanım için önce ScopeSmith'te işi netleştir, sonra Jira veya GitHub'a gönder ve son adımda insan kontrolü yap.")
+                .answer(statusText + " En güvenli akış: önce ScopeSmith'te işi netleştir, Jira veya GitHub'a gönder, son adımda ekip manuel olarak uygular.")
                 .confidence("HIGH")
                 .fallbackUsed(false)
                 .evidence(List.of())
-                .actions(List.of(action("İş Listesine Git", "NAVIGATE", "/projects/:id?tab=tasks")))
+                .actions(List.of(action("Task'lara Git", "NAVIGATE", "/projects/:id?tab=tasks")))
                 .build();
     }
 
@@ -295,7 +297,7 @@ public class SelfAssistantService {
         if (answer == null) return "";
         String fixed = answer.trim();
         // Leaked enum names → human-readable Turkish equivalents
-        fixed = fixed.replaceAll("\\bMANAGED_AGENT\\b", "Yönetilen Ajan");
+        fixed = fixed.replaceAll("\\bMANAGED_AGENT\\b", "otomatik kod üretimi");
         fixed = fixed.replaceAll("\\bIN_PROGRESS\\b", "devam ediyor");
         fixed = fixed.replaceAll("\\bCOMPLETED\\b", "tamamlandı");
         fixed = fixed.replaceAll("\\bFAILED\\b", "başarısız");

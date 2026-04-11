@@ -46,11 +46,11 @@ class SelfAssistantServiceTest {
     @Test
     void answer_shouldReturnHybridAnswerWhenAiOutputValid() {
         SelfAssistantAiResult ai = new SelfAssistantAiResult();
-        ai.setAnswer("Yönetilen Ajan için en güvenli yaklaşım, önce işi netleştirip sonra insan kontrolü ile ilerlemektir.");
+        ai.setAnswer("Otomatik kod üretimi için önce işi netleştirip sonra ekiple birlikte ilerlemek en güvenli yoldur.");
         ai.setConfidence("HIGH");
         SelfAssistantAiResult.ActionItem action = new SelfAssistantAiResult.ActionItem();
         action.setActionType("NAVIGATE");
-        action.setLabel("Task'lar");
+        action.setLabel("Task'lara Git");
         action.setTarget("/projects/:id?tab=tasks");
         ai.setActions(List.of(action));
 
@@ -62,7 +62,7 @@ class SelfAssistantServiceTest {
 
         assertEquals("HIGH", response.getConfidence());
         assertFalse(response.isFallbackUsed());
-        assertTrue(response.getAnswer().contains("insan kontrolü"));
+        assertTrue(response.getAnswer().toLowerCase(Locale.ENGLISH).contains("otomatik kod üretimi"));
         assertEquals(1, response.getActions().size());
     }
 
