@@ -1,0 +1,115 @@
+image: mcr.microsoft.com/playwright:v1.59.1-noble
+
+definitions:
+  services:
+    postgres:
+      image: pgvector/pgvector:pg17
+      variables:
+        POSTGRES_DB: scopesmith
+        POSTGRES_USER: scopesmith
+        POSTGRES_PASSWORD: scopesmith_dev
+
+pipelines:
+  default:
+    - step:
+        name: Verify (Backend + Frontend + Smoke)
+        caches:
+          - maven
+          - node
+        services:
+          - postgres
+        script:
+          - export DEBIAN_FRONTEND=noninteractive
+          - apt-get update
+          - apt-get install -y openjdk-21-jdk
+          - export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+          - export PATH="$JAVA_HOME/bin:$PATH"
+          - java -version
+          - export CI=true
+          - export DB_URL=jdbc:postgresql://localhost:5432/scopesmith
+          - export DB_USERNAME=scopesmith
+          - export DB_PASSWORD=scopesmith_dev
+          - export ANTHROPIC_API_KEY=dummy
+          - export OPENAI_API_KEY=dummy
+          - cd backend
+          - ./mvnw test
+          - cd ../frontend
+          - npm ci
+          - npm run lint
+          - npm run build
+          - npm run e2e:install
+          - cd ../backend
+          - nohup ./mvnw spring-boot:run > ../backend.log 2>&1 &
+          - cd ..
+          - |
+            for i in $(seq 1 60); do
+              if curl -fsS http://localhost:8080/actuator/health >/dev/null; then
+                echo "Backend is ready"
+                break
+              fi
+              sleep 2
+              if [ "$i" -eq 60 ]; then
+                echo "Backend failed to start"
+                cat backend.log || true
+                exit 1
+              fi
+            done
+          - cd frontend
+          - export SMOKE_CLEANUP=true
+          - npm run e2e:smoke
+        artifacts:
+          - backend.log
+          - frontend/playwright-report/**
+          - frontend/test-results/**
+  custom:
+    deploy-openshift:
+      - step:
+          name: Deploy OpenShift (Security Gate)
+          script:
+            - export DEBIAN_FRONTEND=noninteractive
+            - apt-get update
+            - apt-get install -y curl ca-certificates tar gzip
+            - |
+              if [ -z "${OPENSHIFT_TOKEN:-}" ]; then
+                echo "ERROR: OPENSHIFT_TOKEN is required."
+                exit 1
+              fi
+              if [ -z "${OPENSHIFT_API_URL:-}" ]; then
+                echo "ERROR: OPENSHIFT_API_URL is required."
+                exit 1
+              fi
+              if [ -z "${OPENSHIFT_NAMESPACE:-}" ]; then
+                echo "ERROR: OPENSHIFT_NAMESPACE is required."
+                exit 1
+              fi
+              if [ -z "${SCOPESMITH_ENCRYPTION_KEY:-}" ]; then
+                echo "ERROR: SCOPESMITH_ENCRYPTION_KEY is required."
+                exit 1
+              fi
+              if [ "${SCOPESMITH_ENCRYPTION_KEY}" = "scopesmith-default-key-change-in-production" ]; then
+                echo "ERROR: Default encryption key is not allowed for deploy."
+                exit 1
+              fi
+            - curl -fsSL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz -o /tmp/oc.tar.gz
+            - tar -xzf /tmp/oc.tar.gz -C /tmp
+            - install /tmp/oc /usr/local/bin/oc
+            - oc version --client
+            - oc login --token="$OPENSHIFT_TOKEN" --server="$OPENSHIFT_API_URL"
+            - oc project "$OPENSHIFT_NAMESPACE"
+            - set +x
+            - oc set env deployment/scopesmith-backend SCOPESMITH_ENCRYPTION_KEY="$SCOPESMITH_ENCRYPTION_KEY" -n "$OPENSHIFT_NAMESPACE"
+            - set -x
+            - |
+              if [ -d deploy/openshift ]; then
+                oc apply -f deploy/openshift/
+              fi
+            - |
+              if [ -n "${BACKEND_IMAGE:-}" ]; then
+                oc set image deployment/scopesmith-backend scopesmith-backend="$BACKEND_IMAGE" -n "$OPENSHIFT_NAMESPACE"
+              fi
+            - |
+              if [ -n "${FRONTEND_IMAGE:-}" ]; then
+                oc set image deployment/scopesmith-frontend scopesmith-frontend="$FRONTEND_IMAGE" -n "$OPENSHIFT_NAMESPACE"
+              fi
+            - oc rollout status deployment/scopesmith-backend -n "$OPENSHIFT_NAMESPACE" --timeout=180s || true
+            - oc rollout status deployment/scopesmith-frontend -n "$OPENSHIFT_NAMESPACE" --timeout=180s || true
