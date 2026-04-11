@@ -87,29 +87,49 @@ function StatGrid({ stats }: { stats: StatItem[] }) {
   );
 }
 
-export default function ContextTab({
-  project,
-  projectId,
-  scanPath,
-  setScanPath,
-  scanMode,
-  setScanMode,
-  gitUrl,
-  setGitUrl,
-  gitToken,
-  setGitToken,
-  handleScan,
-  documents,
-  setDocDialog,
-  handleDeleteDocument,
-  integrationConfig: _integrationConfig,
-  actionLoading,
-  setActionLoading,
-  showToast,
-  setActiveTab,
-}: ContextTabProps) {
+export default function ContextTab(props: ContextTabProps) {
+  const {
+    project,
+    scanPath,
+    setScanPath,
+    scanMode,
+    setScanMode,
+    gitUrl,
+    setGitUrl,
+    gitToken,
+    setGitToken,
+    handleScan,
+    contextFreshness,
+    partialRefreshStatus,
+    partialRefreshHistory,
+    partialRefreshHasMore,
+    partialRefreshLoadingMore,
+    traceability,
+    onPartialRefresh,
+    onLoadMorePartialRefreshHistory,
+    documents,
+    setDocDialog,
+    handleDeleteDocument,
+    actionLoading,
+  } = props;
   const [reportOpen, setReportOpen] = useState(true);
   const [scanOpen, setScanOpen] = useState(false);
+  const [selectedJobId, setSelectedJobId] = useState<number | null>(null);
+
+  function formatDuration(startedAt?: string, completedAt?: string) {
+    if (!startedAt) return "—";
+    if (!completedAt) return "devam ediyor";
+    const startMs = new Date(startedAt).getTime();
+    const endMs = new Date(completedAt).getTime();
+    if (Number.isNaN(startMs) || Number.isNaN(endMs)) return "—";
+    const sec = Math.max(0, Math.round((endMs - startMs) / 1000));
+    if (sec < 60) return `${sec}s`;
+    const min = Math.floor(sec / 60);
+    const rem = sec % 60;
+    return `${min}m ${rem}s`;
+  }
+
+  const selectedJob = partialRefreshHistory.find((j) => j.jobId === selectedJobId) ?? null;
   return (
     <div className="space-y-4">
       {/* Kaynak Kod */}
@@ -134,6 +154,114 @@ export default function ContextTab({
           </div>
         </CardHeader>
         {scanOpen && <CardContent className="space-y-3">
+          {contextFreshness && (
+            <div className="rounded-md border bg-muted/25 p-3 space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-medium">Context Freshness</p>
+                  <p className="text-xs text-muted-foreground">
+                    {contextFreshness.reason}
+                  </p>
+                </div>
+                <Badge variant="outline">
+                  Skor {contextFreshness.analysisFreshnessScore} / Güven {contextFreshness.contextConfidence}
+                </Badge>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span>{contextFreshness.commitsBehind ?? 0} commit</span>
+                <span>·</span>
+                <span>{contextFreshness.changedFiles} dosya değişti</span>
+                {contextFreshness.impactedModules.length > 0 && (
+                  <>
+                    <span>·</span>
+                    <span>{contextFreshness.impactedModules.slice(0, 4).join(", ")}</span>
+                  </>
+                )}
+              </div>
+              {partialRefreshStatus?.status === "RUNNING" && (
+                <div className="text-xs text-muted-foreground">
+                  Kısmi yenileme sürüyor: {partialRefreshStatus.processedAnalyses ?? 0}/{partialRefreshStatus.totalAnalyses ?? 0}
+                </div>
+              )}
+              {contextFreshness.recommendation === "PARTIAL_REFRESH" && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={onPartialRefresh}
+                  disabled={actionLoading === "partial-refresh" || partialRefreshStatus?.status === "RUNNING"}
+                >
+                  {(actionLoading === "partial-refresh" || partialRefreshStatus?.status === "RUNNING")
+                    ? "Kısmi yenileme..."
+                    : "Etkilenenleri Yeniden Analiz Et"}
+                </Button>
+              )}
+              {partialRefreshHistory.length > 0 && (
+                <div className="pt-1">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Son Kısmi Yenileme Denemeleri</p>
+                  <div className="space-y-1.5">
+                    {partialRefreshHistory.map((job) => (
+                      <button
+                        key={job.jobId ?? `${job.startedAt}-${job.status}`}
+                        type="button"
+                        onClick={() => setSelectedJobId((prev) => (prev === (job.jobId ?? null) ? null : (job.jobId ?? null)))}
+                        className="w-full flex items-center justify-between rounded border bg-background/70 px-2 py-1.5 text-xs hover:bg-muted/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className={
+                            job.status === "DONE"
+                              ? "text-green-700 border-green-300"
+                              : job.status === "FAILED"
+                                ? "text-red-700 border-red-300"
+                                : "text-blue-700 border-blue-300"
+                          }>
+                            {job.status}
+                          </Badge>
+                          <span className="text-muted-foreground">
+                            {job.refreshedCount ?? 0} talep
+                          </span>
+                        </div>
+                        <span className="text-muted-foreground">
+                          {job.startedAt ? timeAgo(job.startedAt) : "—"}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  {partialRefreshHasMore && (
+                    <button
+                      type="button"
+                      onClick={onLoadMorePartialRefreshHistory}
+                      disabled={partialRefreshLoadingMore}
+                      className="mt-2 text-xs text-primary hover:underline disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                    >
+                      {partialRefreshLoadingMore ? "Yükleniyor..." : "Daha Fazla Göster"}
+                    </button>
+                  )}
+                  {selectedJob && (
+                    <div className="mt-2 rounded border bg-background/70 p-2 text-xs space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">Job #{selectedJob.jobId}</span>
+                        <span className="text-muted-foreground">Süre: {formatDuration(selectedJob.startedAt, selectedJob.completedAt)}</span>
+                      </div>
+                      <div className="text-muted-foreground">
+                        Recommendation: {selectedJob.recommendation ?? "—"} · İlerleme: {selectedJob.processedAnalyses ?? 0}/{selectedJob.totalAnalyses ?? 0}
+                      </div>
+                      {(selectedJob.refreshedRequirementIds?.length ?? 0) > 0 && (
+                        <div className="text-muted-foreground">
+                          Yenilenen Talep ID: {selectedJob.refreshedRequirementIds?.join(", ")}
+                        </div>
+                      )}
+                      {selectedJob.error && (
+                        <div className="text-destructive">
+                          Hata: {selectedJob.error}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="inline-flex rounded bg-muted/40 p-0.5 gap-0.5">
             <button
               onClick={() => setScanMode("local")}
@@ -194,6 +322,56 @@ export default function ContextTab({
           )}
         </CardContent>}
       </Card>
+
+      {traceability && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Traceability</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid gap-2 grid-cols-2 md:grid-cols-4">
+              <div className="rounded border bg-muted/20 px-3 py-2">
+                <p className="text-[11px] text-muted-foreground">Talep</p>
+                <p className="text-sm font-semibold">{traceability.summary.totalRequirements}</p>
+              </div>
+              <div className="rounded border bg-muted/20 px-3 py-2">
+                <p className="text-[11px] text-muted-foreground">Analizli</p>
+                <p className="text-sm font-semibold">{traceability.summary.analyzedRequirements}</p>
+              </div>
+              <div className="rounded border bg-muted/20 px-3 py-2">
+                <p className="text-[11px] text-muted-foreground">SP Onaylı</p>
+                <p className="text-sm font-semibold">{traceability.summary.approvedTasks}</p>
+              </div>
+              <div className="rounded border bg-muted/20 px-3 py-2">
+                <p className="text-[11px] text-muted-foreground">Sync Coverage</p>
+                <p className="text-sm font-semibold">%{Math.round(traceability.summary.syncCoveragePercent)}</p>
+              </div>
+            </div>
+
+            {traceability.items.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Henüz traceability verisi yok.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {traceability.items.slice(0, 6).map((item) => (
+                  <div key={item.requirementId} className="rounded border bg-background/70 px-3 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium truncate">
+                        {item.requirementSeq != null ? `#${item.requirementSeq} ` : ""}{item.requirementPreview}
+                      </p>
+                      <Badge variant="outline" className="text-xs">
+                        {item.syncedTaskCount}/{item.approvedTaskCount} sync
+                      </Badge>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Analysis: {item.analysisId ?? "—"} · Task: {item.taskCount} · Hedef: {item.syncTargets.length > 0 ? item.syncTargets.join(", ") : "—"}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Proje Dokümanları */}
       <Card>
