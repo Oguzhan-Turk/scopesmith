@@ -1,4 +1,4 @@
-# ScopeSmith — Demo Senaryosu
+# ScopeSmith — Demo Senaryosu (Enterprise Akış)
 
 ## Senaryo: Turkcell Kampanya Yönetim Sistemi
 
@@ -131,7 +131,42 @@ kampanya bazlı olsun. Ayrıca raporlama da lazım sanırım. Ne zaman bitirebil
 
 ---
 
-## Demo Süresi: ~7-10 dakika
+## Adım 7: Enterprise Güvenilirlik Gösterimi
+
+**Amaç:** "Sadece AI öneri üretmiyor, üretim kalitesinde izlenebilir ve testli çalışıyor" mesajını kanıtlamak.
+
+1. **Model Governance**
+- Settings -> AI Modelleri sekmesinden LIGHT/STANDARD/PREMIUM mapping değiştir.
+- Deploy yapmadan model config değişiminin kalıcı olduğunu göster.
+
+2. **Incremental Re-analysis**
+- Bağlam sekmesinde Context Freshness kartını aç.
+- Partial refresh başlat, status'in `RUNNING -> DONE/FAILED` geçişini göster.
+- Timeline'da job detayını aç: recommendation, processed/total, refreshed IDs, error.
+
+3. **Operability / Auditability**
+- History pagination (`Daha Fazla Göster`) ile eski koşumları getir.
+- "Restart olsa da job geçmişi kaybolmuyor" vurgusu yap (DB-backed job store).
+
+4. **Quality Gate (CI + Smoke)**
+- Repo'da CI akışını göster (`backend test + frontend lint/build + e2e smoke`).
+- Bitbucket kullanan ekiplerde aynı akışın `bitbucket-pipelines.yml` ile çalıştığını belirt.
+- Jenkins + OpenShift kullanan ekiplerde aynı akışın `Jenkinsfile` ile yönetildiğini belirt.
+- Smoke testin gerçek kullanıcı akışını ve timeline görünürlüğünü otomatik doğruladığını söyle.
+
+5. **Workspace Services Federation (ScopeSmith Farkı)**
+- Integrations sekmesinde service registry'yi aç (`backend-api`, `frontend-web`, `gateway` gibi servisleri göster).
+- Service dependency graph'i ve federated context üretimini göster.
+- Mesaj: "Tek bir kod tabanı değil, çok servisli sistemde impact analizi yapabiliyoruz."
+
+6. **Service-aware Multi-Provider Sync (ScopeSmith Farkı)**
+- Task listesinde bir task'ın hem Jira hem GitHub sync referansını aynı anda göster.
+- Route bazlı sync policy gate'i vurgula:
+  - "Bu task'ın servisi için Jira/GitHub target route tanımlı değilse gönderim bilinçli olarak bloklanır."
+- Mesaj: "Local coding agent sadece kod üretir; ScopeSmith kurumsal yönetişimle doğru hedefe, güvenli gönderim yapar."
+- Not: "System of Record Jira/GitHub'dır; ScopeSmith control tower olarak çalışır."
+
+## Demo Süresi: ~12-14 dakika
 
 | Adım | Süre |
 |------|------|
@@ -141,4 +176,11 @@ kampanya bazlı olsun. Ayrıca raporlama da lazım sanırım. Ne zaman bitirebil
 | Soruları cevapla | 1 dk |
 | Task + SP gösterimi | 1.5 dk |
 | PO özeti | 1 dk |
-| Teknik açıklama + sorular | 2-3 dk |
+| Enterprise reliability + federation + provider routing | 5-6 dk |
+| Teknik açıklama + sorular | 2 dk |
+
+---
+
+## Final Cümle (Kapanış Önerisi)
+
+> "ScopeSmith yalnızca talebi task'a çeviren bir AI aracı değil; model governance, incremental refresh, audit trail, workspace services federation ve service-aware multi-provider delivery ile enterprise SDLC akışına güvenli şekilde entegre olabilen bir platform."

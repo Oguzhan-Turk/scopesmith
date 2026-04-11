@@ -82,6 +82,7 @@ Backend: http://localhost:8080 | Frontend: http://localhost:5173 | Users: admin/
 
 ## Çalışma Kuralları
 - Kaynak: dosya (CLAUDE.md + docs/), konuşma değil
+- Agent handoff kaydı: `docs/ai-handoff.md` (her oturum sonunda standart formatla append)
 - Türkçe sohbet, İngilizce kod/terim. Her zaman "neden" açıklanır
 - Büyük kararlar → docs/decisions.md
 - Demo notu: ScopeSmith kendi kodunu taradı (meta-demo)
