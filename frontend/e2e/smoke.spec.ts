@@ -73,7 +73,7 @@ test("login + create project + add requirement flow", async ({ page, request }) 
   expect(seeded.ok()).toBeTruthy();
 
   await openContextAndExpandScan(page);
-  await expect(page.getByText("Son Kısmi Yenileme Denemeleri")).toBeVisible();
+  await expect(page.getByText("Geçmiş yenilemeler")).toBeVisible();
 
   await cleanupProject(request, projectId, projectName, cookieHeader);
 });
@@ -104,7 +104,7 @@ test("partial refresh FAILED entry is visible in timeline", async ({ page, reque
   await client.end();
 
   await openContextAndExpandScan(page);
-  await expect(page.getByText("Son Kısmi Yenileme Denemeleri")).toBeVisible();
+  await expect(page.getByText("Geçmiş yenilemeler")).toBeVisible();
   await expect(page.getByText("FAILED")).toBeVisible();
   await page.getByText("FAILED").first().click();
   await expect(page.getByText(projectIdErrorText)).toBeVisible();
