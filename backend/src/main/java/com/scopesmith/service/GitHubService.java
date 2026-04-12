@@ -1,6 +1,7 @@
 package com.scopesmith.service;
 
 import com.scopesmith.config.GitHubConfig;
+import com.scopesmith.service.ClaudeCodeService;
 import com.scopesmith.dto.IntegrationConfigDTO;
 import com.scopesmith.entity.Analysis;
 import com.scopesmith.entity.RequirementType;
@@ -32,18 +33,21 @@ public class GitHubService {
     private final AnalysisRepository analysisRepository;
     private final TaskSyncRefRepository taskSyncRefRepository;
     private final TaskSyncRefService taskSyncRefService;
+    private final ClaudeCodeService claudeCodeService;
     private final RestTemplate restTemplate;
 
     public GitHubService(GitHubConfig gitHubConfig, TaskRepository taskRepository,
                          AnalysisRepository analysisRepository,
                          TaskSyncRefRepository taskSyncRefRepository,
                          TaskSyncRefService taskSyncRefService,
+                         ClaudeCodeService claudeCodeService,
                          RestTemplateBuilder restTemplateBuilder) {
         this.gitHubConfig = gitHubConfig;
         this.taskRepository = taskRepository;
         this.analysisRepository = analysisRepository;
         this.taskSyncRefRepository = taskSyncRefRepository;
         this.taskSyncRefService = taskSyncRefService;
+        this.claudeCodeService = claudeCodeService;
         this.restTemplate = restTemplateBuilder
                 .connectTimeout(Duration.ofSeconds(10))
                 .readTimeout(Duration.ofSeconds(30))
@@ -252,6 +256,17 @@ public class GitHubService {
 
         if (task.getDependency() != null) {
             md.append("**Bağımlılık:** ").append(task.getDependency().getTitle()).append("\n\n");
+        }
+
+        // Claude Code implementation prompt
+        try {
+            String prompt = claudeCodeService.buildPrompt(task.getId());
+            if (prompt != null && !prompt.isBlank()) {
+                md.append("### Claude Code Uygulama Promptu\n\n");
+                md.append("```\n").append(prompt).append("\n```\n\n");
+            }
+        } catch (Exception e) {
+            log.warn("Could not build Claude Code prompt for task #{}: {}", task.getId(), e.getMessage());
         }
 
         md.append("---\n_Bu issue [ScopeSmith](https://github.com/Oguzhan-Turk/scopesmith) tarafından otomatik oluşturulmuştur._");

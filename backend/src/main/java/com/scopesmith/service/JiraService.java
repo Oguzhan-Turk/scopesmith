@@ -1,6 +1,7 @@
 package com.scopesmith.service;
 
 import com.scopesmith.config.JiraConfig;
+import com.scopesmith.service.ClaudeCodeService;
 import com.scopesmith.dto.IntegrationConfigDTO;
 import com.scopesmith.entity.Analysis;
 import com.scopesmith.entity.RequirementType;
@@ -33,18 +34,21 @@ public class JiraService {
     private final AnalysisRepository analysisRepository;
     private final TaskSyncRefRepository taskSyncRefRepository;
     private final TaskSyncRefService taskSyncRefService;
+    private final ClaudeCodeService claudeCodeService;
     private final RestTemplate restTemplate;
 
     public JiraService(JiraConfig jiraConfig, TaskRepository taskRepository,
                        AnalysisRepository analysisRepository,
                        TaskSyncRefRepository taskSyncRefRepository,
                        TaskSyncRefService taskSyncRefService,
+                       ClaudeCodeService claudeCodeService,
                        RestTemplateBuilder restTemplateBuilder) {
         this.jiraConfig = jiraConfig;
         this.taskRepository = taskRepository;
         this.analysisRepository = analysisRepository;
         this.taskSyncRefRepository = taskSyncRefRepository;
         this.taskSyncRefService = taskSyncRefService;
+        this.claudeCodeService = claudeCodeService;
         this.restTemplate = restTemplateBuilder
                 .connectTimeout(Duration.ofSeconds(10))
                 .readTimeout(Duration.ofSeconds(30))
@@ -115,7 +119,7 @@ public class JiraService {
                 String jiraKey = createJiraIssue(task, routedProject, routedType, jiraSettings);
                 task.setJiraKey(jiraKey);
                 taskRepository.save(task);
-                taskSyncRefService.upsert(task, SyncProviderType.JIRA, routedProject, jiraKey);
+                taskSyncRefService.upsert(task, SyncProviderType.JIRA, jiraConfig.getUrl(), jiraKey);
                 created.add(Map.of(
                         "taskId", task.getId().toString(),
                         "jiraKey", jiraKey,
@@ -294,10 +298,29 @@ public class JiraService {
             content.add(adfParagraph(sibText.toString().trim()));
         }
 
+        // Claude Code implementation prompt
+        try {
+            String prompt = claudeCodeService.buildPrompt(task.getId());
+            if (prompt != null && !prompt.isBlank()) {
+                content.add(adfHeading("Claude Code Uygulama Promptu"));
+                content.add(adfCodeBlock(prompt));
+            }
+        } catch (Exception e) {
+            log.warn("Could not build Claude Code prompt for task #{}: {}", task.getId(), e.getMessage());
+        }
+
         return Map.of(
                 "version", 1,
                 "type", "doc",
                 "content", content
+        );
+    }
+
+    private Map<String, Object> adfCodeBlock(String text) {
+        return Map.of(
+                "type", "codeBlock",
+                "attrs", Map.of("language", "text"),
+                "content", List.of(Map.of("type", "text", "text", text))
         );
     }
 
