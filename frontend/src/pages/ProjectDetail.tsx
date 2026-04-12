@@ -1120,6 +1120,7 @@ export default function ProjectDetail() {
             handleDeleteRequirement={handleDeleteRequirement}
             setActiveTab={setActiveTab}
             setReqDialogOpen={setReqDialogOpen}
+            traceability={traceability}
           />
         </TabsContent>
 
@@ -1211,17 +1212,6 @@ export default function ProjectDetail() {
             handleDeleteDocument={handleDeleteDocument}
             integrationConfig={integrationConfig}
             setActiveTab={setActiveTab}
-            projectServices={projectServices}
-            serviceGraph={serviceGraph}
-            newServiceForm={newServiceForm}
-            setNewServiceForm={setNewServiceForm}
-            handleCreateService={handleCreateService}
-            handleDeleteService={handleDeleteService}
-            handleScanService={handleScanService}
-            dependencyForm={dependencyForm}
-            setDependencyForm={setDependencyForm}
-            handleAddDependency={handleAddDependency}
-            handleDeleteDependency={handleDeleteDependency}
           />
         </TabsContent>
 
@@ -1238,6 +1228,17 @@ export default function ProjectDetail() {
             handleSaveIntegrationConfig={handleSaveIntegrationConfig}
             handleUpdateProject={handleUpdateProject}
             onDeleteProject={() => setDeleteDialogOpen(true)}
+            projectServices={projectServices}
+            serviceGraph={serviceGraph}
+            newServiceForm={newServiceForm}
+            setNewServiceForm={setNewServiceForm}
+            handleCreateService={handleCreateService}
+            handleDeleteService={handleDeleteService}
+            handleScanService={handleScanService}
+            dependencyForm={dependencyForm}
+            setDependencyForm={setDependencyForm}
+            handleAddDependency={handleAddDependency}
+            handleDeleteDependency={handleDeleteDependency}
           />
         </TabsContent>
 

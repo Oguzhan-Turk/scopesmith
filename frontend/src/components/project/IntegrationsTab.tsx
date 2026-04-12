@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Save, Trash2, GitBranch, FolderOpen, ChevronDown } from "lucide-react";
+import { Save, Trash2, GitBranch, FolderOpen, ChevronDown, Layers, Plus, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { timeAgo } from "@/lib/utils";
 import type { IntegrationsTabProps } from "./types";
 
 export default function IntegrationsTab({
@@ -14,11 +15,24 @@ export default function IntegrationsTab({
   actionLoading,
   isAdmin,
   onDeleteProject,
+  projectServices,
+  serviceGraph,
+  newServiceForm,
+  setNewServiceForm,
+  handleCreateService,
+  handleDeleteService,
+  handleScanService,
+  dependencyForm,
+  setDependencyForm,
+  handleAddDependency,
+  handleDeleteDependency,
 }: IntegrationsTabProps) {
   const [editName, setEditName] = useState(project.name);
   const [editDescription, setEditDescription] = useState(project.description ?? "");
   const [infoOpen, setInfoOpen] = useState(false);
   const [trackerOpen, setTrackerOpen] = useState(true);
+  const [archOpen, setArchOpen] = useState(false);
+  const [multiService, setMultiService] = useState(projectServices.length > 0);
 
   return (
     <div className="space-y-6">
@@ -151,6 +165,159 @@ export default function IntegrationsTab({
             </Button>
           </div>
         </CardContent>}
+      </Card>
+
+      {/* Servis Mimarisi */}
+      <Card>
+        <CardHeader className="pb-3 cursor-pointer select-none" onClick={() => setArchOpen(v => !v)}>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Layers className="w-4 h-4 text-muted-foreground" />
+              Servis Mimarisi
+            </CardTitle>
+            <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${archOpen ? "rotate-180" : ""}`} />
+          </div>
+        </CardHeader>
+        {archOpen && (
+          <CardContent className="space-y-3">
+            {/* Çoklu servis toggle */}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Çoklu servis projesi</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {multiService
+                    ? "Her servis ayrı taranır, AI analizlerinde ilgili servisler seçilir."
+                    : "Tek repo — Bağlam sekmesindeki Kaynak Tarama yeterli."}
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={multiService}
+                onClick={() => {
+                  if (!multiService && project.hasContext) {
+                    if (!window.confirm("Çoklu servis moduna geçmek mevcut taramayı silmez. Yeni servisler eklenirse AI analizleri federe moda geçer. Devam edilsin mi?")) return;
+                  }
+                  setMultiService(v => !v);
+                }}
+                className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${multiService ? "bg-primary" : "bg-muted"}`}
+              >
+                <span className={`pointer-events-none block h-4 w-4 rounded-full bg-background shadow-sm transition-transform ${multiService ? "translate-x-4" : "translate-x-0.5"} mt-[1px]`} />
+              </button>
+            </div>
+
+            {/* Servis listesi */}
+            {multiService && (
+              <div className="space-y-3">
+                {/* Servis ekleme */}
+                <div className="space-y-2">
+                  <div className="grid md:grid-cols-3 gap-2">
+                    <input type="text" placeholder="Servis adı (billing-api)"
+                      value={newServiceForm.name}
+                      onChange={(e) => setNewServiceForm({ ...newServiceForm, name: e.target.value })}
+                      className="px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+                    <select value={newServiceForm.serviceType}
+                      onChange={(e) => setNewServiceForm({ ...newServiceForm, serviceType: e.target.value as typeof newServiceForm.serviceType })}
+                      className="px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      {["BACKEND", "FRONTEND", "LIBRARY", "OTHER"].map((t) => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                    <input type="text" placeholder="Klasör yolu veya Git URL"
+                      value={newServiceForm.localPath || newServiceForm.repoUrl}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val.startsWith("http") || val.startsWith("git@")) {
+                          setNewServiceForm({ ...newServiceForm, repoUrl: val, localPath: "" });
+                        } else {
+                          setNewServiceForm({ ...newServiceForm, localPath: val, repoUrl: "" });
+                        }
+                      }}
+                      className="px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+                  </div>
+                  <div className="flex justify-end">
+                    <Button size="sm" variant="outline" onClick={handleCreateService}
+                      disabled={actionLoading === "create-service" || !newServiceForm.name.trim()}>
+                      {actionLoading === "create-service" ? "Ekleniyor..." : <><Plus className="w-3.5 h-3.5 mr-1" />Servis Ekle</>}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Servis listesi */}
+                {projectServices.length > 0 && (
+                  <div className="space-y-2">
+                    {projectServices.map((service) => (
+                      <div key={service.id} className="rounded-lg border px-3 py-2 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">{service.name}</span>
+                            <Badge variant="outline" className="text-xs">{service.serviceType}</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {service.lastScannedAt ? `Son tarama: ${timeAgo(service.lastScannedAt)}` : "Henüz taranmadı"}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Button size="sm" variant="outline" onClick={() => handleScanService(service.id)}
+                            disabled={actionLoading === `scan-service-${service.id}`}>
+                            {actionLoading === `scan-service-${service.id}` ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : "Tara"}
+                          </Button>
+                          <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
+                            onClick={() => handleDeleteService(service.id)}
+                            disabled={actionLoading === `delete-service-${service.id}`}>
+                            Sil
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Bağımlılıklar */}
+                {projectServices.length >= 2 && (
+                  <div className="rounded-lg border p-3 space-y-2">
+                    <p className="text-sm font-medium">Servis Bağımlılıkları</p>
+                    <div className="grid md:grid-cols-4 gap-2">
+                      <select value={dependencyForm.fromServiceId}
+                        onChange={(e) => setDependencyForm({ ...dependencyForm, fromServiceId: e.target.value ? Number(e.target.value) : "" })}
+                        className="px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                        <option value="">Kaynak</option>
+                        {projectServices.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                      </select>
+                      <select value={dependencyForm.toServiceId}
+                        onChange={(e) => setDependencyForm({ ...dependencyForm, toServiceId: e.target.value ? Number(e.target.value) : "" })}
+                        className="px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                        <option value="">Hedef</option>
+                        {projectServices.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                      </select>
+                      <input type="text" placeholder="Tip (SYNC/ASYNC)" value={dependencyForm.dependencyType}
+                        onChange={(e) => setDependencyForm({ ...dependencyForm, dependencyType: e.target.value || "SYNC" })}
+                        className="px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+                      <Button size="sm" variant="outline" onClick={handleAddDependency}
+                        disabled={actionLoading === "add-service-dependency"}>
+                        {actionLoading === "add-service-dependency" ? "..." : "Ekle"}
+                      </Button>
+                    </div>
+                    {(serviceGraph?.dependencies?.length ?? 0) > 0 && (
+                      <div className="space-y-1">
+                        {serviceGraph!.dependencies.map((d) => (
+                          <div key={d.id} className="text-xs flex items-center justify-between rounded border px-2 py-1">
+                            <span>{d.fromServiceName} → {d.toServiceName} <span className="text-muted-foreground">({d.dependencyType})</span></span>
+                            <button onClick={() => handleDeleteDependency(d.id)}
+                              className="text-destructive hover:underline focus-visible:outline-none rounded"
+                              disabled={actionLoading === `delete-dependency-${d.id}`}>
+                              Sil
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        )}
       </Card>
 
       {/* Projeyi Sil — sadece admin görür */}
