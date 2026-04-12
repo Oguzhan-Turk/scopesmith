@@ -321,6 +321,8 @@ export const startManagedAgent = (taskId: number) =>
   request<AgentStartResult>(`/tasks/${taskId}/agent/start`, { method: "POST" });
 export const getManagedAgentStatus = (taskId: number) =>
   request<AgentStatusResult>(`/tasks/${taskId}/agent/status`);
+export const cancelManagedAgent = (taskId: number) =>
+  request<void>(`/tasks/${taskId}/agent/cancel`, { method: "POST" });
 export const refineAnalysis = (analysisId: number, instruction: string) =>
   request<Analysis>(`/analyses/${analysisId}/refine`, {
     method: "POST",
@@ -687,7 +689,7 @@ export interface PartialRefreshHistory {
   items: PartialRefreshResult[];
 }
 
-export type ServiceType = "BACKEND" | "FRONTEND" | "MOBILE" | "GATEWAY" | "DATA" | "PLATFORM" | "SHARED" | "OTHER";
+export type ServiceType = "BACKEND" | "FRONTEND" | "LIBRARY" | "OTHER";
 
 export interface ProjectServiceRequest {
   name: string;
