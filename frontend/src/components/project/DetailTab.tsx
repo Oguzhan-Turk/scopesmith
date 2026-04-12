@@ -198,8 +198,10 @@ export default function DetailTab({
                                 return (
                                   <button
                                     key={opt}
-                                    className={`px-3 py-1.5 text-xs rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                                      selected ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"
+                                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                                      selected
+                                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                                        : "bg-background hover:bg-muted border-border"
                                     }`}
                                     onClick={() => {
                                       if (isDiger) {
@@ -235,6 +237,7 @@ export default function DetailTab({
                                       }
                                     }}
                                   >
+                                    {selected && <span>✓</span>}
                                     {opt}
                                   </button>
                                 );
@@ -411,13 +414,13 @@ export default function DetailTab({
             {selectedAnalysis.affectedModules && (
               <>
                 <Separator />
-                <div className="border-l-2 border-primary/20 pl-4 py-3">
-                  <h4 className="text-sm font-semibold text-primary/60 mb-2">Etkilenen Moduller</h4>
+                <div>
+                  <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Etkilenen Modüller</h4>
                   <div className="flex flex-wrap gap-1.5">
                     {selectedAnalysis.affectedModules.split(",").map((m) => m.trim()).filter(Boolean).map((mod, i) => (
-                      <code key={i} className="px-2 py-0.5 text-xs rounded bg-muted border border-border font-mono text-foreground/80">
+                      <span key={i} className="px-2 py-0.5 text-xs rounded-md bg-muted text-foreground/80 border border-border">
                         {mod}
-                      </code>
+                      </span>
                     ))}
                   </div>
                 </div>

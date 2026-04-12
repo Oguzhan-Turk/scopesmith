@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect, type ReactNode } from "react";
-import { ArrowLeft, Send, Pencil, ChevronDown, ChevronRight, Copy, RefreshCw, Plus, Settings2, Check, Download, ExternalLink, Bot } from "lucide-react";
+import { ArrowLeft, Send, Pencil, ChevronDown, ChevronRight, Copy, RefreshCw, Plus, Settings2, Check, Download, ExternalLink, Play, Square, GitBranch } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip } from "@/components/ui/tooltip";
-import { syncToJira, syncToGitHub, suggestSp, getClaudeCodePrompt, updateTask } from "@/api/client";
+import { syncToJira, syncToGitHub, suggestSp, getClaudeCodePrompt, updateTask, startManagedAgent, getManagedAgentStatus, cancelManagedAgent, getFeatures } from "@/api/client";
 
 import { categoryColor, priorityColor } from "./utils";
 import type { TasksTabProps } from "./types";
@@ -171,6 +171,195 @@ function IntegrationMenu({
   );
 }
 
+// ─── Prompt Section ───────────────────────────────────────────────────────────
+
+function PromptSection({ taskId, showToast }: { taskId: number; showToast: (msg: string, type?: "success" | "error" | "info") => void }) {
+  const [prompt, setPrompt] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  async function load() {
+    if (prompt !== null) { setOpen(true); return; }
+    setLoading(true);
+    try {
+      const result = await getClaudeCodePrompt(taskId);
+      setPrompt(result.prompt);
+      setOpen(true);
+    } catch { showToast("Prompt yüklenemedi.", "error"); }
+    finally { setLoading(false); }
+  }
+
+  return (
+    <div className="border-l-2 border-primary/15 pl-4 py-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <h5 className="text-xs font-semibold text-primary/60 uppercase tracking-wide">Uygulama Promptu</h5>
+        <div className="flex items-center gap-2">
+          {open && prompt && (
+            <button
+              onClick={async () => { await navigator.clipboard.writeText(prompt); showToast("Kopyalandı!", "success"); }}
+              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 focus-visible:outline-none rounded"
+            >
+              <Copy className="w-3 h-3" />Kopyala
+            </button>
+          )}
+          <button
+            onClick={() => open ? setOpen(false) : load()}
+            className="text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none rounded"
+          >
+            {loading ? <RefreshCw className="w-3 h-3 animate-spin" /> : open ? "Gizle" : "Göster"}
+          </button>
+        </div>
+      </div>
+      {open && prompt && (
+        <pre className="text-xs text-foreground/70 bg-muted/50 rounded-md p-3 overflow-x-auto whitespace-pre-wrap leading-relaxed font-mono max-h-64 overflow-y-auto">
+          {prompt}
+        </pre>
+      )}
+    </div>
+  );
+}
+
+// ─── Agent Section ────────────────────────────────────────────────────────────
+
+function AgentSection({
+  task,
+  showToast,
+  onStatusChange,
+}: {
+  task: { id: number; agentStatus: string | null; agentBranch: string | null; agentSessionId: string | null };
+  showToast: (msg: string, type?: "success" | "error" | "info") => void;
+  onStatusChange: () => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [polling, setPolling] = useState(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const status = task.agentStatus;
+  const isRunning = status === "PENDING" || status === "IN_PROGRESS";
+
+  // Poll status while running
+  useEffect(() => {
+    if (isRunning && !polling) {
+      setPolling(true);
+      intervalRef.current = setInterval(async () => {
+        try {
+          const result = await getManagedAgentStatus(task.id);
+          if (result.status !== "PENDING" && result.status !== "IN_PROGRESS") {
+            onStatusChange();
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            setPolling(false);
+          }
+        } catch { /* ignore polling errors */ }
+      }, 5000);
+    }
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [isRunning, task.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleStart() {
+    setLoading(true);
+    try {
+      await startManagedAgent(task.id);
+      showToast("Agent başlatıldı.", "success");
+      onStatusChange();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Agent başlatılamadı.";
+      showToast(msg, "error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleCancel() {
+    try {
+      await cancelManagedAgent(task.id);
+      showToast("Agent iptal edildi.", "info");
+      onStatusChange();
+    } catch { showToast("İptal edilemedi.", "error"); }
+  }
+
+  const statusLabel: Record<string, string> = {
+    PENDING: "Başlatılıyor...",
+    IN_PROGRESS: "Çalışıyor...",
+    COMPLETED: "Tamamlandı",
+    FAILED: "Başarısız",
+    CANCELLED: "İptal edildi",
+  };
+
+  const statusColor: Record<string, string> = {
+    PENDING: "text-blue-600 dark:text-blue-400",
+    IN_PROGRESS: "text-blue-600 dark:text-blue-400",
+    COMPLETED: "text-emerald-600 dark:text-emerald-400",
+    FAILED: "text-destructive",
+    CANCELLED: "text-muted-foreground",
+  };
+
+  return (
+    <div className="border-l-2 border-violet-300/40 dark:border-violet-700/40 pl-4 py-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <h5 className="text-xs font-semibold text-violet-600/70 dark:text-violet-400/70 uppercase tracking-wide flex items-center gap-1.5">
+          <Play className="w-3 h-3" />
+          Managed Agent
+        </h5>
+
+        {/* Status badge */}
+        {status && (
+          <span className={`text-xs font-medium ${statusColor[status] || "text-muted-foreground"}`}>
+            {isRunning && <RefreshCw className="w-3 h-3 animate-spin inline mr-1" />}
+            {statusLabel[status] || status}
+          </span>
+        )}
+      </div>
+
+      {/* Description — context-aware, one line */}
+      <p className="text-xs text-muted-foreground leading-relaxed">
+        {!status && "Claude Code bu task'ı projeniz üzerinde implement eder. Ayrı bir branch açılır, kod yazılır ve push edilir."}
+        {status === "PENDING" && "Branch oluşturuluyor, agent başlatılıyor..."}
+        {status === "IN_PROGRESS" && "Agent projeyi inceliyor, kodu yazıyor. Bu birkaç dakika sürebilir."}
+        {status === "COMPLETED" && "Kod yazıldı ve push edildi. Branch üzerinden review yapabilirsiniz."}
+        {status === "FAILED" && "Agent çalışırken bir hata oluştu. Tekrar deneyebilirsiniz."}
+        {status === "CANCELLED" && "Agent iptal edildi. Tekrar başlatabilirsiniz."}
+      </p>
+
+      {/* Actions */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {!isRunning && (
+          <Button
+            size="sm"
+            variant={status === "COMPLETED" ? "outline" : "default"}
+            className="text-xs"
+            onClick={handleStart}
+            disabled={loading}
+          >
+            {loading ? (
+              <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />Başlatılıyor</>
+            ) : status === "COMPLETED" ? (
+              <><RefreshCw className="w-3.5 h-3.5 mr-1.5" />Tekrar Çalıştır</>
+            ) : (
+              <><Play className="w-3.5 h-3.5 mr-1.5" />Agent Başlat</>
+            )}
+          </Button>
+        )}
+
+        {isRunning && (
+          <Button size="sm" variant="outline" className="text-xs text-destructive" onClick={handleCancel}>
+            <Square className="w-3 h-3 mr-1.5" />İptal
+          </Button>
+        )}
+
+        {/* Branch link */}
+        {task.agentBranch && (status === "COMPLETED" || status === "IN_PROGRESS") && (
+          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground font-mono bg-muted px-2 py-1 rounded">
+            <GitBranch className="w-3 h-3" />
+            {task.agentBranch}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 
 export default function TasksTab({
@@ -205,6 +394,12 @@ export default function TasksTab({
   const [feedbackOpen, setFeedbackOpen] = useState<Set<number>>(new Set());
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<number>>(new Set());
   const [bulkServiceId, setBulkServiceId] = useState<number | "">("");
+  const [agentEnabled, setAgentEnabled] = useState(false);
+
+  // Check if managed agent feature is enabled
+  useEffect(() => {
+    getFeatures().then(f => setAgentEnabled(f.managedAgentEnabled)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     // Only fetch for tasks that have no spSuggestion AND no spFinal yet
@@ -281,8 +476,10 @@ export default function TasksTab({
   };
 
   const syncRefUrl = (ref: { provider: "JIRA" | "GITHUB"; externalRef: string; target: string | null }) => {
-    if (ref.provider === "GITHUB") {
-      if (!ref.target || !ref.externalRef.startsWith("#")) return null;
+    if (ref.provider === "JIRA" && ref.target?.startsWith("http")) {
+      return `${ref.target}/browse/${ref.externalRef}`;
+    }
+    if (ref.provider === "GITHUB" && ref.target && ref.externalRef.startsWith("#")) {
       return `https://github.com/${ref.target}/issues/${ref.externalRef.replace("#", "")}`;
     }
     return null;
@@ -331,33 +528,6 @@ export default function TasksTab({
   const spApprovedUnsyncedCount = tasks.filter((t) => !isTaskSynced(t) && t.spFinal != null).length;
   const unsyncedCount = spApprovedUnsyncedCount;
   const allSynced = spApprovedUnsyncedCount === 0;
-  const tinyTaskCount = tasks.filter((t) => {
-    const sp = t.spFinal ?? t.spSuggestion ?? 0;
-    return sp > 0 && sp <= 2;
-  }).length;
-  const overSplitRisk =
-    tasks.length > 10 ||
-    (tasks.length >= 8 && tasks.length > 0 && tinyTaskCount / tasks.length >= 0.5);
-  const unassignedServiceCount =
-    projectServices.length > 1 ? tasks.filter((t) => !t.serviceId).length : 0;
-  const evaluateAgentFit = (task: TasksTabProps["tasks"][number]) => {
-    const sp = task.spFinal ?? task.spSuggestion ?? 0;
-    const hasFinalSp = task.spFinal != null;
-    const inExecutableRange = sp >= 3 && sp <= 8;
-    const hasAcceptance = !!task.acceptanceCriteria && task.acceptanceCriteria.split("\n").filter(Boolean).length >= 2;
-    const serviceAligned = projectServices.length <= 1 || !!task.serviceId;
-    const synced = isTaskSynced(task);
-
-    const ready = hasFinalSp && inExecutableRange && hasAcceptance && serviceAligned;
-    const recommended = ready && synced;
-    const manualPreferred = sp > 0 && sp <= 2;
-
-    return { ready, recommended, manualPreferred, synced, hasFinalSp, inExecutableRange, hasAcceptance, serviceAligned };
-  };
-  const agentAssessments = tasks.map((task) => ({ taskId: task.id, ...evaluateAgentFit(task) }));
-  const readyForAgentCount = agentAssessments.filter((a) => a.ready).length;
-  const recommendedAgentCount = agentAssessments.filter((a) => a.recommended).length;
-  const manualPreferredCount = agentAssessments.filter((a) => a.manualPreferred).length;
 
   return (
     <div className="space-y-4">
@@ -409,7 +579,7 @@ export default function TasksTab({
           )}
         </div>
       </div>
-      {isAdmin && tasks.length > 0 && (
+      {isAdmin && tasks.length > 0 && projectServices.length > 0 && (
         <Card>
           <CardContent className="pt-4 pb-4 flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -445,81 +615,6 @@ export default function TasksTab({
           </CardContent>
         </Card>
       )}
-      {tasks.length > 0 && (
-        <Card>
-          <CardContent className="pt-4 pb-4 space-y-2">
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="font-medium">Task Quality Guardrail</span>
-              {overSplitRisk ? (
-                <Badge variant="outline" className="border-amber-300/70 text-amber-700 dark:text-amber-300">Mikro-split riski</Badge>
-              ) : (
-                <Badge variant="outline" className="border-emerald-300/70 text-emerald-700 dark:text-emerald-300">Denge iyi</Badge>
-              )}
-              {projectServices.length > 1 && unassignedServiceCount > 0 && (
-                <Badge variant="outline" className="border-blue-300/70 text-blue-700 dark:text-blue-300">
-                  {unassignedServiceCount} task service atanmamış
-                </Badge>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Hedef: outcome odaklı 4-8 task. Aynı deliverable içindeki endpoint/DTO/test mikro adımlarını ayrı task yapmayın.
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {[
-                "Mikro task'ları birleştir, 4-8 outcome odaklı task bırak",
-                "Task'ları service sınırına göre grupla (backend-api/frontend-web/gateway)",
-                "Test adımlarını ilgili feature task'larına göm, gereksiz ayrı test task'larını kaldır",
-              ].map((chip) => (
-                <button
-                  key={chip}
-                  onClick={() => setTaskInstruction(chip)}
-                  className="px-2.5 py-1 text-xs rounded-full border bg-muted hover:bg-muted/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  {chip}
-                </button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-      {tasks.length > 0 && (
-        <Card>
-          <CardContent className="pt-4 pb-4 space-y-2">
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="font-medium flex items-center gap-1.5">
-                <Bot className="w-3.5 h-3.5 text-muted-foreground" />
-                Managed Agent Karar Rehberi
-              </span>
-              <Badge variant="outline">{recommendedAgentCount} task önerilen aday</Badge>
-              <Badge variant="outline">{readyForAgentCount} task teknik olarak hazır</Badge>
-              {manualPreferredCount > 0 && (
-                <Badge variant="outline" className="border-amber-300/70 text-amber-700 dark:text-amber-300">
-                  {manualPreferredCount} task hızlı manuel daha uygun
-                </Badge>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Önerilen kullanım: SP onaylı (3-8), net kabul kriterli, service sınırı belli ve sync/ref hazır task'lar.
-              Düşük kapsamlı (1-2 SP) veya belirsiz task'larda manuel ilerleyin.
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {[
-                "Task'ı agent-executable hale getir (tek service, net acceptance criteria)",
-                "Bu task'ı manuelde tut, agent gerektirmiyor",
-                "Task'ı 2 deliverable'a ayır: biri agent, biri manuel",
-              ].map((chip) => (
-                <button
-                  key={chip}
-                  onClick={() => setTaskInstruction(chip)}
-                  className="px-2.5 py-1 text-xs rounded-full border bg-muted hover:bg-muted/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  {chip}
-                </button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {tasks.length === 0 ? (
         <div className="text-center py-12 border border-dashed rounded-lg">
@@ -532,7 +627,7 @@ export default function TasksTab({
           {tasks.map((task) => {
             const isExpanded = expandedTasks.has(task.id);
             return (
-              <Card key={task.id}>
+              <Card key={task.id} className={isTaskSynced(task) ? "border-emerald-300/50 dark:border-emerald-700/40" : ""}>
                 <div
                   className="flex items-center gap-3 cursor-pointer select-none px-4 py-1.5"
                   onClick={() => toggleTask(task.id)}
@@ -546,7 +641,7 @@ export default function TasksTab({
                     {isExpanded
                       ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
                       : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />}
-                    {isAdmin && (
+                    {isAdmin && projectServices.length > 0 && (
                       <input
                         type="checkbox"
                         checked={selectedTaskIds.has(task.id)}
@@ -573,24 +668,6 @@ export default function TasksTab({
                           {task.serviceName}
                         </Badge>
                       )}
-                      {(() => {
-                        const fit = evaluateAgentFit(task);
-                        if (fit.recommended) {
-                          return (
-                            <Badge variant="outline" className="text-[11px] border-emerald-300/70 text-emerald-700 dark:text-emerald-300">
-                              Agent önerilir
-                            </Badge>
-                          );
-                        }
-                        if (fit.manualPreferred) {
-                          return (
-                            <Badge variant="outline" className="text-[11px] border-amber-300/70 text-amber-700 dark:text-amber-300">
-                              Manual hızlı
-                            </Badge>
-                          );
-                        }
-                        return null;
-                      })()}
 
                       {/* SP — final takes precedence */}
                       {task.spFinal ? (
@@ -776,27 +853,18 @@ export default function TasksTab({
                         </div>
                       )}
                     </div>
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-xs"
-                        onClick={async () => {
-                          try {
-                            const result = await getClaudeCodePrompt(task.id);
-                            await navigator.clipboard.writeText(result.prompt);
-                            showToast("Claude Code prompt'u kopyalandı!", "success");
-                          } catch { showToast("Prompt kopyalanamadı."); }
-                        }}
-                      >
-                        <Copy className="w-3.5 h-3.5 mr-1.5" />Claude Code Kopyala
-                      </Button>
-                      {task.agentBranch && task.agentStatus === "COMPLETED" && (
-                        <Badge variant="outline" className="text-xs font-mono">
-                          {task.agentBranch}
-                        </Badge>
-                      )}
-                    </div>
+                    <Separator />
+                    <PromptSection taskId={task.id} showToast={showToast} />
+                    {agentEnabled && (
+                      <>
+                        <Separator />
+                        <AgentSection
+                          task={task}
+                          showToast={showToast}
+                          onStatusChange={() => { if (selectedAnalysis) loadTasks(selectedAnalysis.id); }}
+                        />
+                      </>
+                    )}
                   </CardContent>
                 )}
               </Card>
