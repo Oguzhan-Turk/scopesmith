@@ -32,8 +32,8 @@ async function backendCookieHeader(page: Page) {
 
 async function openContextAndExpandScan(page: Page) {
   await page.reload();
-  await page.getByRole("button", { name: "Bağlam" }).click();
-  await page.locator("text=Kaynak Kod").first().click();
+  await page.getByRole("button", { name: "Bağlam", exact: true }).click();
+  await page.locator("text=Gelişmiş").first().click();
 }
 
 async function cleanupProject(request: APIRequestContext, projectId: number, projectName: string, cookieHeader: string) {
