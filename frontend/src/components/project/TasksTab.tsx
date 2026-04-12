@@ -192,7 +192,7 @@ function PromptSection({ taskId, showToast }: { taskId: number; showToast: (msg:
   return (
     <div className="border-l-2 border-primary/15 pl-4 py-3 space-y-2">
       <div className="flex items-center justify-between">
-        <h5 className="text-xs font-semibold text-primary/60 uppercase tracking-wide">Uygulama Promptu</h5>
+        <h5 className="text-xs font-semibold text-primary/60 uppercase tracking-wide">Geliştirme Promptu</h5>
         <div className="flex items-center gap-2">
           {open && prompt && (
             <button

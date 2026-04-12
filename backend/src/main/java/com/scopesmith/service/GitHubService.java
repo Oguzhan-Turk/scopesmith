@@ -262,7 +262,7 @@ public class GitHubService {
         try {
             String prompt = claudeCodeService.buildPrompt(task.getId());
             if (prompt != null && !prompt.isBlank()) {
-                md.append("### Claude Code Uygulama Promptu\n\n");
+                md.append("### Claude Code Geliştirme Promptu\n\n");
                 md.append("```\n").append(prompt).append("\n```\n\n");
             }
         } catch (Exception e) {

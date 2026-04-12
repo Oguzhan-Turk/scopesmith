@@ -302,7 +302,7 @@ public class JiraService {
         try {
             String prompt = claudeCodeService.buildPrompt(task.getId());
             if (prompt != null && !prompt.isBlank()) {
-                content.add(adfHeading("Claude Code Uygulama Promptu"));
+                content.add(adfHeading("Claude Code Geliştirme Promptu"));
                 content.add(adfCodeBlock(prompt));
             }
         } catch (Exception e) {
