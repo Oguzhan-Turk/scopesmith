@@ -33,7 +33,11 @@ async function backendCookieHeader(page: Page) {
 async function openContextAndExpandScan(page: Page) {
   await page.reload();
   await page.getByRole("button", { name: "Bağlam", exact: true }).click();
-  await page.locator("text=Gelişmiş").first().click();
+  // Gelişmiş might already be open (default when no context) — only click if closed
+  const advancedContent = page.locator("text=Kaynak Tarama");
+  if (!(await advancedContent.isVisible({ timeout: 1000 }).catch(() => false))) {
+    await page.locator("text=Gelişmiş").first().click();
+  }
 }
 
 async function cleanupProject(request: APIRequestContext, projectId: number, projectName: string, cookieHeader: string) {
