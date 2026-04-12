@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Code, RefreshCw, Plus, ChevronDown } from "lucide-react";
+import { Code, RefreshCw, Plus, ChevronDown, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -111,10 +111,24 @@ export default function ContextTab(props: ContextTabProps) {
     setDocDialog,
     handleDeleteDocument,
     actionLoading,
+    // Workspace Services
+    projectServices,
+    serviceGraph,
+    newServiceForm,
+    setNewServiceForm,
+    handleCreateService,
+    handleDeleteService,
+    handleScanService,
+    dependencyForm,
+    setDependencyForm,
+    handleAddDependency,
+    handleDeleteDependency,
   } = props;
   const [reportOpen, setReportOpen] = useState(true);
   const [scanOpen, setScanOpen] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<number | null>(null);
+  // Multi-service toggle: auto-open if services already exist
+  const [multiService, setMultiService] = useState(projectServices.length > 0);
 
   function formatDuration(startedAt?: string, completedAt?: string) {
     if (!startedAt) return "—";
@@ -321,6 +335,185 @@ export default function ContextTab(props: ContextTabProps) {
             </div>
           )}
         </CardContent>}
+      </Card>
+
+      {/* Workspace Services — multi-service toggle */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Layers className="w-4 h-4 text-muted-foreground" />
+              Proje Yapısı
+            </CardTitle>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <span className="text-xs text-muted-foreground">Çoklu servis projesi</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={multiService}
+                  onClick={() => setMultiService(v => !v)}
+                  className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                    multiService ? "bg-primary" : "bg-muted"
+                  }`}
+                >
+                  <span className={`pointer-events-none block h-4 w-4 rounded-full bg-background shadow-sm ring-0 transition-transform ${
+                    multiService ? "translate-x-4" : "translate-x-0.5"
+                  } mt-[1px]`} />
+                </button>
+              </label>
+            </div>
+          </div>
+          {!multiService && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Tek repo projesi — yukarıdaki kaynak kod taraması yeterli. Çoklu repo/mikroservis yapısı varsa açın.
+            </p>
+          )}
+        </CardHeader>
+
+        {multiService && (
+          <CardContent className="space-y-4">
+            <p className="text-xs text-muted-foreground">
+              Her servisi ayrı ayrı ekleyip tarayın. AI analizlerine ilgili servislerin context'i otomatik dahil edilir.
+            </p>
+
+            {/* Service ekleme formu */}
+            <div className="grid md:grid-cols-5 gap-2">
+              <input
+                type="text"
+                placeholder="Servis adı (billing-api)"
+                value={newServiceForm.name}
+                onChange={(e) => setNewServiceForm({ ...newServiceForm, name: e.target.value })}
+                className="md:col-span-2 px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+              <select
+                value={newServiceForm.serviceType}
+                onChange={(e) => setNewServiceForm({ ...newServiceForm, serviceType: e.target.value as typeof newServiceForm.serviceType })}
+                className="px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {["BACKEND", "FRONTEND", "MOBILE", "GATEWAY", "DATA", "PLATFORM", "SHARED", "OTHER"].map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+              <input
+                type="text"
+                placeholder="Yerel klasör yolu"
+                value={newServiceForm.localPath}
+                onChange={(e) => setNewServiceForm({ ...newServiceForm, localPath: e.target.value })}
+                className="px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+              <Button size="sm" variant="outline" onClick={handleCreateService} disabled={actionLoading === "create-service" || !newServiceForm.name.trim()}>
+                {actionLoading === "create-service" ? "Ekleniyor..." : <><Plus className="w-3.5 h-3.5 mr-1" />Ekle</>}
+              </Button>
+            </div>
+
+            {/* Service listesi */}
+            {projectServices.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Henüz servis eklenmedi.</p>
+            ) : (
+              <div className="space-y-2">
+                {projectServices.map((service) => (
+                  <div key={service.id} className="rounded-lg border px-3 py-2 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">{service.name}</span>
+                        <Badge variant="outline" className="text-xs">{service.serviceType}</Badge>
+                        {service.lastScannedAt && <span className="text-xs text-muted-foreground">v{service.contextVersion}</span>}
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {service.localPath || service.repoUrl || "Klasör yolu tanımlanmadı"}
+                        {" · "}
+                        {service.lastScannedAt ? `Son tarama: ${timeAgo(service.lastScannedAt)}` : "Henüz taranmadı"}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleScanService(service.id)}
+                        disabled={actionLoading === `scan-service-${service.id}`}
+                      >
+                        {actionLoading === `scan-service-${service.id}` ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : "Tara"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => handleDeleteService(service.id)}
+                        disabled={actionLoading === `delete-service-${service.id}`}
+                      >
+                        Sil
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Dependency graph */}
+            {projectServices.length >= 2 && (
+              <div className="rounded-lg border p-3 space-y-2">
+                <p className="text-sm font-medium">Servis Bağımlılıkları</p>
+                <div className="grid md:grid-cols-4 gap-2">
+                  <select
+                    value={dependencyForm.fromServiceId}
+                    onChange={(e) => setDependencyForm({ ...dependencyForm, fromServiceId: e.target.value ? Number(e.target.value) : "" })}
+                    className="px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <option value="">Kaynak servis</option>
+                    {projectServices.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                  <select
+                    value={dependencyForm.toServiceId}
+                    onChange={(e) => setDependencyForm({ ...dependencyForm, toServiceId: e.target.value ? Number(e.target.value) : "" })}
+                    className="px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <option value="">Hedef servis</option>
+                    {projectServices.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                  <input
+                    type="text"
+                    placeholder="Bağımlılık tipi"
+                    value={dependencyForm.dependencyType}
+                    onChange={(e) => setDependencyForm({ ...dependencyForm, dependencyType: e.target.value || "SYNC" })}
+                    className="px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                  <Button size="sm" variant="outline" onClick={handleAddDependency} disabled={actionLoading === "add-service-dependency"}>
+                    {actionLoading === "add-service-dependency" ? "Ekleniyor..." : "Ekle"}
+                  </Button>
+                </div>
+                {(serviceGraph?.dependencies?.length ?? 0) > 0 && (
+                  <div className="space-y-1">
+                    {serviceGraph!.dependencies.map((d) => (
+                      <div key={d.id} className="text-xs flex items-center justify-between rounded border px-2 py-1">
+                        <span>{d.fromServiceName} → {d.toServiceName} <span className="text-muted-foreground">({d.dependencyType})</span></span>
+                        <button
+                          onClick={() => handleDeleteDependency(d.id)}
+                          className="text-destructive hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                          disabled={actionLoading === `delete-dependency-${d.id}`}
+                        >
+                          Sil
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Readiness summary */}
+            {projectServices.length > 0 && (() => {
+              const scanned = projectServices.filter(s => !!s.lastScannedAt).length;
+              return (
+                <div className="flex items-center gap-4 text-xs text-muted-foreground pt-1">
+                  <span>{scanned}/{projectServices.length} servis tarandı</span>
+                  <span>·</span>
+                  <span>{serviceGraph?.dependencies?.length ?? 0} bağımlılık</span>
+                </div>
+              );
+            })()}
+          </CardContent>
+        )}
       </Card>
 
       {traceability && (

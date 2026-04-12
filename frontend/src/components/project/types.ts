@@ -99,13 +99,7 @@ export interface ContextTabProps extends ProjectTabProps {
   handleDeleteDocument: (docId: number, reqId?: number) => void;
   integrationConfig: IntegrationConfig;
   setActiveTab: (tab: string) => void;
-}
-
-export interface IntegrationsTabProps extends ProjectTabProps {
-  integrationConfig: IntegrationConfig;
-  setIntegrationConfig: (v: IntegrationConfig) => void;
-  handleSaveIntegrationConfig: () => void;
-  handleUpdateProject: (name: string, description: string) => Promise<void>;
+  // Workspace Services (multi-service projects)
   projectServices: ProjectService[];
   serviceGraph: ServiceGraph | null;
   newServiceForm: {
@@ -131,6 +125,13 @@ export interface IntegrationsTabProps extends ProjectTabProps {
   setDependencyForm: (v: { fromServiceId: number | ""; toServiceId: number | ""; dependencyType: string }) => void;
   handleAddDependency: () => Promise<void>;
   handleDeleteDependency: (dependencyId: number) => Promise<void>;
+}
+
+export interface IntegrationsTabProps extends ProjectTabProps {
+  integrationConfig: IntegrationConfig;
+  setIntegrationConfig: (v: IntegrationConfig) => void;
+  handleSaveIntegrationConfig: () => void;
+  handleUpdateProject: (name: string, description: string) => Promise<void>;
   onDeleteProject: () => void;
 }
 
