@@ -77,7 +77,7 @@ scopesmith:
       output-per-million: 25.00
 
   features:
-    managed-agent-enabled: ${MANAGED_AGENT_ENABLED:false}
+    managed-agent-enabled: ${MANAGED_AGENT_ENABLED:true}
     self-assistant-enabled: ${SELF_ASSISTANT_ENABLED:false}
   scan:
     allowed-roots: ${SCOPESMITH_SCAN_ALLOWED_ROOTS:${user.home}}

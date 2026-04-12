@@ -12,20 +12,27 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.InputStreamReader;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
  * CLI-based managed agent implementation.
- * Runs `claude` CLI via ProcessBuilder in a git branch.
- * Designed for on-prem/self-hosted deployments where the server
- * has local access to the git repository.
+ * Runs `claude` CLI in full agent mode (--dangerously-skip-permissions)
+ * on the local machine. Designed for on-prem/VPN deployments where
+ * the server has local filesystem access to the git repository.
+ *
+ * Security model: same as Claude Code CLI — code stays on the machine,
+ * only relevant context snippets go to Anthropic API (standard API usage).
  */
 @Slf4j
 public class CliAgentService implements ManagedAgentService {
+
+    private static final long AGENT_TIMEOUT_MINUTES = 30;
 
     private final TaskRepository taskRepository;
     private final ClaudeCodeService claudeCodeService;
@@ -41,17 +48,13 @@ public class CliAgentService implements ManagedAgentService {
     public AgentStartResult startAgent(Long taskId) {
         Task task = findTask(taskId);
 
-        if (task.getAgentStatus() != null && "IN_PROGRESS".equals(task.getAgentStatus())) {
+        if ("IN_PROGRESS".equals(task.getAgentStatus())) {
             throw new IllegalStateException("Agent already running for task #" + taskId);
         }
 
-        String localPath = task.getAnalysis().getRequirement().getProject().getLocalPath();
-        if (localPath == null || localPath.isBlank()) {
-            throw new IllegalStateException(
-                    "Project has no local path configured. Scan the project context first.");
-        }
-
+        String localPath = resolveLocalPath(task);
         String branchName = buildBranchName(task);
+
         task.setAgentStatus("PENDING");
         task.setAgentBranch(branchName);
         task.setAgentSessionId(null);
@@ -60,7 +63,7 @@ public class CliAgentService implements ManagedAgentService {
         // Fire async execution
         executeAgentAsync(taskId, localPath, branchName);
 
-        log.info("Agent start requested for task #{}, branch: {}", taskId, branchName);
+        log.info("Agent start requested for task #{}, branch: {}, path: {}", taskId, branchName, localPath);
         return new AgentStartResult(null, "PENDING", branchName);
     }
 
@@ -101,15 +104,19 @@ public class CliAgentService implements ManagedAgentService {
             // 3. Update status
             updateStatus(taskId, "IN_PROGRESS", null);
 
-            // 4. Run claude CLI
-            log.info("Starting Claude CLI agent for task #{} in {}", taskId, localPath);
+            // 4. Run claude CLI in full agent mode
+            log.info("Starting Claude agent for task #{} in {}", taskId, localPath);
             ProcessBuilder pb = new ProcessBuilder(
-                    "claude", "-p", prompt,
+                    "claude",
+                    "--dangerously-skip-permissions",
+                    "-p", prompt,
                     "--output-format", "json",
-                    "--max-turns", "50"
+                    "--model", "claude-sonnet-4-20250514",
+                    "--max-turns", "100"
             );
-            pb.directory(new java.io.File(localPath));
+            pb.directory(new File(localPath));
             pb.redirectErrorStream(true);
+            pb.environment().put("CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", "1");
 
             Process process = pb.start();
             runningProcesses.put(taskId, process);
@@ -120,17 +127,27 @@ public class CliAgentService implements ManagedAgentService {
                 output = reader.lines().collect(Collectors.joining("\n"));
             }
 
-            int exitCode = process.waitFor();
+            boolean finished = process.waitFor(AGENT_TIMEOUT_MINUTES, TimeUnit.MINUTES);
+            if (!finished) {
+                process.destroyForcibly();
+                log.warn("Agent timed out for task #{} after {} minutes", taskId, AGENT_TIMEOUT_MINUTES);
+                runningProcesses.remove(taskId);
+                updateStatus(taskId, "FAILED", null);
+                return;
+            }
+
+            int exitCode = process.exitValue();
             runningProcesses.remove(taskId);
 
-            // 6. Parse result and update
+            // 6. Commit & push
             if (exitCode == 0) {
+                commitAndPush(localPath, branchName, taskId);
                 String sessionId = extractSessionId(output);
                 updateStatus(taskId, "COMPLETED", sessionId);
                 log.info("Agent completed for task #{}, session: {}", taskId, sessionId);
             } else {
                 log.warn("Agent failed for task #{}, exit code: {}\nOutput: {}",
-                        taskId, exitCode, truncate(output, 500));
+                        taskId, exitCode, truncate(output, 1000));
                 updateStatus(taskId, "FAILED", null);
             }
         } catch (Exception e) {
@@ -150,24 +167,70 @@ public class CliAgentService implements ManagedAgentService {
         taskRepository.save(task);
     }
 
+    /**
+     * Resolve the local filesystem path for the project.
+     * Uses project.localPath (scan path) — the VPN machine must have access.
+     */
+    private String resolveLocalPath(Task task) {
+        String localPath = task.getAnalysis().getRequirement().getProject().getLocalPath();
+        if (localPath == null || localPath.isBlank()) {
+            throw new IllegalStateException(
+                    "Proje için yerel yol tanımlı değil. Önce Bağlam sekmesinden kaynak kodu taratın.");
+        }
+        File dir = new File(localPath);
+        if (!dir.exists() || !dir.isDirectory()) {
+            throw new IllegalStateException(
+                    "Proje yolu bulunamadı: " + localPath + ". Yolun doğru olduğundan emin olun.");
+        }
+        return localPath;
+    }
+
     private void createBranch(String localPath, String branchName) {
         try {
-            ProcessBuilder pb = new ProcessBuilder("git", "checkout", "-b", branchName);
-            pb.directory(new java.io.File(localPath));
-            pb.redirectErrorStream(true);
-            Process p = pb.start();
-            int exit = p.waitFor();
+            // Ensure we're on the latest default branch first
+            runGit(localPath, "git", "fetch", "origin");
+            // Try to create new branch from current HEAD
+            int exit = runGit(localPath, "git", "checkout", "-b", branchName);
             if (exit != 0) {
-                // Branch might already exist — try switching
-                pb = new ProcessBuilder("git", "checkout", branchName);
-                pb.directory(new java.io.File(localPath));
-                pb.redirectErrorStream(true);
-                pb.start().waitFor();
+                // Branch might already exist — switch to it
+                runGit(localPath, "git", "checkout", branchName);
             }
             log.info("Git branch ready: {}", branchName);
         } catch (Exception e) {
             log.warn("Could not create git branch {}: {}", branchName, e.getMessage());
         }
+    }
+
+    private void commitAndPush(String localPath, String branchName, Long taskId) {
+        try {
+            runGit(localPath, "git", "add", "-A");
+            int commitExit = runGit(localPath, "git", "commit", "-m",
+                    "scopesmith: task #" + taskId + " implementation\n\nGenerated by ScopeSmith managed agent.");
+            if (commitExit == 0) {
+                int pushExit = runGit(localPath, "git", "push", "-u", "origin", branchName);
+                if (pushExit == 0) {
+                    log.info("Pushed branch {} for task #{}", branchName, taskId);
+                } else {
+                    log.warn("Git push failed for task #{}, branch: {}", taskId, branchName);
+                }
+            } else {
+                log.info("Nothing to commit for task #{} — agent may not have made changes", taskId);
+            }
+        } catch (Exception e) {
+            log.warn("Git commit/push error for task #{}: {}", taskId, e.getMessage());
+        }
+    }
+
+    private int runGit(String localPath, String... command) throws Exception {
+        ProcessBuilder pb = new ProcessBuilder(command);
+        pb.directory(new File(localPath));
+        pb.redirectErrorStream(true);
+        Process p = pb.start();
+        // Drain output to avoid blocking
+        try (var reader = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+            while (reader.readLine() != null) { /* drain */ }
+        }
+        return p.waitFor();
     }
 
     private String buildBranchName(Task task) {
@@ -180,8 +243,6 @@ public class CliAgentService implements ManagedAgentService {
     }
 
     private String extractSessionId(String output) {
-        // Try to parse session_id from JSON output
-        // Claude CLI --output-format json returns {"session_id": "..."}
         try {
             if (output.contains("session_id")) {
                 int idx = output.indexOf("session_id");
