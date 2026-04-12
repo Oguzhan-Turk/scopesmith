@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Plus, MoreHorizontal, Zap, RefreshCw } from "lucide-react";
+import { Plus, MoreHorizontal, Zap, RefreshCw, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { timeAgo } from "@/lib/utils";
 import type { RequirementsTabProps } from "./types";
 import { statusColor } from "./utils";
 
 export default function RequirementsTab({
+  project,
   requirements,
   loading,
   selectedRequirementId,
@@ -15,8 +16,15 @@ export default function RequirementsTab({
   setActiveTab,
   setReqDialogOpen,
   actionLoading,
+  traceability,
 }: RequirementsTabProps) {
+  const hasContext = project.hasContext;
   const [reqMenuOpen, setReqMenuOpen] = useState<number | null>(null);
+
+  // traceability item'larını req id'ye göre map'le
+  const traceMap = new Map(
+    (traceability?.items ?? []).map((item) => [item.requirementId, item])
+  );
 
   if (loading) {
     return (
@@ -30,12 +38,27 @@ export default function RequirementsTab({
 
   return (
     <div className="space-y-4">
+      {!hasContext && (
+        <div className="flex items-start gap-3 rounded-lg border border-amber-300/40 bg-amber-50/50 dark:bg-amber-950/20 px-4 py-3">
+          <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Proje bağlamı henüz eklenmedi</p>
+            <p className="text-xs text-amber-700/80 dark:text-amber-400/70">
+              Talep ekleyebilirsiniz ancak AI analizi projenizi tanımadan çalışacağından sonuçlar genel kalır. Daha isabetli analiz için önce kaynak kodu taratın.
+            </p>
+            <Button variant="outline" size="sm" className="mt-1.5 h-7 text-xs" onClick={() => setActiveTab("context")}>
+              Bağlam Ekle
+            </Button>
+          </div>
+        </div>
+      )}
+
       {requirements.length === 0 ? (
         <div className="text-center py-12 border border-dashed rounded-lg">
-          <p className="text-sm text-muted-foreground mb-4">Henuz talep eklenmedi</p>
+          <p className="text-sm text-muted-foreground mb-4">Henüz talep eklenmedi</p>
           <Button variant="outline" size="sm" onClick={() => setReqDialogOpen(true)}>
             <Plus className="w-3.5 h-3.5 mr-1.5" />
-            Ilk Talebi Ekle
+            İlk Talebi Ekle
           </Button>
         </div>
       ) : (
@@ -45,8 +68,9 @@ export default function RequirementsTab({
               <tr className="border-b bg-muted/40">
                 <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3 w-10">#</th>
                 <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3 w-20">Tip</th>
-                <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">Aciklama</th>
+                <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">Açıklama</th>
                 <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3 w-32">Durum</th>
+                <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3 hidden md:table-cell">İlerleme</th>
                 <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3 w-28 hidden sm:table-cell">Tarih</th>
                 <th className="text-right text-sm font-medium text-muted-foreground px-4 py-3 w-24"></th>
               </tr>
@@ -54,9 +78,10 @@ export default function RequirementsTab({
             <tbody>
               {requirements.map((req) => {
                 const isSelected = selectedRequirementId === req.id;
+                const trace = traceMap.get(req.id);
                 const statusLabel: Record<string, string> = {
                   NEW: "Yeni", ANALYZED: "Analiz Edildi", CLARIFYING: "Soru Bekleniyor",
-                  COMPLETED: "Tamamlandi", RE_ANALYZED: "Yeniden Analiz",
+                  COMPLETED: "Tamamlandı", RE_ANALYZED: "Yeniden Analiz",
                 };
                 return (
                   <tr
@@ -91,6 +116,32 @@ export default function RequirementsTab({
                         <span className={`w-1.5 h-1.5 rounded-full ${statusColor(req.status)}`} />
                         <span className="text-sm text-muted-foreground">{statusLabel[req.status] || req.status}</span>
                       </div>
+                    </td>
+                    <td className="px-4 py-3 hidden md:table-cell">
+                      {trace ? (
+                        <div className="flex items-center gap-1.5">
+                          {/* Analiz */}
+                          <span className={`text-xs px-1.5 py-0.5 rounded ${
+                            trace.analysisId ? "bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400" : "text-muted-foreground/40"
+                          }`}>
+                            Analiz
+                          </span>
+                          {/* Task */}
+                          {trace.taskCount > 0 && (
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                              {trace.taskCount} task
+                            </span>
+                          )}
+                          {/* Sync */}
+                          {trace.syncedTaskCount > 0 && (
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400">
+                              {trace.syncedTaskCount} sync
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground/40">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 hidden sm:table-cell">
                       <span className="text-xs text-muted-foreground tabular-nums">{timeAgo(req.createdAt)}</span>

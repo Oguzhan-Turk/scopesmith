@@ -12,6 +12,7 @@ import com.scopesmith.repository.UsageRecordRepository;
 import java.time.LocalDateTime;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -60,11 +61,11 @@ public class ProjectService {
         List<Project> projects;
         if (accessibleIds == null) {
             // Admin — all projects across all organizations
-            projects = projectRepository.findAll();
+            projects = projectRepository.findAll(Sort.by(Sort.Direction.DESC, "id"));
         } else if (accessibleIds.isEmpty()) {
             return List.of();
         } else {
-            projects = projectRepository.findByIdIn(accessibleIds);
+            projects = projectRepository.findByIdInOrderByIdDesc(accessibleIds);
         }
 
         return projects.stream()
