@@ -45,7 +45,6 @@ export default function ContextTab(props: ContextTabProps) {
   // Freshness durumu
   const freshnessOk = contextFreshness?.recommendation === "NO_ACTION";
   const freshnessPartial = contextFreshness?.recommendation === "PARTIAL_REFRESH";
-  const freshnessStale = contextFreshness?.recommendation === "FULL_REFRESH" && contextFreshness.status !== "NO_BASELINE";
   const showFreshness = project.hasContext && !!project.lastScannedAt && contextFreshness && contextFreshness.status !== "NO_BASELINE";
 
   return (
