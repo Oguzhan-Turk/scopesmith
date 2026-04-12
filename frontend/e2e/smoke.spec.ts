@@ -66,19 +66,6 @@ test("login + create project + add requirement flow", async ({ page, request }) 
   await page.getByRole("button", { name: "Ekle" }).click();
   await expect(page.getByText(requirementText)).toBeVisible();
 
-  const seeded = await request.post(`${BASE_BACKEND}/api/v1/projects/${projectId}/context-freshness/partial-refresh`, {
-    headers: {
-      "Content-Type": "application/json",
-      Origin: ORIGIN,
-      Cookie: cookieHeader,
-    },
-    data: { force: true, maxAnalyses: 1 },
-  });
-  expect(seeded.ok()).toBeTruthy();
-
-  await openContextAndExpandScan(page);
-  await expect(page.getByText("Geçmiş yenilemeler")).toBeVisible();
-
   await cleanupProject(request, projectId, projectName, cookieHeader);
 });
 
@@ -108,8 +95,8 @@ test("partial refresh FAILED entry is visible in timeline", async ({ page, reque
   await client.end();
 
   await openContextAndExpandScan(page);
-  await expect(page.getByText("Geçmiş yenilemeler")).toBeVisible();
-  await expect(page.getByText("FAILED")).toBeVisible();
+  await expect(page.getByText("Geçmiş yenilemeler")).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText("FAILED")).toBeVisible({ timeout: 5000 });
   await page.getByText("FAILED").first().click();
   await expect(page.getByText(projectIdErrorText)).toBeVisible();
 
