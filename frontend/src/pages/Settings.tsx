@@ -10,32 +10,60 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
 
+// ── Prompt labels ────────────────────────────────────────────────────────────
 const PROMPT_LABELS: Record<string, string> = {
-  "requirement-analysis": "Talep Analizi",
-  "bug-analysis": "Bug Analizi",
-  "task-breakdown": "Task Üretimi",
-  "task-breakdown-refine": "Task İyileştirme",
-  "stakeholder-summary": "İş Özeti",
-  "stakeholder-summary-refine": "Özet İyileştirme",
-  "change-impact": "Değişiklik Etkisi",
-  "project-context": "Proje Context",
-  "project-context-structured": "Yapısal Context",
+  "requirement-analysis":       "Talep Analizi",
+  "bug-analysis":               "Bug Analizi",
+  "analysis-refine":            "Analiz Düzenleme",
+  "task-breakdown":             "Task Üretimi",
+  "task-breakdown-refine":      "Task Düzenleme",
+  "stakeholder-summary":        "İş Özeti",
+  "stakeholder-summary-refine": "İş Özeti Düzenleme",
+  "change-impact":              "Değişiklik Etkisi",
+  "project-context":            "Kod Tarama",
+  "project-context-structured": "Yapısal Analiz",
+  "document-summary":           "Belge Özeti",
+  "feature-suggestion":         "Özellik Önerisi",
+  "sp-suggestion":              "SP Tahmini",
 };
 
+// ── Credential labels ─────────────────────────────────────────────────────────
 const CREDENTIAL_LABELS: Record<string, { label: string; placeholder: string }> = {
-  JIRA_URL: { label: "Jira URL", placeholder: "https://yoursite.atlassian.net" },
-  JIRA_EMAIL: { label: "Jira Email", placeholder: "email@example.com" },
-  JIRA_API_TOKEN: { label: "Jira API Token", placeholder: "Token" },
-  GITHUB_TOKEN: { label: "GitHub Token", placeholder: "ghp_..." },
-  GITHUB_REPO: { label: "GitHub Repository", placeholder: "owner/repo" },
+  JIRA_URL:        { label: "Jira URL",        placeholder: "https://yoursite.atlassian.net" },
+  JIRA_EMAIL:      { label: "Jira Email",      placeholder: "email@example.com" },
+  JIRA_API_TOKEN:  { label: "Jira API Token",  placeholder: "Token" },
+  GITHUB_TOKEN:    { label: "GitHub Token",    placeholder: "ghp_..." },
+  GITHUB_REPO:     { label: "Varsayılan Repository", placeholder: "owner/repo" },
 };
 
-const MODEL_TIER_LABELS: Record<ModelTier, string> = {
-  LIGHT: "Light",
-  STANDARD: "Standard",
-  PREMIUM: "Premium",
+// ── Model tier labels ─────────────────────────────────────────────────────────
+const MODEL_TIER_LABELS: Record<ModelTier, { name: string; description: string }> = {
+  LIGHT:    { name: "Light",    description: "Hızlı, düşük maliyetli işlemler (belge özeti, context tarama)" },
+  STANDARD: { name: "Standard", description: "Talep analizi ve task üretimi" },
+  PREMIUM:  { name: "Premium",  description: "Karmaşık analizler ve iyileştirmeler" },
 };
 
+// ── Known Claude models ───────────────────────────────────────────────────────
+interface ModelPreset {
+  value: string;
+  label: string;
+  provider: string;
+  input: number | null;
+  output: number | null;
+}
+
+const KNOWN_MODELS: ModelPreset[] = [
+  { value: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5",  provider: "anthropic", input: 1.00, output: 5.00  },
+  { value: "claude-sonnet-4-20250514",  label: "Claude Sonnet 4",   provider: "anthropic", input: 3.00, output: 15.00 },
+  { value: "claude-opus-4-6",           label: "Claude Opus 4.6",   provider: "anthropic", input: 5.00, output: 25.00 },
+  { value: "custom",                    label: "Özel model...",      provider: "",          input: null, output: null  },
+];
+
+function getPreset(modelName: string): ModelPreset {
+  return KNOWN_MODELS.find((m) => m.value === modelName) ?? KNOWN_MODELS[KNOWN_MODELS.length - 1];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function Settings() {
   const [prompts, setPrompts] = useState<PromptItem[]>([]);
@@ -70,7 +98,6 @@ export default function Settings() {
         if (promptData.length > 0) {
           setSelected(promptData[0]);
           setEditContent(promptData[0].content);
-          setMessage(null);
         }
       } catch (e) {
         console.error("Failed to load settings:", e);
@@ -78,7 +105,6 @@ export default function Settings() {
         setLoading(false);
       }
     }
-
     void loadAll();
   }, []);
 
@@ -125,7 +151,7 @@ export default function Settings() {
       const updated = await updateCredentials(credentialEdits);
       setCredentials(updated);
       setCredentialEdits(updated);
-      setMessage({ text: "Bağlantı bilgileri kaydedildi.", type: "success" });
+      setMessage({ text: "Kimlik bilgileri kaydedildi.", type: "success" });
     } catch {
       setMessage({ text: "Kaydetme başarısız.", type: "error" });
     } finally {
@@ -143,7 +169,7 @@ export default function Settings() {
           return updateModelConfig(tier, {
             provider: model.provider,
             modelName: model.modelName,
-            active: model.active,
+            active: true,
             inputPerMillion: model.inputPerMillion,
             outputPerMillion: model.outputPerMillion,
             latencyClass: model.latencyClass,
@@ -158,7 +184,7 @@ export default function Settings() {
           return acc;
         }, {} as Record<ModelTier, AiModelConfig>),
       );
-      setMessage({ text: "AI model ayarları kaydedildi.", type: "success" });
+      setMessage({ text: "Model ayarları kaydedildi.", type: "success" });
     } catch {
       setMessage({ text: "Model ayarları kaydedilemedi.", type: "error" });
     } finally {
@@ -167,13 +193,20 @@ export default function Settings() {
   }
 
   function updateModelField<K extends keyof AiModelConfig>(tier: ModelTier, key: K, value: AiModelConfig[K]) {
-    setModelEdits((prev) => ({
-      ...prev,
-      [tier]: {
-        ...prev[tier],
-        [key]: value,
-      },
-    }));
+    setModelEdits((prev) => ({ ...prev, [tier]: { ...prev[tier], [key]: value } }));
+  }
+
+  function applyModelPreset(tier: ModelTier, presetValue: string) {
+    const preset = getPreset(presetValue);
+    if (preset.value === "custom") {
+      updateModelField(tier, "modelName", "");
+      updateModelField(tier, "provider", "");
+    } else {
+      updateModelField(tier, "modelName", preset.value);
+      updateModelField(tier, "provider", preset.provider);
+      if (preset.input !== null)  updateModelField(tier, "inputPerMillion",  preset.input);
+      if (preset.output !== null) updateModelField(tier, "outputPerMillion", preset.output);
+    }
   }
 
   if (loading) return <Spinner label="Ayarlar yükleniyor..." />;
@@ -183,37 +216,37 @@ export default function Settings() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Ayarlar</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Bu ayarlar tüm projelerde geçerlidir. Proje bazlı entegrasyon ayarları için ilgili projenin <strong>Entegrasyonlar</strong> sekmesini kullanın.
+          Bu ayarlar tüm projelerde geçerlidir. Proje bazlı entegrasyon ayarları için ilgili projenin <strong>Proje Ayarları</strong> sekmesini kullanın.
         </p>
       </div>
 
       <Tabs defaultValue="credentials">
         <TabsList>
-          <TabsTrigger value="credentials">Bağlantılar</TabsTrigger>
+          <TabsTrigger value="credentials">API Kimlik Bilgileri</TabsTrigger>
           <TabsTrigger value="models">AI Modelleri</TabsTrigger>
           <TabsTrigger value="prompts">Prompt Yönetimi</TabsTrigger>
         </TabsList>
 
-        {/* CREDENTIALS TAB */}
+        {/* ── API KİMLİK BİLGİLERİ ── */}
         <TabsContent value="credentials" className="space-y-6">
           <p className="text-sm text-muted-foreground">
-            Jira ve GitHub bağlantı bilgilerini buradan yönetin. Bu bilgiler DB'de saklanır, .env dosyasına gerek kalmaz.
+            Jira ve GitHub servislerine bağlanmak için gereken kimlik bilgileri. Hangi projenin hangi Jira/GitHub reposunu kullandığı her projenin <strong>Proje Ayarları</strong> bölümünden ayrıca yapılandırılır.
           </p>
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Jira</CardTitle>
+              <CardTitle className="text-base">Jira</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {["JIRA_URL", "JIRA_EMAIL", "JIRA_API_TOKEN"].map((key) => (
                 <div key={key}>
-                  <label className="text-sm font-medium mb-1 block">{CREDENTIAL_LABELS[key].label}</label>
+                  <label className="text-xs text-muted-foreground mb-1 block">{CREDENTIAL_LABELS[key].label}</label>
                   <input
                     type={key.includes("TOKEN") ? "password" : "text"}
                     placeholder={CREDENTIAL_LABELS[key].placeholder}
                     value={credentialEdits[key] || credentials[key] || ""}
                     onChange={(e) => setCredentialEdits({ ...credentialEdits, [key]: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="w-full px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   />
                 </div>
               ))}
@@ -222,156 +255,151 @@ export default function Settings() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">GitHub</CardTitle>
+              <CardTitle className="text-base">GitHub</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {["GITHUB_TOKEN", "GITHUB_REPO"].map((key) => (
-                <div key={key}>
-                  <label className="text-sm font-medium mb-1 block">{CREDENTIAL_LABELS[key].label}</label>
-                  <input
-                    type={key.includes("TOKEN") ? "password" : "text"}
-                    placeholder={CREDENTIAL_LABELS[key].placeholder}
-                    value={credentialEdits[key] || credentials[key] || ""}
-                    onChange={(e) => setCredentialEdits({ ...credentialEdits, [key]: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  />
-                </div>
-              ))}
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">{CREDENTIAL_LABELS["GITHUB_TOKEN"].label}</label>
+                <input
+                  type="password"
+                  placeholder={CREDENTIAL_LABELS["GITHUB_TOKEN"].placeholder}
+                  value={credentialEdits["GITHUB_TOKEN"] || credentials["GITHUB_TOKEN"] || ""}
+                  onChange={(e) => setCredentialEdits({ ...credentialEdits, GITHUB_TOKEN: e.target.value })}
+                  className="w-full px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">
+                  {CREDENTIAL_LABELS["GITHUB_REPO"].label}
+                  <span className="ml-1 text-muted-foreground/60 font-normal">— proje bazlı override edilebilir</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder={CREDENTIAL_LABELS["GITHUB_REPO"].placeholder}
+                  value={credentialEdits["GITHUB_REPO"] || credentials["GITHUB_REPO"] || ""}
+                  onChange={(e) => setCredentialEdits({ ...credentialEdits, GITHUB_REPO: e.target.value })}
+                  className="w-full px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+              </div>
             </CardContent>
           </Card>
 
-          <Button onClick={handleSaveCredentials} disabled={saving}>
-            {saving ? "Kaydediliyor..." : "Kaydet"}
-          </Button>
-          {message && (
-            <p className={`text-sm ${message.type === "success" ? "text-foreground" : "text-destructive"}`}>
-              {message.text}
-            </p>
-          )}
+          <div className="flex items-center gap-4">
+            <Button onClick={handleSaveCredentials} disabled={saving}>
+              {saving ? "Kaydediliyor..." : "Kaydet"}
+            </Button>
+            {message && (
+              <p className={`text-sm ${message.type === "success" ? "text-foreground" : "text-destructive"}`}>
+                {message.text}
+              </p>
+            )}
+          </div>
         </TabsContent>
 
-        {/* MODELS TAB */}
+        {/* ── AI MODELLERİ ── */}
         <TabsContent value="models" className="space-y-6">
           <p className="text-sm text-muted-foreground">
-            LIGHT, STANDARD ve PREMIUM tier&apos;larında kullanılacak model/provider eşlemesini buradan yönetin.
+            Her tier için hangi modelin kullanılacağını seçin. Fiyatlar maliyet takibinde kullanılır.
           </p>
 
-          <div className="space-y-4">
-            {modelConfigs.map((model) => {
-              const edit = modelEdits[model.tier] ?? model;
-              return (
-                <Card key={model.tier}>
-                  <CardHeader>
-                    <CardTitle className="text-lg">{MODEL_TIER_LABELS[model.tier]}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <div>
-                        <label className="text-sm font-medium mb-1 block">Provider</label>
-                        <input
-                          type="text"
-                          value={edit.provider || ""}
-                          onChange={(e) => updateModelField(model.tier, "provider", e.target.value)}
-                          className="w-full px-3 py-2 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium mb-1 block">Model</label>
-                        <input
-                          type="text"
-                          value={edit.modelName || ""}
-                          onChange={(e) => updateModelField(model.tier, "modelName", e.target.value)}
-                          className="w-full px-3 py-2 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        />
-                      </div>
-                    </div>
+          <Card>
+            <CardContent className="p-0">
+              <div className="divide-y">
+                {modelConfigs.map((model) => {
+                  const edit = modelEdits[model.tier] ?? model;
+                  const isCustom = !KNOWN_MODELS.find((m) => m.value === edit.modelName);
+                  const tierInfo = MODEL_TIER_LABELS[model.tier];
+                  return (
+                    <div key={model.tier} className="px-5 py-4 space-y-3">
+                      {/* Tier başlığı + model seçici */}
+                      <div className="flex items-start gap-4">
+                        <div className="w-28 shrink-0 pt-1">
+                          <p className="text-sm font-medium">{tierInfo.name}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5 leading-snug">{tierInfo.description}</p>
+                        </div>
+                        <div className="flex-1 space-y-2">
+                          <select
+                            value={isCustom ? "custom" : edit.modelName}
+                            onChange={(e) => applyModelPreset(model.tier, e.target.value)}
+                            className="w-full px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            {KNOWN_MODELS.map((m) => (
+                              <option key={m.value} value={m.value}>{m.label}</option>
+                            ))}
+                          </select>
 
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <div>
-                        <label className="text-sm font-medium mb-1 block">Input / 1M token (USD)</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={edit.inputPerMillion ?? ""}
-                          onChange={(e) => updateModelField(
-                            model.tier,
-                            "inputPerMillion",
-                            e.target.value === "" ? null : Number(e.target.value),
+                          {/* Özel model girişi */}
+                          {isCustom && (
+                            <div className="grid gap-2 md:grid-cols-2">
+                              <input
+                                type="text"
+                                placeholder="Provider (anthropic)"
+                                value={edit.provider || ""}
+                                onChange={(e) => updateModelField(model.tier, "provider", e.target.value)}
+                                className="px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              />
+                              <input
+                                type="text"
+                                placeholder="Model adı"
+                                value={edit.modelName || ""}
+                                onChange={(e) => updateModelField(model.tier, "modelName", e.target.value)}
+                                className="px-3 py-1.5 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              />
+                            </div>
                           )}
-                          className="w-full px-3 py-2 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium mb-1 block">Output / 1M token (USD)</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={edit.outputPerMillion ?? ""}
-                          onChange={(e) => updateModelField(
-                            model.tier,
-                            "outputPerMillion",
-                            e.target.value === "" ? null : Number(e.target.value),
-                          )}
-                          className="w-full px-3 py-2 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        />
+
+                          {/* Fiyatlar — satır içi, kompakt */}
+                          <div className="flex items-center gap-4">
+                            <span className="text-xs text-muted-foreground shrink-0">Fiyat ($/1M token)</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs text-muted-foreground">Girdi</span>
+                              <input
+                                type="number" step="0.01" min="0"
+                                value={edit.inputPerMillion ?? ""}
+                                onChange={(e) => updateModelField(model.tier, "inputPerMillion", e.target.value === "" ? null : Number(e.target.value))}
+                                className="w-20 px-2 py-1 border rounded-md bg-background text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring tabular-nums"
+                              />
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs text-muted-foreground">Çıktı</span>
+                              <input
+                                type="number" step="0.01" min="0"
+                                value={edit.outputPerMillion ?? ""}
+                                onChange={(e) => updateModelField(model.tier, "outputPerMillion", e.target.value === "" ? null : Number(e.target.value))}
+                                className="w-20 px-2 py-1 border rounded-md bg-background text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring tabular-nums"
+                              />
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
 
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <div>
-                        <label className="text-sm font-medium mb-1 block">Latency Class</label>
-                        <input
-                          type="text"
-                          value={edit.latencyClass ?? ""}
-                          onChange={(e) => updateModelField(model.tier, "latencyClass", e.target.value || null)}
-                          className="w-full px-3 py-2 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium mb-1 block">Quality Class</label>
-                        <input
-                          type="text"
-                          value={edit.qualityClass ?? ""}
-                          onChange={(e) => updateModelField(model.tier, "qualityClass", e.target.value || null)}
-                          className="w-full px-3 py-2 border rounded-md bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        />
-                      </div>
-                    </div>
-
-                    <label className="inline-flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={edit.active}
-                        onChange={(e) => updateModelField(model.tier, "active", e.target.checked)}
-                      />
-                      Aktif
-                    </label>
-                  </CardContent>
-                </Card>
-              );
-            })}
+          <div className="flex items-center gap-4">
+            <Button onClick={handleSaveModels} disabled={saving || modelConfigs.length === 0}>
+              {saving ? "Kaydediliyor..." : "Kaydet"}
+            </Button>
+            {message && (
+              <p className={`text-sm ${message.type === "success" ? "text-foreground" : "text-destructive"}`}>
+                {message.text}
+              </p>
+            )}
           </div>
-
-          <Button onClick={handleSaveModels} disabled={saving || modelConfigs.length === 0}>
-            {saving ? "Kaydediliyor..." : "Model Ayarlarını Kaydet"}
-          </Button>
-          {message && (
-            <p className={`text-sm ${message.type === "success" ? "text-foreground" : "text-destructive"}`}>
-              {message.text}
-            </p>
-          )}
         </TabsContent>
 
-        {/* PROMPTS TAB */}
+        {/* ── PROMPT YÖNETİMİ ── */}
         <TabsContent value="prompts" className="space-y-6">
           <p className="text-sm text-muted-foreground">
-            AI'ın davranışını belirleyen prompt'ları görüntüleyin ve düzenleyin.
+            AI'ın davranışını belirleyen prompt'ları görüntüleyin ve düzenleyin. Değişiklikler anında geçerli olur.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="space-y-2">
+            {/* Sol: prompt listesi */}
+            <div className="space-y-1">
               {prompts.map((p) => (
                 <button
                   key={p.id}
@@ -382,20 +410,21 @@ export default function Settings() {
                       : "hover:bg-muted"
                   }`}
                 >
-                  <div>{PROMPT_LABELS[p.name] || p.name}</div>
-                  <div className="text-xs opacity-60">v{p.version}</div>
+                  <div>{PROMPT_LABELS[p.name] ?? p.name}</div>
+                  <div className="text-xs opacity-50">v{p.version}</div>
                 </button>
               ))}
             </div>
 
+            {/* Sağ: editör */}
             <div className="md:col-span-3">
               {selected ? (
                 <Card>
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div>
-                        <CardTitle className="text-lg">{PROMPT_LABELS[selected.name] || selected.name}</CardTitle>
-                        <p className="text-xs text-muted-foreground mt-1">{selected.name}.txt — v{selected.version}</p>
+                        <CardTitle className="text-base">{PROMPT_LABELS[selected.name] ?? selected.name}</CardTitle>
+                        <p className="text-xs text-muted-foreground mt-1 font-mono">{selected.name}.txt — v{selected.version}</p>
                       </div>
                       <div className="flex gap-2">
                         <Button size="sm" variant="outline" onClick={handleResetPrompt} disabled={saving}>
