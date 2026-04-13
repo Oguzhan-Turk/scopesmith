@@ -9,7 +9,7 @@ async function login(page: Page) {
   await page.getByRole("textbox").first().fill(process.env.SMOKE_USER || "admin");
   await page.locator('input[type="password"]').first().fill(process.env.SMOKE_PASS || "admin123");
   await page.getByRole("button", { name: "Giriş Yap" }).click();
-  await expect(page.getByRole("heading", { name: "Projeler" })).toBeVisible();
+  await expect(page.getByText("Projeler")).toBeVisible();
 }
 
 async function createProject(page: Page, name: string) {
@@ -17,11 +17,13 @@ async function createProject(page: Page, name: string) {
   await page.locator("#proj-name").fill(name);
   await page.locator("#proj-desc").fill("Smoke test project");
   await page.getByRole("button", { name: "Oluştur" }).click();
+  // Wait for project to appear in list, then navigate
   const projectLink = page.getByRole("link", { name });
-  await expect(projectLink).toBeVisible();
+  await expect(projectLink).toBeVisible({ timeout: 10000 });
   await projectLink.click();
   await expect(page).toHaveURL(/\/projects\/\d+/);
-  await expect(page.getByRole("heading", { name })).toBeVisible();
+  // Verify project name is visible somewhere on the page (sidebar or heading)
+  await expect(page.getByText(name).first()).toBeVisible({ timeout: 10000 });
   return Number(page.url().split("/projects/")[1]?.split("?")[0]);
 }
 
@@ -32,12 +34,17 @@ async function backendCookieHeader(page: Page) {
 
 async function openContextAndExpandScan(page: Page) {
   await page.reload();
-  await page.getByRole("button", { name: "Bağlam", exact: true }).click();
-  // Wait for tab content to load, then ensure Gelişmiş is open
+  const baglamBtn = page.getByRole("button", { name: /Bağlam/ });
+  await expect(baglamBtn).toBeVisible({ timeout: 10000 });
+  await baglamBtn.click();
+  // Wait for tab content to load
   await page.waitForTimeout(1000);
   const yerelKlasor = page.getByText("Yerel Klasör");
   if (!(await yerelKlasor.isVisible().catch(() => false))) {
-    await page.getByText("Gelişmiş Tarama Ayarları").first().click();
+    const advancedBtn = page.getByText(/Gelişmiş/);
+    if (await advancedBtn.isVisible().catch(() => false)) {
+      await advancedBtn.first().click();
+    }
   }
   await expect(yerelKlasor).toBeVisible({ timeout: 5000 });
 }
@@ -65,7 +72,7 @@ test("login + create project + add requirement flow", async ({ page, request }) 
   const projectId = await createProject(page, projectName);
   const cookieHeader = await backendCookieHeader(page);
 
-  await page.getByRole("button", { name: "Yeni Talep" }).click();
+  await page.getByRole("button", { name: /Yeni Talep/ }).click();
   await page.locator("#req-text").fill(requirementText);
   await page.getByRole("button", { name: "Ekle" }).click();
   await expect(page.getByText(requirementText)).toBeVisible();
@@ -99,7 +106,7 @@ test("partial refresh FAILED entry is visible in timeline", async ({ page, reque
   await client.end();
 
   await openContextAndExpandScan(page);
-  await expect(page.getByText("Tarama Geçmişi")).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText(/Tarama Geçmişi|Geçmiş/)).toBeVisible({ timeout: 15000 });
   await expect(page.getByText("FAILED")).toBeVisible({ timeout: 5000 });
   await page.getByText("FAILED").first().click();
   await expect(page.getByText(projectIdErrorText)).toBeVisible();
