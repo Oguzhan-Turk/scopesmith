@@ -216,10 +216,6 @@ scopesmith/
 └── docker-compose.yml         # PostgreSQL + pgvector
 ```
 
-## License
-
-This project was built for the Atmosware AI Challenge 2025.
-
 ---
 
 <div align="center">
