@@ -34,9 +34,8 @@ async function backendCookieHeader(page: Page) {
 
 async function openContextAndExpandScan(page: Page) {
   await page.reload();
-  const baglamBtn = page.getByRole("button", { name: "Bağlam", exact: true });
-  await expect(baglamBtn).toBeVisible({ timeout: 10000 });
-  await baglamBtn.click();
+  // Sidebar buttons have material icon text prepended, so use text locator
+  await page.locator("button", { hasText: "Bağlam" }).filter({ hasNotText: "Ekle" }).click();
   // Wait for tab content to load
   await page.waitForTimeout(1000);
   const yerelKlasor = page.getByText("Yerel Klasör");
