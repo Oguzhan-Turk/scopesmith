@@ -13,7 +13,7 @@ async function login(page: Page) {
 }
 
 async function createProject(page: Page, name: string) {
-  await page.getByRole("button", { name: /Yeni Proje/ }).click();
+  await page.getByRole("button", { name: /Proje Oluştur|Yeni Proje/ }).click();
   await page.locator("#proj-name").fill(name);
   await page.locator("#proj-desc").fill("Smoke test project");
   await page.getByRole("button", { name: "Oluştur" }).click();
