@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Tooltip } from "@/components/ui/tooltip";
 import { refineAnalysis } from "@/api/client";
-import { riskColor } from "./utils";
 import MarkdownBody from "./MarkdownBody";
 import type { DetailTabProps } from "./types";
 

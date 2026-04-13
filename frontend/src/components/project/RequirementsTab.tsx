@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { timeAgo } from "@/lib/utils";
 import type { RequirementsTabProps } from "./types";
 
 export default function RequirementsTab({

@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect, type ReactNode } from "react";
-import { ArrowLeft, Send, Pencil, ChevronDown, ChevronRight, Copy, RefreshCw, Plus, Settings2, Check, Download, ExternalLink, Play, Square, GitBranch } from "lucide-react";
+import { ArrowLeft, Send, Pencil, ChevronRight, RefreshCw, Settings2, Check, Download, ExternalLink, Square } from "lucide-react";
 import { Tooltip } from "@/components/ui/tooltip";
 import { syncToJira, syncToGitHub, suggestSp, getClaudeCodePrompt, updateTask, startManagedAgent, getManagedAgentStatus, cancelManagedAgent, getFeatures } from "@/api/client";
 
-import { categoryColor, priorityColor } from "./utils";
+import { priorityColor } from "./utils";
 import type { TasksTabProps } from "./types";
 
 // ─── Category badge bg helper ────────────────────────────────────────────────
