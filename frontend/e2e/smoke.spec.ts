@@ -9,7 +9,7 @@ async function login(page: Page) {
   await page.getByRole("textbox").first().fill(process.env.SMOKE_USER || "admin");
   await page.locator('input[type="password"]').first().fill(process.env.SMOKE_PASS || "admin123");
   await page.getByRole("button", { name: "Giriş Yap" }).click();
-  await expect(page.getByText("Projeler")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Projeler" })).toBeVisible();
 }
 
 async function createProject(page: Page, name: string) {
