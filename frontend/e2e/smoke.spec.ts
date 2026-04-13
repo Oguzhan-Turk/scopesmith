@@ -34,7 +34,7 @@ async function backendCookieHeader(page: Page) {
 
 async function openContextAndExpandScan(page: Page) {
   await page.reload();
-  const baglamBtn = page.getByRole("button", { name: /Bağlam/ });
+  const baglamBtn = page.getByRole("button", { name: "Bağlam", exact: true });
   await expect(baglamBtn).toBeVisible({ timeout: 10000 });
   await baglamBtn.click();
   // Wait for tab content to load
