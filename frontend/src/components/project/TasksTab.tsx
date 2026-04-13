@@ -238,6 +238,7 @@ function AgentSection({
   task,
   showToast,
   onStatusChange,
+  hasLocalPath,
 }: {
   task: { id: number; agentStatus: string | null; agentBranch: string | null; agentSessionId: string | null };
   showToast: (msg: string, type?: "success" | "error" | "info") => void;
@@ -380,6 +381,7 @@ function AgentSection({
 // ──────────────────────────────────────────────────────────────────────────────
 
 export default function TasksTab({
+  project,
   selectedRequirementId,
   selectedAnalysis,
   tasks,
