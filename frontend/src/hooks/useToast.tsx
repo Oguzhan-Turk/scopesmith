@@ -39,16 +39,30 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`px-4 py-3 rounded-lg shadow-lg text-sm border animate-in slide-in-from-bottom-2 cursor-pointer ${
-              toast.type === "error"
-                ? "bg-destructive text-destructive-foreground"
-                : toast.type === "success"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground"
-            }`}
+            className="bg-card border border-border rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] flex items-start gap-3 px-4 py-3 cursor-pointer animate-in slide-in-from-bottom-2 min-w-[280px] max-w-sm"
+            style={{
+              borderLeft: `3px solid ${
+                toast.type === "error" ? "#ef4444"
+                : toast.type === "success" ? "#10b981"
+                : "#6366f1"
+              }`
+            }}
             onClick={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))}
           >
-            {toast.message}
+            <span
+              className="material-icons-outlined text-[18px] flex-shrink-0 mt-px"
+              style={{
+                color: toast.type === "error" ? "#ef4444"
+                  : toast.type === "success" ? "#10b981"
+                  : "#6366f1"
+              }}
+            >
+              {toast.type === "error" ? "error_outline"
+                : toast.type === "success" ? "check_circle"
+                : "info"}
+            </span>
+            <span className="text-[0.8rem] text-foreground leading-relaxed flex-1">{toast.message}</span>
+            <span className="material-icons-outlined text-[16px] text-muted-foreground/40 hover:text-muted-foreground flex-shrink-0 mt-px transition-colors">close</span>
           </div>
         ))}
       </div>

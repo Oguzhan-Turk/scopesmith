@@ -1,9 +1,4 @@
 import { useState } from "react";
-import { ArrowLeft, Check, Lightbulb, RefreshCw, ChevronDown, ChevronRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Tooltip } from "@/components/ui/tooltip";
 import { refineAnalysis } from "@/api/client";
 import { riskColor } from "./utils";
@@ -30,7 +25,7 @@ export default function DetailTab({
   setActionLoading,
   showToast,
 }: DetailTabProps) {
-  // "Diğer" seçeneği: aktiflik (Set) + yazılan metin (Record)
+  // "Diger" secenegi: aktiflik (Set) + yazilan metin (Record)
   const [digerActive, setDigerActive] = useState<Set<number>>(new Set());
   const [digerInputs, setDigerInputs] = useState<Record<number, string>>({});
   const [analysisRefineInput, setAnalysisRefineInput] = useState("");
@@ -40,31 +35,61 @@ export default function DetailTab({
 
   if (!selectedRequirementId) {
     return (
-      <div className="text-center py-12 border border-dashed rounded-lg">
-        <p className="text-sm text-muted-foreground mb-4">Analiz ve task uretmek icin once bir talep secin.</p>
-        <Button variant="outline" size="sm" onClick={() => setActiveTab("requirements")}>
-          <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
+      <div className="flex items-center justify-between rounded-[12px] border border-dashed border-border/60 bg-secondary/30 px-6 py-6">
+        <p className="text-[0.82rem] text-muted-foreground">Analiz ve task uretmek icin once bir talep secin.</p>
+        <button
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[7px] border border-border bg-card text-[0.78rem] font-semibold text-foreground/70 hover:bg-secondary transition-colors"
+          onClick={() => setActiveTab("requirements")}
+        >
+          <span className="material-icons-outlined" style={{ fontSize: 16 }}>arrow_back</span>
           Talepler'e Git
-        </Button>
+        </button>
       </div>
     );
   }
 
   if (!selectedAnalysis) {
     return (
-      <div className="text-center py-12 border border-dashed rounded-lg">
-        <p className="text-sm text-muted-foreground mb-4">Bu talep henuz analiz edilmedi.</p>
-        <Button variant="outline" size="sm" onClick={() => setActiveTab("requirements")}>
-          <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
+      <div className="flex items-center justify-between rounded-[12px] border border-dashed border-border/60 bg-secondary/30 px-6 py-6">
+        <p className="text-[0.82rem] text-muted-foreground">Bu talep henuz analiz edilmedi.</p>
+        <button
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[7px] border border-border bg-card text-[0.78rem] font-semibold text-foreground/70 hover:bg-secondary transition-colors"
+          onClick={() => setActiveTab("requirements")}
+        >
+          <span className="material-icons-outlined" style={{ fontSize: 16 }}>arrow_back</span>
           Talepler'e Don ve Analiz Et
-        </Button>
+        </button>
       </div>
     );
   }
 
+  const riskBadgeClass = (level: string) => {
+    const l = level?.toUpperCase();
+    if (l?.includes("HIGH")) return "bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400";
+    if (l?.includes("MEDIUM")) return "bg-amber-50 text-amber-600 dark:bg-amber-950 dark:text-amber-400";
+    return "bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400";
+  };
+
+  const riskLabel = (level: string) => {
+    const l = level?.toUpperCase();
+    if (l?.includes("HIGH")) return "Yuksek";
+    if (l?.includes("MEDIUM")) return "Orta";
+    return "Dusuk";
+  };
+
   return (
-    <div className="space-y-4">
-      {/* Questions */}
+    <div className="space-y-5">
+      {/* Content header */}
+      <div>
+        <h2 className="text-[1.25rem] font-bold text-foreground tracking-tight">Talep Detay</h2>
+        {selectedRequirement?.rawText && (
+          <p className="text-[0.75rem] text-muted-foreground mt-0.5 line-clamp-1">
+            {selectedRequirement.rawText}
+          </p>
+        )}
+      </div>
+
+      {/* ── 1. Acik Noktalar ── */}
       {selectedAnalysis.questions.length > 0 && actionLoading !== "re-analyze" && (() => {
         const openQuestions = selectedAnalysis.questions.filter((q) => q.status === "OPEN");
         const closedQuestions = selectedAnalysis.questions.filter((q) => q.status !== "OPEN");
@@ -72,371 +97,373 @@ export default function DetailTab({
         const doneCount = closedQuestions.length;
 
         return (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base">Açık Noktalar</CardTitle>
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-muted-foreground tabular-nums">
-                  {openQuestions.length}/{total}
+          <div className="bg-card rounded-[14px] border border-black/4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] overflow-hidden">
+            {/* Section header */}
+            <div className="flex items-center justify-between px-5 py-3.5 cursor-default">
+              <div className="flex items-center gap-2.5">
+                <span className="material-icons-outlined" style={{ fontSize: 18, color: "#00bcd4" }}>help_outline</span>
+                <span className="text-[0.88rem] font-semibold text-foreground">Acik Noktalar</span>
+              </div>
+              <div className="flex gap-1.5">
+                {selectedAnalysis.modelTier && (
+                  <span className="px-2 py-0.5 rounded-[5px] text-[0.65rem] font-semibold bg-indigo-50 text-indigo-500 dark:bg-indigo-950 dark:text-indigo-400">
+                    {selectedAnalysis.modelTier === "LIGHT" ? "Haiku" :
+                     selectedAnalysis.modelTier === "PREMIUM" ? "Opus" : "Sonnet"}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Section body */}
+            <div className="px-5 pb-5">
+              {/* Progress bar */}
+              <div className="flex items-center gap-3 mb-4">
+                <span className="text-[0.72rem] font-semibold text-foreground/70 whitespace-nowrap">
+                  {doneCount} / {total} tamamlandi
                 </span>
-                <div className="h-1.5 w-20 bg-muted rounded-full overflow-hidden">
+                <div className="flex-1 h-1 bg-secondary rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-primary rounded-full transition-all"
-                    style={{ width: `${(doneCount / total) * 100}%` }}
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${(doneCount / total) * 100}%`,
+                      background: "linear-gradient(90deg, #00bcd4, #00d1ff)",
+                    }}
                   />
                 </div>
               </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {openQuestions.map((q, idx) => (
-              <div key={q.id} className="rounded-lg border p-4 bg-background">
-                <div className="flex items-start gap-3">
-                  <span className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium bg-primary/10 text-primary">
-                    {idx + 1}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <p className="text-sm font-medium">
+
+              {/* Open questions */}
+              {openQuestions.map((q, idx) => (
+                <div key={q.id} className="py-4 border-b border-secondary/80 last:border-b-0">
+                  <div className="flex items-start gap-2.5 mb-2.5">
+                    <span className="flex-shrink-0 w-6 h-6 rounded-[6px] flex items-center justify-center text-[0.68rem] font-bold bg-blue-50 text-blue-500 dark:bg-blue-950 dark:text-blue-400">
+                      {idx + 1 + doneCount}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[0.82rem] text-foreground/80 leading-relaxed">
                         {q.questionText}
-                        {q.questionType === "MULTIPLE_CHOICE" && (
-                          <span className="text-xs text-muted-foreground/60 font-normal ml-1.5">(birden fazla seçilebilir)</span>
-                        )}
                       </p>
-                      {q.status === "OPEN" && (
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <Button
-                            size="sm"
-                            className="h-6 px-2 text-xs"
-                            disabled={
-                              actionLoading === `answer-${q.id}` ||
-                              (!(answers[q.id] || "").trim() && !(digerActive.has(q.id) && (digerInputs[q.id] || "").trim()))
-                            }
-                            onClick={() => {
-                              let finalAnswer = answers[q.id] || "";
-                              if (digerActive.has(q.id) && digerInputs[q.id]?.trim()) {
-                                if (q.questionType === "SINGLE_CHOICE") {
-                                  finalAnswer = digerInputs[q.id].trim();
-                                } else {
-                                  const parts = finalAnswer ? finalAnswer.split(", ").filter(Boolean) : [];
-                                  finalAnswer = [...parts, digerInputs[q.id].trim()].join(", ");
-                                }
-                              }
-                              handleAnswer(q.id, finalAnswer || undefined);
-                            }}
-                          >
-                            {actionLoading === `answer-${q.id}` ? <RefreshCw className="w-3 h-3 animate-spin" /> : "Onayla"}
-                          </Button>
-                          <button
-                            onClick={() => handleDismiss(q.id)}
-                            disabled={actionLoading === `dismiss-${q.id}`}
-                            aria-label="Soruyu kapat"
-                            className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors focus-visible:outline-none"
-                          >
-                            Atla
-                          </button>
-                        </div>
+                      {q.questionType === "MULTIPLE_CHOICE" && (
+                        <p className="text-[0.7rem] text-muted-foreground italic mt-0.5">(birden fazla secilebilir)</p>
                       )}
                     </div>
+                  </div>
 
-                    {q.status === "OPEN" ? (
-                      <div className="space-y-2">
-                        {q.suggestedAnswer && (
-                          <button
-                            className="flex items-start gap-1.5 text-xs text-primary hover:text-primary/80 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
-                            onClick={() => {
-                              if (q.options && q.options.length > 0) {
-                                const suggested = q.suggestedAnswer!.toLowerCase();
-                                const sugWords = suggested.split(/\s+/).filter(w => w.length > 3);
-                                const stemMatch = (a: string, b: string) => {
-                                  const len = Math.min(5, a.length, b.length);
-                                  return a.slice(0, len) === b.slice(0, len);
-                                };
-                                const score = (opt: string) => {
-                                  const optWords = opt.toLowerCase().split(/\s+/).filter(w => w.length > 3);
-                                  if (optWords.length === 0) return 0;
-                                  const hits = optWords.filter(ow => sugWords.some(sw => stemMatch(ow, sw))).length;
-                                  return hits / optWords.length;
-                                };
-                                if (q.questionType === "SINGLE_CHOICE") {
-                                  const best = q.options.reduce<{ opt: string; score: number } | null>((acc, opt) => {
-                                    const s = score(opt);
-                                    return s > (acc?.score ?? 0) ? { opt, score: s } : acc;
-                                  }, null);
-                                  if (best && best.score >= 0.5) {
-                                    setAnswers((prev) => ({ ...prev, [q.id]: best.opt }));
-                                    setDigerActive((prev) => { const next = new Set(prev); next.delete(q.id); return next; });
-                                    return;
+                  {/* Suggested answer */}
+                  {q.suggestedAnswer && (
+                    <button
+                      className="flex items-start gap-1.5 text-[0.72rem] text-[#00838f] hover:text-[#00bcd4] text-left ml-[2.1rem] mb-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                      onClick={() => {
+                        if (q.options && q.options.length > 0) {
+                          const suggested = q.suggestedAnswer!.toLowerCase();
+                          const sugWords = suggested.split(/\s+/).filter(w => w.length > 3);
+                          const stemMatch = (a: string, b: string) => {
+                            const len = Math.min(5, a.length, b.length);
+                            return a.slice(0, len) === b.slice(0, len);
+                          };
+                          const score = (opt: string) => {
+                            const optWords = opt.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+                            if (optWords.length === 0) return 0;
+                            const hits = optWords.filter(ow => sugWords.some(sw => stemMatch(ow, sw))).length;
+                            return hits / optWords.length;
+                          };
+                          if (q.questionType === "SINGLE_CHOICE") {
+                            const best = q.options.reduce<{ opt: string; score: number } | null>((acc, opt) => {
+                              const s = score(opt);
+                              return s > (acc?.score ?? 0) ? { opt, score: s } : acc;
+                            }, null);
+                            if (best && best.score >= 0.5) {
+                              setAnswers((prev) => ({ ...prev, [q.id]: best.opt }));
+                              setDigerActive((prev) => { const next = new Set(prev); next.delete(q.id); return next; });
+                              return;
+                            }
+                          } else {
+                            const matches = q.options.filter(opt => score(opt) >= 0.5);
+                            if (matches.length > 0) {
+                              setAnswers((prev) => ({ ...prev, [q.id]: matches.join(", ") }));
+                              return;
+                            }
+                          }
+                        }
+                        setAnswers((prev) => ({ ...prev, [q.id]: q.suggestedAnswer! }));
+                      }}
+                    >
+                      <span className="material-icons-outlined" style={{ fontSize: 14, marginTop: 1 }}>lightbulb</span>
+                      <span className="italic">{q.suggestedAnswer}</span>
+                    </button>
+                  )}
+
+                  {/* Options / free text */}
+                  {q.options && q.options.length > 0 && (q.questionType === "MULTIPLE_CHOICE" || q.questionType === "SINGLE_CHOICE") ? (
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap gap-1.5 ml-[2.1rem]">
+                        {q.options.map((opt) => {
+                          const isDiger = opt === "Diger";
+                          const currentAnswer = answers[q.id] || "";
+                          const selected = isDiger
+                            ? digerActive.has(q.id)
+                            : currentAnswer.split(", ").includes(opt);
+                          return (
+                            <button
+                              key={opt}
+                              className={`px-2.5 py-1 rounded-[7px] border text-[0.72rem] font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                                selected
+                                  ? "text-white border-[#00bcd4] shadow-sm"
+                                  : "bg-card border-border text-foreground/70 hover:border-[#00bcd4] hover:text-[#00838f] hover:bg-cyan-50/30 dark:hover:bg-cyan-950/20"
+                              }`}
+                              style={selected ? { background: "linear-gradient(135deg, #00bcd4, #00acc1)" } : undefined}
+                              onClick={() => {
+                                if (isDiger) {
+                                  const nowActive = !digerActive.has(q.id);
+                                  setDigerActive((prev) => {
+                                    const next = new Set(prev);
+                                    if (nowActive) next.add(q.id);
+                                    else next.delete(q.id);
+                                    return next;
+                                  });
+                                  if (!nowActive) {
+                                    setDigerInputs((prev) => ({ ...prev, [q.id]: "" }));
+                                    if (q.questionType === "SINGLE_CHOICE") {
+                                      setAnswers((prev) => ({ ...prev, [q.id]: "" }));
+                                    }
                                   }
                                 } else {
-                                  const matches = q.options.filter(opt => score(opt) >= 0.5);
-                                  if (matches.length > 0) {
-                                    setAnswers((prev) => ({ ...prev, [q.id]: matches.join(", ") }));
-                                    return;
+                                  if (q.questionType === "SINGLE_CHOICE") {
+                                    setAnswers((prev) => ({ ...prev, [q.id]: opt }));
+                                    setDigerActive((prev) => { const next = new Set(prev); next.delete(q.id); return next; });
+                                    setDigerInputs((prev) => ({ ...prev, [q.id]: "" }));
+                                  } else {
+                                    const parts = currentAnswer ? currentAnswer.split(", ").filter(Boolean) : [];
+                                    const isSelected = parts.includes(opt);
+                                    const next = isSelected ? parts.filter((p) => p !== opt) : [...parts, opt];
+                                    setAnswers((prev) => ({ ...prev, [q.id]: next.join(", ") }));
                                   }
                                 }
-                              }
-                              setAnswers((prev) => ({ ...prev, [q.id]: q.suggestedAnswer! }));
-                            }}
-                          >
-                            <Lightbulb className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                            <span className="italic">{q.suggestedAnswer}</span>
-                          </button>
-                        )}
-
-                        {q.options && q.options.length > 0 && (q.questionType === "MULTIPLE_CHOICE" || q.questionType === "SINGLE_CHOICE") ? (
-                          <div className="space-y-2">
-                            <div className="flex flex-wrap gap-2">
-                              {q.options.map((opt) => {
-                                const isDiger = opt === "Diğer";
-                                const currentAnswer = answers[q.id] || "";
-                                // "Diğer" chip: aktiflik ayrı Set'te takip edilir
-                                const selected = isDiger
-                                  ? digerActive.has(q.id)
-                                  : currentAnswer.split(", ").includes(opt);
-                                return (
-                                  <button
-                                    key={opt}
-                                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                                      selected
-                                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                                        : "bg-background hover:bg-muted border-border"
-                                    }`}
-                                    onClick={() => {
-                                      if (isDiger) {
-                                        // "Diğer" toggle
-                                        const nowActive = !digerActive.has(q.id);
-                                        setDigerActive((prev) => {
-                                          const next = new Set(prev);
-                                          if (nowActive) next.add(q.id);
-                                          else next.delete(q.id);
-                                          return next;
-                                        });
-                                        if (!nowActive) {
-                                          // Deselect: temizle
-                                          setDigerInputs((prev) => ({ ...prev, [q.id]: "" }));
-                                          if (q.questionType === "SINGLE_CHOICE") {
-                                            setAnswers((prev) => ({ ...prev, [q.id]: "" }));
-                                          }
-                                          // MULTIPLE: diğer seçimler kalır
-                                        }
-                                      } else {
-                                        // Normal seçenek
-                                        if (q.questionType === "SINGLE_CHOICE") {
-                                          setAnswers((prev) => ({ ...prev, [q.id]: opt }));
-                                          // Diğer'i kapat
-                                          setDigerActive((prev) => { const next = new Set(prev); next.delete(q.id); return next; });
-                                          setDigerInputs((prev) => ({ ...prev, [q.id]: "" }));
-                                        } else {
-                                          const parts = currentAnswer ? currentAnswer.split(", ").filter(Boolean) : [];
-                                          const isSelected = parts.includes(opt);
-                                          const next = isSelected ? parts.filter((p) => p !== opt) : [...parts, opt];
-                                          setAnswers((prev) => ({ ...prev, [q.id]: next.join(", ") }));
-                                        }
-                                      }
-                                    }}
-                                  >
-                                    {selected && <span>✓</span>}
-                                    {opt}
-                                  </button>
-                                );
-                              })}
-                            </div>
-
-                            {/* "Diğer" aktifse serbest metin */}
-                            {digerActive.has(q.id) && (
-                              <input
-                                type="text"
-                                autoFocus
-                                placeholder="Belirtin..."
-                                value={digerInputs[q.id] || ""}
-                                onChange={(e) => {
-                                  const text = e.target.value;
-                                  setDigerInputs((prev) => ({ ...prev, [q.id]: text }));
-                                }}
-                                className="w-full px-3 py-1.5 text-sm border rounded-md bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                              />
-                            )}
-
-                          </div>
-                        ) : (
-                          <input
-                            type="text"
-                            placeholder="Cevap girin..."
-                            value={answers[q.id] || ""}
-                            onChange={(e) => setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))}
-                            onKeyDown={(e) => { if (e.key === "Enter" && (answers[q.id] || "").trim()) handleAnswer(q.id); }}
-                            className="w-full px-3 py-1.5 text-sm border rounded-md bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                          />
-                        )}
+                              }}
+                            >
+                              {selected && <span className="mr-0.5">&#10003; </span>}
+                              {opt}
+                            </button>
+                          );
+                        })}
                       </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {q.status === "ANSWERED" ? q.answer : "Atlandı"}
-                      </p>
-                    )}
+
+                      {/* "Diger" free text input */}
+                      {digerActive.has(q.id) && (
+                        <input
+                          type="text"
+                          autoFocus
+                          placeholder="Belirtin..."
+                          value={digerInputs[q.id] || ""}
+                          onChange={(e) => {
+                            const text = e.target.value;
+                            setDigerInputs((prev) => ({ ...prev, [q.id]: text }));
+                          }}
+                          className="w-full ml-[2.1rem] max-w-[calc(100%-2.1rem)] px-3 py-1.5 text-[0.78rem] rounded-[8px] border border-border bg-secondary/50 text-foreground focus:border-[#00bcd4] focus:bg-card outline-none placeholder:text-muted-foreground/50 font-[inherit]"
+                        />
+                      )}
+                    </div>
+                  ) : (
+                    <input
+                      type="text"
+                      placeholder="Cevap girin..."
+                      value={answers[q.id] || ""}
+                      onChange={(e) => setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))}
+                      onKeyDown={(e) => { if (e.key === "Enter" && (answers[q.id] || "").trim()) handleAnswer(q.id); }}
+                      className="w-full ml-[2.1rem] max-w-[calc(100%-2.1rem)] px-3 py-1.5 text-[0.78rem] rounded-[8px] border border-border bg-secondary/50 text-foreground focus:border-[#00bcd4] focus:bg-card outline-none placeholder:text-muted-foreground/50 font-[inherit]"
+                    />
+                  )}
+
+                  {/* Question actions */}
+                  <div className="flex gap-2 mt-2.5 ml-[2.1rem]">
+                    <button
+                      className="px-2.5 py-1 rounded-[6px] border-none text-white text-[0.7rem] font-semibold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                      style={{ background: "linear-gradient(135deg, #00bcd4, #00acc1)" }}
+                      disabled={
+                        actionLoading === `answer-${q.id}` ||
+                        (!(answers[q.id] || "").trim() && !(digerActive.has(q.id) && (digerInputs[q.id] || "").trim()))
+                      }
+                      onClick={() => {
+                        let finalAnswer = answers[q.id] || "";
+                        if (digerActive.has(q.id) && digerInputs[q.id]?.trim()) {
+                          if (q.questionType === "SINGLE_CHOICE") {
+                            finalAnswer = digerInputs[q.id].trim();
+                          } else {
+                            const parts = finalAnswer ? finalAnswer.split(", ").filter(Boolean) : [];
+                            finalAnswer = [...parts, digerInputs[q.id].trim()].join(", ");
+                          }
+                        }
+                        handleAnswer(q.id, finalAnswer || undefined);
+                      }}
+                    >
+                      {actionLoading === `answer-${q.id}` ? (
+                        <span className="material-icons-outlined animate-spin" style={{ fontSize: 14 }}>refresh</span>
+                      ) : "Onayla"}
+                    </button>
+                    <button
+                      onClick={() => handleDismiss(q.id)}
+                      disabled={actionLoading === `dismiss-${q.id}`}
+                      aria-label="Soruyu kapat"
+                      className="px-2 py-1 border-none bg-transparent text-[0.7rem] text-muted-foreground hover:text-foreground/70 cursor-pointer transition-colors"
+                    >
+                      Atla
+                    </button>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
 
-            {/* Closed questions toggle */}
-            {doneCount > 0 && (
-              <div>
-                <button
-                  onClick={() => setClosedQuestionsOpen((v) => !v)}
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded py-1"
-                >
-                  <ChevronRight className={`w-3.5 h-3.5 transition-transform ${closedQuestionsOpen ? "rotate-90" : ""}`} />
-                  {doneCount} tamamlandı
-                </button>
-                {closedQuestionsOpen && (
-                  <div className="mt-2 space-y-1.5 pl-1">
-                    {closedQuestions.map((q) => (
-                      <div key={q.id} className="flex items-start gap-2 rounded-md px-3 py-2 bg-muted/30 border border-transparent">
-                        <Check className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-muted-foreground/60" />
-                        <div className="min-w-0">
-                          <p className="text-xs text-muted-foreground line-clamp-1">{q.questionText}</p>
-                          {q.status === "ANSWERED" && q.answer && (
-                            <p className="text-xs text-muted-foreground/60 mt-0.5 line-clamp-1">{q.answer}</p>
-                          )}
+              {/* Closed questions toggle */}
+              {doneCount > 0 && (
+                <div className="pt-2">
+                  <button
+                    onClick={() => setClosedQuestionsOpen((v) => !v)}
+                    className="flex items-center gap-1.5 py-2 text-[0.72rem] text-muted-foreground hover:text-foreground/70 cursor-pointer border-none bg-transparent transition-colors"
+                  >
+                    <span className="material-icons-outlined" style={{ fontSize: 16 }}>check_circle</span>
+                    {doneCount} tamamlandi
+                    <span className="material-icons-outlined" style={{ fontSize: 16, transition: "transform 0.2s", transform: closedQuestionsOpen ? "rotate(180deg)" : "rotate(0)" }}>expand_more</span>
+                  </button>
+                  {closedQuestionsOpen && (
+                    <div className="mt-1.5 space-y-1.5 pl-1">
+                      {closedQuestions.map((q) => (
+                        <div key={q.id} className="flex items-start gap-2 rounded-[8px] px-3 py-2 bg-secondary/40 border border-transparent">
+                          <span className="material-icons-outlined flex-shrink-0 text-muted-foreground/60" style={{ fontSize: 14, marginTop: 2 }}>check</span>
+                          <div className="min-w-0">
+                            <p className="text-[0.72rem] text-muted-foreground line-clamp-1">{q.questionText}</p>
+                            {q.status === "ANSWERED" && q.answer && (
+                              <p className="text-[0.72rem] text-muted-foreground/60 mt-0.5 line-clamp-1">{q.answer}</p>
+                            )}
+                          </div>
                         </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── 2. Teknik Analiz ── */}
+      <div className="bg-card rounded-[14px] border border-black/4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] overflow-hidden">
+        {/* Section header */}
+        <div
+          className="flex items-center justify-between px-5 py-3.5 cursor-pointer select-none"
+          onClick={() => setAnalysisOpen((v) => !v)}
+        >
+          <div className="flex items-center gap-2.5">
+            <span className="material-icons-outlined" style={{ fontSize: 18, color: "#00bcd4" }}>analytics</span>
+            <span className="text-[0.88rem] font-semibold text-foreground">
+              {isBug ? "Bug Analizi" : "Teknik Analiz"}
+            </span>
+          </div>
+          <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
+            <span className={`px-2 py-0.5 rounded-[5px] text-[0.65rem] font-semibold ${riskBadgeClass(selectedAnalysis.riskLevel)}`}>
+              {riskLabel(selectedAnalysis.riskLevel)} Risk
+            </span>
+            {selectedAnalysis.durationMs && (
+              <Tooltip content="AI analiz suresi">
+                <span className="px-2 py-0.5 rounded-[5px] text-[0.65rem] font-semibold bg-secondary text-muted-foreground cursor-help tabular-nums">
+                  {(selectedAnalysis.durationMs / 1000).toFixed(1)}s
+                </span>
+              </Tooltip>
+            )}
+            {selectedAnalysis.contextVersion != null && (
+              <Tooltip content={
+                selectedAnalysis.contextVersion < (project.contextVersion ?? 0)
+                  ? `Context v${selectedAnalysis.contextVersion} ile analiz edildi (guncel: v${project.contextVersion})`
+                  : `Guncel context (v${selectedAnalysis.contextVersion})`
+              }>
+                <span className="px-2 py-0.5 rounded-[5px] text-[0.65rem] font-semibold bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400 cursor-help">
+                  Cv{selectedAnalysis.contextVersion}
+                </span>
+              </Tooltip>
+            )}
+            {selectedAnalysis.modelTier && (
+              <Tooltip content={{
+                LIGHT: "Hizli model (Haiku)",
+                STANDARD: "Standart model (Sonnet)",
+                PREMIUM: "Detayli model (Opus)",
+              }[selectedAnalysis.modelTier] || selectedAnalysis.modelTier}>
+                <span className="px-2 py-0.5 rounded-[5px] text-[0.65rem] font-semibold bg-indigo-50 text-indigo-500 dark:bg-indigo-950 dark:text-indigo-400 cursor-help">
+                  {selectedAnalysis.modelTier === "LIGHT" ? "Haiku" :
+                   selectedAnalysis.modelTier === "PREMIUM" ? "Opus" : "Sonnet"}
+                </span>
+              </Tooltip>
+            )}
+          </div>
+        </div>
+
+        {/* Section body */}
+        {analysisOpen && (
+          <div className="px-5 pb-5">
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-5">
+              {/* Left column: analysis text + assumptions + modules */}
+              <div>
+                {/* Summary text */}
+                {selectedAnalysis.structuredSummary && (
+                  <div className="text-[0.82rem] text-foreground/70 leading-[1.7] [&_strong]:text-foreground">
+                    <p className="whitespace-pre-wrap">{selectedAnalysis.structuredSummary}</p>
+                  </div>
+                )}
+
+                {/* Raw text (if no structured summary) */}
+                {!selectedAnalysis.structuredSummary && selectedRequirement?.rawText && (
+                  <div className="text-[0.82rem] text-foreground/70 leading-[1.7]">
+                    <MarkdownBody text={selectedRequirement.rawText} />
+                  </div>
+                )}
+
+                {/* Assumptions */}
+                {selectedAnalysis.assumptions && (
+                  <div className="mt-3">
+                    {selectedAnalysis.assumptions.split("\n").filter(Boolean).map((line, i) => (
+                      <div key={i} className="flex items-start gap-1.5 py-1 text-[0.78rem] text-muted-foreground leading-relaxed">
+                        <span className="w-[5px] h-[5px] rounded-full bg-[#00bcd4] flex-shrink-0 mt-[7px]" />
+                        <span>{line.replace(/^[-\u2022]\s*/, "")}</span>
                       </div>
                     ))}
                   </div>
                 )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        );
-      })()}
 
-      {/* Analysis Summary */}
-      <Card>
-        <CardHeader
-          className="cursor-pointer select-none"
-          onClick={() => setAnalysisOpen((v) => !v)}
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {analysisOpen
-                ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
-              <CardTitle className="text-base">{isBug ? "Bug Analizi" : "Teknik Analiz"}</CardTitle>
-            </div>
-            <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
-              <Badge variant={riskColor(selectedAnalysis.riskLevel)}>
-                {selectedAnalysis.riskLevel === "HIGH" ? "Yuksek" : selectedAnalysis.riskLevel === "MEDIUM" ? "Orta" : "Dusuk"}
-              </Badge>
-              {selectedAnalysis.durationMs && (
-                <Tooltip content="AI analiz suresi">
-                  <Badge variant="outline" className="cursor-help tabular-nums">
-                    {(selectedAnalysis.durationMs / 1000).toFixed(1)}s
-                  </Badge>
-                </Tooltip>
-              )}
-              {selectedAnalysis.contextVersion != null && (
-                <Tooltip content={
-                  selectedAnalysis.contextVersion < (project.contextVersion ?? 0)
-                    ? `Context v${selectedAnalysis.contextVersion} ile analiz edildi (guncel: v${project.contextVersion})`
-                    : `Guncel context (v${selectedAnalysis.contextVersion})`
-                }>
-                  <Badge variant="outline" className="cursor-help">Cv{selectedAnalysis.contextVersion}</Badge>
-                </Tooltip>
-              )}
-              {selectedAnalysis.modelTier && (
-                <Tooltip content={{
-                  LIGHT: "Hizli model (Haiku)",
-                  STANDARD: "Standart model (Sonnet)",
-                  PREMIUM: "Detayli model (Opus)",
-                }[selectedAnalysis.modelTier] || selectedAnalysis.modelTier}>
-                  <Badge
-                    variant="outline"
-                    className="cursor-help text-muted-foreground border-border"
-                  >
-                    {selectedAnalysis.modelTier === "LIGHT" ? "Haiku" :
-                     selectedAnalysis.modelTier === "PREMIUM" ? "Opus" : "Sonnet"}
-                  </Badge>
-                </Tooltip>
-              )}
-            </div>
-          </div>
-        </CardHeader>
-        {analysisOpen && (
-          <CardContent className="space-y-0">
-            {selectedRequirement?.rawText && (
-              <>
-                <div className="border-l-2 border-muted-foreground/20 pl-4 py-3">
-                  <h4 className="text-xs font-semibold text-muted-foreground mb-1.5 uppercase tracking-wide">Talep</h4>
-                  <MarkdownBody text={selectedRequirement.rawText} />
-                </div>
-                <Separator />
-              </>
-            )}
-            {selectedAnalysis.structuredSummary && (
-              <div className="border-l-2 border-primary/40 pl-4 py-3">
-                <h4 className="text-sm font-semibold text-primary/80 mb-1.5">Ozet</h4>
-                <p className="text-sm leading-relaxed whitespace-pre-wrap">{selectedAnalysis.structuredSummary}</p>
-              </div>
-            )}
-            {selectedAnalysis.assumptions && (
-              <>
-                <Separator />
-                <div className="border-l-2 border-primary/20 pl-4 py-3">
-                  <h4 className="text-sm font-semibold text-primary/60 mb-2">Varsayimlar</h4>
-                  <ul className="space-y-1.5">
-                    {selectedAnalysis.assumptions.split("\n").filter(Boolean).map((line, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm">
-                        <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary/30 flex-shrink-0" />
-                        <span className="leading-relaxed">{line.replace(/^[-•]\s*/, "")}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </>
-            )}
-            {selectedAnalysis.riskReason && (
-              <>
-                <Separator />
-                <div className="border-l-2 border-primary/20 pl-4 py-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <h4 className="text-sm font-semibold text-primary/60">{isBug ? "Severity Analizi" : "Risk Analizi"}</h4>
-                    <Badge variant={riskColor(selectedAnalysis.riskLevel)} className="text-xs">
-                      {selectedAnalysis.riskLevel === "HIGH" ? "Yuksek" : selectedAnalysis.riskLevel === "MEDIUM" ? "Orta" : "Dusuk"}
-                    </Badge>
-                  </div>
-                  <p className="text-sm leading-relaxed text-muted-foreground">{selectedAnalysis.riskReason}</p>
-                </div>
-              </>
-            )}
-            {selectedAnalysis.affectedModules && (
-              <>
-                <Separator />
-                <div>
-                  <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Etkilenen Modüller</h4>
-                  <div className="flex flex-wrap gap-1.5">
+                {/* Affected modules */}
+                {selectedAnalysis.affectedModules && (
+                  <div className="flex flex-wrap gap-1.5 mt-3">
                     {selectedAnalysis.affectedModules.split(",").map((m) => m.trim()).filter(Boolean).map((mod, i) => (
-                      <span key={i} className="px-2 py-0.5 text-xs rounded-md bg-muted text-foreground/80 border border-border">
+                      <span key={i} className="px-2 py-0.5 rounded-[5px] bg-secondary text-secondary-foreground text-[0.68rem] font-medium">
                         {mod}
                       </span>
                     ))}
                   </div>
+                )}
+              </div>
+
+              {/* Right column: risk card */}
+              {selectedAnalysis.riskReason && (
+                <div className="bg-secondary rounded-[10px] p-4">
+                  <div className="text-[0.62rem] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
+                    {isBug ? "Severity Seviyesi" : "Risk Seviyesi"}
+                  </div>
+                  <span className={`inline-flex px-2.5 py-0.5 rounded-[6px] text-[0.72rem] font-semibold mb-2.5 ${riskBadgeClass(selectedAnalysis.riskLevel)}`}>
+                    {riskLabel(selectedAnalysis.riskLevel)}
+                  </span>
+                  <p className="text-[0.75rem] text-muted-foreground leading-relaxed">{selectedAnalysis.riskReason}</p>
                 </div>
-              </>
-            )}
-            <Separator />
-            <div className="flex gap-2 pt-3">
+              )}
+            </div>
+
+            {/* Refine row */}
+            <div className="flex gap-2 mt-4 pt-3 border-t border-secondary">
               <input
                 type="text"
                 placeholder="Analizi nasil iyilestireyim?"
                 value={analysisRefineInput}
                 onChange={(e) => setAnalysisRefineInput(e.target.value)}
-                className="flex-1 px-3 py-1.5 text-sm border rounded-md bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex-1 px-3 py-[0.45rem] rounded-[8px] border border-border bg-secondary/50 text-[0.78rem] text-foreground outline-none focus:border-[#00bcd4] focus:bg-card placeholder:text-muted-foreground/40 font-[inherit]"
               />
-              <Button
-                size="sm"
+              <button
+                className="px-3.5 py-[0.4rem] rounded-[7px] border border-border bg-card text-[0.75rem] font-semibold text-foreground/70 whitespace-nowrap hover:bg-secondary hover:border-border/80 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 onClick={async () => {
                   if (!analysisRefineInput.trim()) return;
                   setActionLoading("refine-analysis");
@@ -451,68 +478,90 @@ export default function DetailTab({
                 disabled={!!actionLoading || !analysisRefineInput.trim()}
               >
                 {actionLoading === "refine-analysis" ? (
-                  <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />Guncelleniyor</>
+                  <span className="flex items-center gap-1.5">
+                    <span className="material-icons-outlined animate-spin" style={{ fontSize: 14 }}>refresh</span>
+                    Guncelleniyor
+                  </span>
                 ) : "Guncelle"}
-              </Button>
+              </button>
             </div>
-          </CardContent>
+          </div>
         )}
-      </Card>
+      </div>
 
-      {/* Stakeholder Summary */}
+      {/* ── 3. Talep Aciklamasi (Stakeholder Summary) ── */}
       {selectedAnalysis.stakeholderSummary ? (
-        <Card>
-          <CardHeader
-            className="cursor-pointer select-none"
+        <div className="bg-card rounded-[14px] border border-black/4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] overflow-hidden">
+          {/* Section header */}
+          <div
+            className="flex items-center justify-between px-5 py-3.5 cursor-pointer select-none"
             onClick={() => setSummaryOpen((v) => !v)}
           >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {summaryOpen
-                  ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                  : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
-                <CardTitle className="text-base">Talep Aciklamasi</CardTitle>
-              </div>
+            <div className="flex items-center gap-2.5">
+              <span className="material-icons-outlined" style={{ fontSize: 18, color: "#00bcd4" }}>article</span>
+              <span className="text-[0.88rem] font-semibold text-foreground">Talep Aciklamasi</span>
             </div>
-          </CardHeader>
+            <span
+              className="material-icons-outlined text-muted-foreground transition-transform"
+              style={{ fontSize: 18, transform: summaryOpen ? "rotate(180deg)" : "rotate(0)" }}
+            >
+              expand_more
+            </span>
+          </div>
+
+          {/* Section body */}
           {summaryOpen && (
-            <CardContent className="space-y-0">
-              <MarkdownBody text={selectedAnalysis.stakeholderSummary} />
-              <Separator />
-              <div className="flex gap-2 pt-3 px-4" onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 pb-5">
+              <div className="text-[0.82rem] text-foreground/70 leading-[1.7] mb-4">
+                <MarkdownBody text={selectedAnalysis.stakeholderSummary} />
+              </div>
+
+              {/* Refine row */}
+              <div className="flex gap-2 mt-4 pt-3 border-t border-secondary" onClick={(e) => e.stopPropagation()}>
                 <input
                   type="text"
                   placeholder="Ozeti nasil degistireyim?"
                   value={summaryInstruction}
                   onChange={(e) => setSummaryInstruction(e.target.value)}
-                  className="flex-1 px-3 py-1.5 text-sm border rounded-md bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="flex-1 px-3 py-[0.45rem] rounded-[8px] border border-border bg-secondary/50 text-[0.78rem] text-foreground outline-none focus:border-[#00bcd4] focus:bg-card placeholder:text-muted-foreground/40 font-[inherit]"
                 />
-                <Button
-                  size="sm"
+                <button
+                  className="px-3.5 py-[0.4rem] rounded-[7px] border border-border bg-card text-[0.75rem] font-semibold text-foreground/70 whitespace-nowrap hover:bg-secondary hover:border-border/80 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   onClick={handleRefineSummary}
                   disabled={!!actionLoading || !summaryInstruction.trim()}
                 >
                   {actionLoading === "refine-summary" ? (
-                    <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />Iyilestiriliyor</>
+                    <span className="flex items-center gap-1.5">
+                      <span className="material-icons-outlined animate-spin" style={{ fontSize: 14 }}>refresh</span>
+                      Iyilestiriliyor
+                    </span>
                   ) : "Guncelle"}
-                </Button>
+                </button>
               </div>
-            </CardContent>
+            </div>
           )}
-        </Card>
+        </div>
       ) : (
-        <div className="flex items-center justify-between rounded-lg border border-dashed px-4 py-4">
-          <p className="text-sm text-muted-foreground">Is ozeti henuz uretilmedi.</p>
-          <Button
-            variant="outline"
-            size="sm"
+        <div className="flex items-center justify-between rounded-[12px] border border-dashed border-border/60 bg-secondary/30 px-6 py-6">
+          <p className="text-[0.82rem] text-muted-foreground">Is ozeti henuz uretilmedi.</p>
+          <button
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[7px] border-none text-white text-[0.78rem] font-semibold cursor-pointer shadow-[0_1px_3px_rgba(0,188,212,0.3)] disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ background: "linear-gradient(135deg, #00bcd4, #00acc1)" }}
             onClick={handleStakeholderSummary}
             disabled={!!actionLoading}
           >
             {actionLoading === "summary" ? (
-              <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />Hazirlaniyor</>
-            ) : "Talep Aciklamasi Uret"}
-          </Button>
+              <>
+                <span className="material-icons-outlined animate-spin" style={{ fontSize: 16 }}>refresh</span>
+                Hazirlaniyor
+              </>
+            ) : (
+              <>
+                <span className="material-icons-outlined" style={{ fontSize: 16 }}>auto_awesome</span>
+                Talep Aciklamasi Uret
+              </>
+            )}
+          </button>
         </div>
       )}
     </div>

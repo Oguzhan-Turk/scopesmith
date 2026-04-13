@@ -277,6 +277,11 @@ export const createRequirement = (projectId: number, rawText: string, type?: str
     method: "POST",
     body: JSON.stringify({ rawText, type }),
   });
+export const updateRequirement = (id: number, rawText: string, type?: string) =>
+  request<Requirement>(`/requirements/${id}`, {
+    method: "PUT",
+    body: JSON.stringify({ rawText, type }),
+  });
 export const deleteRequirement = (id: number) =>
   request<void>(`/requirements/${id}`, { method: "DELETE" });
 export const analyzeRequirement = (id: number, modelTier?: string) => {
@@ -313,6 +318,18 @@ export const suggestSp = (taskId: number) =>
   request<{ spSuggestion: number; spRationale: string }>(`/tasks/${taskId}/suggest-sp`, { method: "POST" });
 export const getClaudeCodePrompt = (taskId: number) =>
   request<{ prompt: string }>(`/tasks/${taskId}/claude-code-prompt`);
+
+// Similar Requirements
+export interface SimilarRequirement {
+  requirementId: number;
+  text: string;
+  summary: string | null;
+  riskLevel: string | null;
+  affectedModules: string | null;
+  similarityPercent: number;
+}
+export const getSimilarRequirements = (requirementId: number, limit = 3) =>
+  request<SimilarRequirement[]>(`/requirements/${requirementId}/similar?limit=${limit}`);
 
 // Managed Agent
 export interface AgentStartResult { sessionId: string | null; status: string; branch: string; }

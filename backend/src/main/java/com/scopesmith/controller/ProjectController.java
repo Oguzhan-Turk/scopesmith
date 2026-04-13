@@ -336,6 +336,10 @@ public class ProjectController {
                     project.setRepoUrl(safeGitUrl);
                     projectService.save(project);
                     contextService.scanLocalFolder(id, clonedDir.toString());
+                    // Clear the temp clone path so it's not used after cleanup
+                    Project p2 = projectService.getProjectOrThrow(id);
+                    p2.setLocalPath(null);
+                    projectService.save(p2);
                     scanStatusService.setDone(id);
                 } catch (Exception e) {
                     log.error("Git scan failed for project {}: {}", id, e.getMessage());

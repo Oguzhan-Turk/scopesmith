@@ -8,6 +8,7 @@ import com.scopesmith.entity.Analysis;
 import com.scopesmith.entity.ModelTier;
 import com.scopesmith.repository.AnalysisRepository;
 import com.scopesmith.service.ChangeImpactService;
+import com.scopesmith.service.EmbeddingService;
 import com.scopesmith.service.ResourceAccessService;
 import com.scopesmith.service.RequirementAnalysisService;
 import com.scopesmith.service.RequirementService;
@@ -26,6 +27,7 @@ public class RequirementController {
     private final RequirementService requirementService;
     private final RequirementAnalysisService analysisService;
     private final ChangeImpactService changeImpactService;
+    private final EmbeddingService embeddingService;
     private final AnalysisRepository analysisRepository;
     private final ResourceAccessService resourceAccessService;
 
@@ -83,4 +85,35 @@ public class RequirementController {
         resourceAccessService.assertRequirementAccess(id);
         return changeImpactService.analyzeImpact(id);
     }
+
+    @GetMapping("/requirements/{id}/similar")
+    public List<SimilarRequirementResponse> findSimilar(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "3") int limit) {
+        resourceAccessService.assertRequirementAccess(id);
+        var req = requirementService.getRequirementOrThrow(id);
+        var similar = embeddingService.findSimilar(req.getProject().getId(), id, req.getRawText());
+        return similar.stream()
+                .limit(limit)
+                .map(s -> new SimilarRequirementResponse(
+                        s.requirementId(),
+                        s.rawText() != null && s.rawText().length() > 120
+                                ? s.rawText().substring(0, 120) + "..."
+                                : s.rawText(),
+                        s.summary(),
+                        s.riskLevel(),
+                        s.affectedModules(),
+                        Math.round(s.similarity() * 100)
+                ))
+                .toList();
+    }
+
+    public record SimilarRequirementResponse(
+            Long requirementId,
+            String text,
+            String summary,
+            String riskLevel,
+            String affectedModules,
+            int similarityPercent
+    ) {}
 }

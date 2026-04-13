@@ -5,6 +5,7 @@ import {
   getRequirements,
   createRequirement,
   deleteRequirement,
+  updateRequirement,
   analyzeRequirement,
   answerQuestion,
   dismissQuestion,
@@ -62,7 +63,6 @@ import {
   type ServiceGraph,
   type ServiceType,
 } from "@/api/client";
-import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/hooks/useToast";
 import { useAuth } from "@/hooks/useAuth";
@@ -309,6 +309,17 @@ export default function ProjectDetail() {
       handleSelectRequirement(Number(reqId));
     }
   }, [handleSelectRequirement, requirements, searchParams, selectedRequirementId]);
+
+  async function handleUpdateRequirement(reqId: number, rawText: string, type: string) {
+    try {
+      const updated = await updateRequirement(reqId, rawText, type);
+      setRequirements(prev => prev.map(r => r.id === reqId ? updated : r));
+      showToast("Talep güncellendi.", "success");
+    } catch (e) {
+      showToast("Talep güncellenemedi.");
+      console.error("Update failed:", e);
+    }
+  }
 
   async function handleDeleteRequirement(reqId: number) {
     setConfirmDialog({
@@ -1005,106 +1016,72 @@ export default function ProjectDetail() {
   const showProgress = !!(aiLoadingLabel || isAnalyzing);
   const progressLabel = aiLoadingLabel || (isAnalyzing ? "AI analiz ediyor..." : null);
 
-  return (
-    <div className="space-y-6 relative">
-      {/* AI Progress Bar */}
-      {showProgress && (
-        <div className="sticky top-0 z-30 -mx-6 -mt-6 mb-2 px-6 py-2.5 bg-primary/10 border-b flex items-center gap-3">
-          <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          <p className="text-sm font-medium">{progressLabel}</p>
-        </div>
-      )}
+  const sidebarItems = [
+    { section: "Analiz" as const, items: [
+      { value: "requirements", label: "Talepler", icon: "description", badge: requirements.length > 0 ? String(requirements.length) : undefined },
+      { value: "detail", label: "Talep Detay", icon: "search" },
+      { value: "tasks", label: "Task'lar", icon: "checklist", badge: tasks.length > 0 ? String(tasks.length) : undefined },
+    ]},
+    { section: "Proje" as const, items: [
+      { value: "context", label: "Bağlam", icon: "code", badge: project.hasContext ? `v${project.contextVersion}` : undefined, dot: project.contextStale || !project.hasContext },
+      ...(isAdmin ? [{ value: "integrations", label: "Proje Ayarları", icon: "settings" }] : []),
+      ...(isAdmin ? [{ value: "usage", label: "Kullanım", icon: "bar_chart" }] : []),
+    ]},
+  ];
 
-      {/* Project Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h1 className="text-xl font-semibold tracking-tight truncate">{project.name}</h1>
+  return (
+    <div className="flex flex-1 min-h-[calc(100vh-52px)]">
+      {/* Sidebar */}
+      <aside className="w-[230px] bg-card border-r border-border/50 py-5 flex-shrink-0 sticky top-[52px] h-[calc(100vh-52px)] overflow-y-auto">
+        {/* Project info */}
+        <div className="px-4 pb-4 border-b border-secondary mb-3">
+          <div className="text-[0.85rem] font-bold text-foreground mb-0.5">{project.name}</div>
           {project.description && (
-            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{project.description}</p>
+            <div className="text-[0.68rem] text-muted-foreground leading-snug line-clamp-2">{project.description}</div>
           )}
         </div>
-      </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        {/* Underline tab navigation — Linear/GitHub style */}
-        <div className="flex items-center justify-between border-b border-border mb-6">
-          {/* Primary workflow tabs */}
-          <div className="flex items-center">
-            {[
-              { value: "requirements", label: "Talepler" },
-              { value: "detail", label: "Talep Detay" },
-              {
-                value: "tasks",
-                label: (
-                  <>
-                    Task'lar
-                    {tasks.length > 0 && (
-                      <span className="ml-1.5 text-xs tabular-nums opacity-50">({tasks.length})</span>
-                    )}
-                  </>
-                ),
-              },
-            ].map((tab) => (
+        {sidebarItems.map((group) => (
+          <div key={group.section}>
+            <div className="text-[0.62rem] font-semibold text-muted-foreground uppercase tracking-[0.08em] px-4 py-2">
+              {group.section}
+            </div>
+            {group.items.map((item) => (
               <button
-                key={tab.value}
-                onClick={() => setActiveTab(tab.value)}
-                className={`flex items-center gap-1 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 ${
-                  activeTab === tab.value
-                    ? "border-primary text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+                key={item.value}
+                onClick={() => setActiveTab(item.value)}
+                className={`w-full flex items-center gap-2.5 px-4 py-2 text-[0.78rem] font-medium border-l-2 transition-all text-left ${
+                  activeTab === item.value
+                    ? "border-l-primary bg-gradient-to-r from-primary/4 to-transparent text-foreground font-semibold"
+                    : "border-l-transparent text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
                 }`}
               >
-                {tab.label}
+                <span className={`material-icons-outlined text-[17px] ${activeTab === item.value ? "text-primary" : "text-muted-foreground"}`}>{item.icon}</span>
+                {item.label}
+                {item.badge && (
+                  <span className="ml-auto text-[0.62rem] font-semibold px-1.5 py-px rounded-[10px] bg-secondary text-muted-foreground tabular-nums">{item.badge}</span>
+                )}
+                {"dot" in item && item.dot && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-warning ml-auto" />
+                )}
               </button>
             ))}
+            {group.section === "Analiz" && <div className="h-px bg-secondary mx-0 my-2" />}
           </div>
+        ))}
+      </aside>
 
-          {/* Utility / config tabs */}
-          <div className="flex items-center">
-            <button
-              onClick={() => setActiveTab("context")}
-              className={`flex items-center gap-1 px-3 py-2.5 text-sm border-b-2 -mb-px transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                activeTab === "context"
-                  ? "border-primary text-foreground font-medium"
-                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
-              }`}
-            >
-              Bağlam
-              {project.hasContext && (
-                <span className="text-xs opacity-50 font-normal">v{project.contextVersion}</span>
-              )}
-              {(project.contextStale || !project.hasContext) && (
-                <span className="w-1.5 h-1.5 rounded-full bg-warning inline-block" />
-              )}
-            </button>
-            {isAdmin && (
-              <button
-                onClick={() => setActiveTab("integrations")}
-                className={`px-3 py-2.5 text-sm border-b-2 -mb-px transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                  activeTab === "integrations"
-                    ? "border-primary text-foreground font-medium"
-                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
-                }`}
-              >
-                Proje Ayarları
-              </button>
-            )}
-            {isAdmin && (
-              <button
-                onClick={() => setActiveTab("usage")}
-                className={`px-3 py-2.5 text-sm border-b-2 -mb-px transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                  activeTab === "usage"
-                    ? "border-primary text-foreground font-medium"
-                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
-                }`}
-              >
-                Kullanım
-              </button>
-            )}
+      {/* Content */}
+      <main className="flex-1 p-8 max-w-[900px]">
+        {/* AI Progress Bar */}
+        {showProgress && (
+          <div className="mb-5 px-4 py-2.5 rounded-[10px] flex items-center gap-3" style={{ background: "linear-gradient(135deg, #00bcd410, #00d1ff08)", border: "1px solid #00bcd420" }}>
+            <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            <p className="text-[0.78rem] font-medium text-foreground">{progressLabel}</p>
           </div>
-        </div>
+        )}
 
-        <TabsContent value="requirements" className="space-y-4">
+        {activeTab === "requirements" && (
           <RequirementsTab
             project={project}
             projectId={projectId}
@@ -1118,13 +1095,14 @@ export default function ProjectDetail() {
             handleSelectRequirement={handleSelectRequirement}
             handleAnalyzeWithConfirm={handleAnalyzeWithConfirm}
             handleDeleteRequirement={handleDeleteRequirement}
+            handleUpdateRequirement={handleUpdateRequirement}
             setActiveTab={setActiveTab}
             setReqDialogOpen={setReqDialogOpen}
             traceability={traceability}
           />
-        </TabsContent>
+        )}
 
-        <TabsContent value="detail" className="space-y-6">
+        {activeTab === "detail" && (
           <DetailTab
             project={project}
             projectId={projectId}
@@ -1147,9 +1125,9 @@ export default function ProjectDetail() {
             handleRefineSummary={handleRefineSummary}
             setActiveTab={setActiveTab}
           />
-        </TabsContent>
+        )}
 
-        <TabsContent value="tasks" className="space-y-4">
+        {activeTab === "tasks" && (
           <TasksTab
             project={project}
             projectId={projectId}
@@ -1180,9 +1158,9 @@ export default function ProjectDetail() {
             setActiveTab={setActiveTab}
             loadTasks={loadTasks}
           />
-        </TabsContent>
+        )}
 
-        <TabsContent value="context" className="space-y-4">
+        {activeTab === "context" && (
           <ContextTab
             project={project}
             projectId={projectId}
@@ -1213,9 +1191,9 @@ export default function ProjectDetail() {
             integrationConfig={integrationConfig}
             setActiveTab={setActiveTab}
           />
-        </TabsContent>
+        )}
 
-        <TabsContent value="integrations" className="space-y-4">
+        {activeTab === "integrations" && (
           <IntegrationsTab
             project={project}
             projectId={projectId}
@@ -1240,9 +1218,9 @@ export default function ProjectDetail() {
             handleAddDependency={handleAddDependency}
             handleDeleteDependency={handleDeleteDependency}
           />
-        </TabsContent>
+        )}
 
-        <TabsContent value="usage" className="space-y-4">
+        {activeTab === "usage" && (
           <UsageTab
             project={project}
             projectId={projectId}
@@ -1252,8 +1230,8 @@ export default function ProjectDetail() {
             showToast={showToast}
             usageSummary={usageSummary}
           />
-        </TabsContent>
-      </Tabs>
+        )}
+      </main>
 
       <EditTaskDialog
         task={editingTask}

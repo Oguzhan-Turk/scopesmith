@@ -30,6 +30,7 @@ export interface RequirementsTabProps extends ProjectTabProps {
   handleSelectRequirement: (reqId: number) => void;
   handleAnalyzeWithConfirm: (reqId: number, tier?: string) => void;
   handleDeleteRequirement: (reqId: number) => void;
+  handleUpdateRequirement: (reqId: number, rawText: string, type: string) => void;
   setActiveTab: (tab: string) => void;
   setReqDialogOpen: (open: boolean) => void;
   traceability: TraceabilityReport | null;
