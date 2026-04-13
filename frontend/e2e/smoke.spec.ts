@@ -13,7 +13,7 @@ async function login(page: Page) {
 }
 
 async function createProject(page: Page, name: string) {
-  await page.getByRole("button", { name: "Yeni Proje" }).click();
+  await page.getByRole("button", { name: /Yeni Proje/ }).click();
   await page.locator("#proj-name").fill(name);
   await page.locator("#proj-desc").fill("Smoke test project");
   await page.getByRole("button", { name: "Oluştur" }).click();
@@ -37,7 +37,7 @@ async function openContextAndExpandScan(page: Page) {
   await page.waitForTimeout(1000);
   const yerelKlasor = page.getByText("Yerel Klasör");
   if (!(await yerelKlasor.isVisible().catch(() => false))) {
-    await page.getByText("Gelişmiş").first().click();
+    await page.getByText("Gelişmiş Tarama Ayarları").first().click();
   }
   await expect(yerelKlasor).toBeVisible({ timeout: 5000 });
 }
@@ -99,7 +99,7 @@ test("partial refresh FAILED entry is visible in timeline", async ({ page, reque
   await client.end();
 
   await openContextAndExpandScan(page);
-  await expect(page.getByText("Geçmiş yenilemeler")).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText("Tarama Geçmişi")).toBeVisible({ timeout: 15000 });
   await expect(page.getByText("FAILED")).toBeVisible({ timeout: 5000 });
   await page.getByText("FAILED").first().click();
   await expect(page.getByText(projectIdErrorText)).toBeVisible();
