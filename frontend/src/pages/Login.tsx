@@ -84,15 +84,6 @@ export default function Login() {
             </div>
           </div>
 
-          {/* Footer */}
-          <div className="flex items-center justify-between text-[0.62rem] uppercase tracking-wide text-muted-foreground/50 shrink-0">
-            <span>© 2024 ScopeSmith AI. Tüm haklar saklıdır.</span>
-            <div className="flex gap-4">
-              <span className="cursor-pointer hover:text-muted-foreground transition-colors">Kullanım Koşulları</span>
-              <span className="cursor-pointer hover:text-muted-foreground transition-colors">Gizlilik Politikası</span>
-              <span className="cursor-pointer hover:text-muted-foreground transition-colors">İletişim</span>
-            </div>
-          </div>
         </div>
 
         {/* ── Right panel ── */}
