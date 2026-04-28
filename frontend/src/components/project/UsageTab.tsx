@@ -23,26 +23,6 @@ function getOpColor(op: string): string {
   return OP_COLORS[op] || "#94a3b8";
 }
 
-function getShortLabel(op: string): string {
-  const shorts: Record<string, string> = {
-    REQUIREMENT_ANALYSIS: "Analiz",
-    BUG_ANALYSIS: "Bug",
-    ANALYSIS_REFINEMENT: "Refine",
-    TASK_BREAKDOWN: "Task",
-    TASK_REFINEMENT: "Task R.",
-    STAKEHOLDER_SUMMARY: "Ozet",
-    SUMMARY_REFINEMENT: "Ozet R.",
-    PROJECT_CONTEXT: "Tarama",
-    PROJECT_CONTEXT_STRUCTURED: "Yapisal",
-    SP_SUGGESTION: "SP",
-    FEATURE_SUGGESTION: "Ozellik",
-    DOCUMENT_SUMMARY: "Belge",
-    CHANGE_IMPACT: "Etki",
-    HEALTH_CHECK: "Saglik",
-    CLAUDE_CODE_EXPORT: "CC",
-  };
-  return shorts[op] || op.slice(0, 6);
-}
 
 export default function UsageTab({ usageSummary }: UsageTabProps) {
   if (!usageSummary || usageSummary.totalAiCalls === 0) {
@@ -57,7 +37,6 @@ export default function UsageTab({ usageSummary }: UsageTabProps) {
   }
 
   const opEntries = Object.entries(usageSummary.byOperationType);
-  const maxCount = Math.max(...opEntries.map(([, d]) => d.count), 1);
 
   return (
     <div className="space-y-6">
@@ -168,6 +147,32 @@ export default function UsageTab({ usageSummary }: UsageTabProps) {
         </div>
       )}
 
+      {/* ROI formula breakdown — transparency */}
+      {usageSummary.roi && (
+        <div className="bg-secondary/30 border border-border/50 rounded-[10px] px-5 py-3">
+          <div className="text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+            ROI Hesabı
+          </div>
+          <div className="text-[0.78rem] text-foreground/80 font-mono">
+            {usageSummary.roi.totalAnalyses} analiz × {usageSummary.roi.hoursPerAnalysis} saat ×{" "}
+            ${usageSummary.roi.analystHourlyRateUsd}/saat (analist rate) ={" "}
+            <span className="font-semibold text-emerald-700 dark:text-emerald-400">
+              ${usageSummary.roi.estimatedValueSavedUsd} tahmini değer
+            </span>
+            {" / "}
+            <span className="font-semibold text-foreground">
+              ${usageSummary.totalEstimatedCostUsd.toFixed(4)} AI maliyeti
+            </span>
+            {" = "}
+            <span className="font-bold text-primary">{usageSummary.roi.roiMultiplier}× ROI</span>
+          </div>
+          <div className="text-[0.68rem] text-muted-foreground/80 mt-1.5">
+            Default: 1.5 saat/analiz, ${usageSummary.roi.analystHourlyRateUsd}/saat (junior düzey).
+            Senior rate veya gerçek pazar saat ücretiyle çok daha yüksek olur.
+          </div>
+        </div>
+      )}
+
       {/* Operations breakdown card */}
       <div className="bg-card rounded-[14px] border border-black/4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] overflow-hidden">
         {/* Card header */}
@@ -211,28 +216,6 @@ export default function UsageTab({ usageSummary }: UsageTabProps) {
           </div>
         ))}
 
-        {/* Bar chart */}
-        {opEntries.length > 0 && (
-          <div className="flex items-end gap-6 px-6 py-6 h-[160px] border-t border-border/50">
-            {opEntries.map(([op, data]) => {
-              const pct = (data.count / maxCount) * 100;
-              return (
-                <div key={op} className="flex flex-col items-center gap-1 flex-1">
-                  <div
-                    className="w-full rounded-t-md min-h-[8px]"
-                    style={{
-                      height: `${pct}%`,
-                      background: "linear-gradient(180deg, #00bcd4, #00acc1)",
-                    }}
-                  />
-                  <span className="text-[0.62rem] text-muted-foreground font-medium">
-                    {getShortLabel(op)}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )}
       </div>
 
       {/* ROI disclaimer */}

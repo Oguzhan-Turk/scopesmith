@@ -230,9 +230,7 @@ public class TaskBreakdownService {
                     builder.jiraKey(oldMatch.getJiraKey());
                     preservedIssues.add(oldMatch.getJiraKey());
                 }
-                if (oldMatch.getSpFinal() != null) {
-                    builder.spFinal(oldMatch.getSpFinal());
-                }
+                // Note: spFinal NOT preserved — refine implies scope change, user re-estimates.
             }
 
             Task task = builder.build();

@@ -894,33 +894,47 @@ export default function TasksTab({
                           ))}
                         </div>
 
-                        {/* Divergence feedback chips */}
-                        {feedbackOpen.has(task.id) && (
-                          <div className="pt-3">
-                            <p className="text-[0.78rem] text-muted-foreground mb-2">AI'dan farklı seçtiniz — neden? <span className="opacity-60">(opsiyonel)</span></p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {["Karmaşık entegrasyon", "Belirsiz kapsam", "Yabancı teknoloji", "Bağımlılık riski"].map(reason => (
+                        {/* Divergence feedback chips — direction-aware */}
+                        {feedbackOpen.has(task.id) && (() => {
+                          const userHigher = task.spFinal != null && task.spSuggestion != null && task.spFinal > task.spSuggestion;
+                          const userLower = task.spFinal != null && task.spSuggestion != null && task.spFinal < task.spSuggestion;
+                          const reasons = userHigher
+                            ? ["Karmaşık entegrasyon", "Belirsiz kapsam", "Yabancı teknoloji", "Bağımlılık riski"]
+                            : userLower
+                            ? ["Mevcut altyapı kullanılabilir", "Benzer iş yapıldı", "Kapsam göründüğünden küçük", "AI fazla tahmin etti"]
+                            : [];
+                          const promptText = userHigher
+                            ? "AI'dan daha yüksek seçtiniz — neden?"
+                            : userLower
+                            ? "AI'dan daha düşük seçtiniz — neden?"
+                            : "AI'dan farklı seçtiniz — neden?";
+                          return (
+                            <div className="pt-3">
+                              <p className="text-[0.78rem] text-muted-foreground mb-2">{promptText} <span className="opacity-60">(opsiyonel)</span></p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {reasons.map(reason => (
+                                  <button
+                                    key={reason}
+                                    onClick={() => {
+                                      handleSpDecision(task.id, task.spFinal!, reason);
+                                      setFeedbackOpen(prev => { const n = new Set(prev); n.delete(task.id); return n; });
+                                      showToast("Geri bildirim kaydedildi.", "success");
+                                    }}
+                                    className="px-2.5 py-1 text-xs rounded-full border border-border bg-card hover:border-primary/40 hover:text-primary transition-colors"
+                                  >
+                                    {reason}
+                                  </button>
+                                ))}
                                 <button
-                                  key={reason}
-                                  onClick={() => {
-                                    handleSpDecision(task.id, task.spFinal!, reason);
-                                    setFeedbackOpen(prev => { const n = new Set(prev); n.delete(task.id); return n; });
-                                    showToast("Geri bildirim kaydedildi.", "success");
-                                  }}
-                                  className="px-2.5 py-1 text-xs rounded-full border border-border bg-card hover:border-primary/40 hover:text-primary transition-colors"
+                                  onClick={() => setFeedbackOpen(prev => { const n = new Set(prev); n.delete(task.id); return n; })}
+                                  className="px-2.5 py-1 text-xs rounded-full border border-transparent text-muted-foreground hover:text-foreground transition-colors"
                                 >
-                                  {reason}
+                                  Atla
                                 </button>
-                              ))}
-                              <button
-                                onClick={() => setFeedbackOpen(prev => { const n = new Set(prev); n.delete(task.id); return n; })}
-                                className="px-2.5 py-1 text-xs rounded-full border border-transparent text-muted-foreground hover:text-foreground transition-colors"
-                              >
-                                Atla
-                              </button>
+                              </div>
                             </div>
-                          </div>
-                        )}
+                          );
+                        })()}
                       </div>
 
                       {/* Two-column: Prompt + Agent */}

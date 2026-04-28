@@ -237,6 +237,7 @@ export interface UsageSummary {
     totalAnalyses: number;
     estimatedHoursSaved: number;
     costPerAnalysis: number;
+    hoursPerAnalysis: number;
     analystHourlyRateUsd: number;
     estimatedValueSavedUsd: number;
     roiMultiplier: number;

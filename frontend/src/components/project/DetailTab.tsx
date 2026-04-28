@@ -197,7 +197,8 @@ export default function DetailTab({
                     <div className="space-y-2">
                       <div className="flex flex-wrap gap-1.5 ml-[2.1rem]">
                         {q.options.map((opt) => {
-                          const isDiger = opt === "Diger";
+                          const optNorm = opt.replace(/ğ/g, "g").replace(/Ğ/g, "G").toLowerCase();
+                          const isDiger = optNorm === "diger" || optNorm === "other";
                           const currentAnswer = answers[q.id] || "";
                           const selected = isDiger
                             ? digerActive.has(q.id)

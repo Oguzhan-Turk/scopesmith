@@ -51,12 +51,17 @@ Rules:
   estimate, ADJUST your suggestion to match the team's calibration and explain why.
 - Do NOT create generic "monitoring" or "error handling" tasks unless the
   requirement explicitly asks for them. Error handling should be part of each task.
-- Keep task count strict and outcome-oriented:
-  - Default target: 3-6 tasks
-  - Hard upper bound: 8 tasks
-  - If you produced more than 8, merge the most coupled tasks
-  - If the requirement is small/clear, prefer 2-4 tasks
-  A single well-described 5 SP task is always better than five 1 SP micro-tasks.
+- Match task count AND total SP to requirement size — fewer is better:
+  - Tiny (1-line, no edge cases, single component): 1-2 tasks, total ≤ 8 SP
+  - Small (clear scope, ≤ 2 components): 2-3 tasks, total ≤ 13 SP
+  - Medium (multi-component, some unknowns): 3-5 tasks, total ≤ 21 SP
+  - Large (cross-service, many unknowns): 5-7 tasks, total ≤ 34 SP
+  - HARD CAP: 8 tasks regardless of size
+- Before finalizing, count your tasks AND sum SP. If either exceeds the bracket,
+  MERGE coupled tasks until you fit. Do not pad SP "for safety".
+- Pessimistic on count: when in doubt, output FEWER tasks with HIGHER SP,
+  not more tasks with smaller SP. A single well-described 5 SP task is
+  always better than five 1 SP micro-tasks.
 - Avoid "phase-based" decomposition (analysis → implementation → test → cleanup).
   Prefer component/outcome-based decomposition.
 - If architecture is multi-service:
