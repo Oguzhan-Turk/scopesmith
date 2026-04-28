@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -108,7 +109,8 @@ class TaskBreakdownServiceTest {
         assertEquals(List.of("#42"), response.getOrphanedIssues());
         assertEquals(1, response.getTasks().size());
         assertEquals("SCOPE-77", response.getTasks().getFirst().getJiraKey());
-        assertEquals(5, response.getTasks().getFirst().getSpFinal());
+        // spFinal should NOT be preserved on refine — scope changed, user re-estimates.
+        assertNull(response.getTasks().getFirst().getSpFinal());
 
         verify(taskSyncRefService, times(1))
                 .upsert(any(Task.class), eq(SyncProviderType.JIRA), eq("SCOPE"), eq("SCOPE-77"));
