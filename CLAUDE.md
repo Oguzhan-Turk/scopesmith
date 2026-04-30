@@ -71,6 +71,10 @@ Backend: http://localhost:8080 | Frontend: http://localhost:5173 | Users: admin/
 - **Dependency parsing:** Build file parse (Maven/npm/Gradle/Python/Go), token harcanmaz
 - **Module dependency graph:** Import-based (dependsOn/consumedBy), token harcanmaz
 - **SP refetch yok:** `task.spSuggestion` doluysa API çağrılmaz, tab geçişlerinde kaybolmaz
+- **Refine SP reset:** Task refine sırasında eski task'ın `spFinal` değeri yeni task'a preserve edilmez (jiraKey/syncRefs preserve edilir). Sebep: refine = scope değişti = yeniden estimate (bkz. ADR-013)
+- **ROI defaults:** `UsageController.hourlyRate` default `$10/saat` (TR junior baseline). Önceki `$25` US-rate'ti, kalibrasyon için düşürüldü (bkz. ADR-012)
+- **"Diğer" choice eşleşmesi:** Frontend `optNorm === "diger" || "other"` (Türkçe ğ + lowercase normalize) — daha önce `=== "Diger"` (G ile) eşleşmiyordu
+- **Task breakdown size matching:** Prompt boyut bazlı task count + total SP eşleştirir (Tiny: 1-2 task, Small: 2-3, Medium: 3-5, Large: 5-7; hard cap 8). Küçük talepler için over-decomposition önlenir
 
 ## Entegrasyonlar
 - **Jira Cloud:** Issue oluşturma, CSV export, durum doğrulama, yetim issue kapatma

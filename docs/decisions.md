@@ -421,3 +421,61 @@ agent orchestration ve audit görünürlüğü sağlar.
     1. Control-tower modelinde yeterli adoption + reliability
     2. Native mode için açık müşteri talebi ve ekonomik gerekçe
     3. Audit, workflow, permission, reporting katmanlarının SoR seviyesinde olgunlaşması
+
+---
+
+## ADR-012: ROI Hourly Rate — TR Junior Analyst Baseline
+**Date:** 2026-04-28
+**Status:** Accepted
+
+**Decision:** `UsageController.hourlyRate` default değeri `$25.0`'tan `$10.0`'a düşürüldü.
+
+**Rationale:**
+- Önceki default ($25/saat) US junior engineer rate'ine yakındı; TR pazarı için fazla yüksek.
+- TR junior analyst tipik maaşı 60-80k TL/ay ≈ ~400 TL/saat ≈ ~$10/saat (38 TL/USD kurla).
+- Düşük rate kullanmak ROI claim'lerini daha **defansif** hâle getirir — senior rate'le yapılan hesaplar daha yüksek çıkar zaten.
+- Default değeri muhafazakâr tutmak, kuruma sunulan ROI sayılarını "abartılmış" eleştirisinden koruyor.
+
+**Alternatives Considered:**
+- $25 olduğu gibi bırakmak: US-rate'e dayalı, TR pazarına kalibre değil
+- Per-organization config gerektirmek: gereksiz friction, default değer olmazsa UI bozulur
+- TL bazlı parametre: API tutarlılığı için USD tercih edildi (Anthropic/OpenAI maliyeti zaten USD)
+
+**Consequences:**
+- Aynı veriyle hesaplanan ROI çarpanı 388× → 162× düştü (görünüş olarak).
+- Ama bu "azalma" değil, "gerçeğe yaklaşma" — sayı şimdi pazara karşı savunulabilir.
+- Müşteri/ekip kendi rate'ini geçirebilir (`?hourlyRate=15` gibi); default sadece konservatif başlangıç.
+- Sunum/pazarlama materyallerinde "TR junior baseline" disclaimer'ı eklenmeli.
+
+**Implementation:**
+- `backend/src/main/java/com/scopesmith/controller/UsageController.java:28`:
+  ```java
+  @RequestParam(defaultValue = "10.0") double hourlyRate
+  ```
+- Frontend ROI breakdown (UsageTab.tsx) bu rate'i ve `hoursPerAnalysis`'ı görünür şekilde gösteriyor (transparency).
+
+---
+
+## ADR-013: Refine Behavior — Reset Story Points
+**Date:** 2026-04-28
+**Status:** Accepted
+
+**Decision:** Task refine işlemi sırasında title-match ile bulunan eski task'ın `spFinal` değeri yeni task'a artık preserve edilmiyor. Refine sonrası SP boş gelir, kullanıcı yeniden seçer.
+
+**Rationale:**
+- Refine = scope değişti = yeni estimate beklenir.
+- Önceki davranış: Title eşleşince `oldMatch.getSpFinal()` yeni task'a yazılıyordu — bu durumda kullanıcı UI'da "zaten karar verilmiş" gibi gözükmesi nedeniyle tekrar değerlendirmiyordu.
+- Refine'ın tam amacı task içeriğini değiştirmek; eski tahmin yeni içeriğe büyük ihtimalle uymaz.
+
+**Alternatives Considered:**
+- Eski SP'yi preserve edip görsel bir "stale" işareti göstermek: ekstra UI karmaşıklığı, kullanıcı yine kafası karışır
+- Sadece exact title match'te preserve, fuzzy match'te reset: özel durum logic'i, anlama zor
+- Kullanıcıya seçenek vermek (preserve mi reset mi): refine zaten bilinçli karar, ekstra modal verimi öldürür
+
+**Consequences:**
+- Jira sync (jiraKey, syncRefs) preserve edilmeye devam eder — sadece SP reset.
+- Test güncellendi: `TaskBreakdownServiceTest.replaceTasksWithRefined_shouldPreserveMatchedSyncRefsAndCloseOrphans` — `assertEquals(5, spFinal)` → `assertNull(spFinal)`.
+- Kullanıcı her refine sonrası SP'yi yeniden seçer — bu "ekstra iş" gibi görünür ama refine'ın tanımına uygun.
+
+**Implementation:**
+- `backend/src/main/java/com/scopesmith/service/TaskBreakdownService.java:233` — `if (oldMatch.getSpFinal() != null)` bloğu kaldırıldı.

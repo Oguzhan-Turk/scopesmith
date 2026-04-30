@@ -1421,3 +1421,87 @@ Bu dosya Claude Code / Codex arasında kayıpsız devir için ortak kaynak olara
   - Hybrid kaliteyi ölçmek için golden question set + answer regression testi eklenebilir.
 - Next actions:
   1. İstenirse `SCOPESMITH_ASSISTANT_AI_ENABLED` ile rollout canary yapılabilir (önce internal users).
+
+---
+
+## 2026-04-13 — Claude Code (UI redesign + CI stabilization)
+- Branch + commit: `master` (merge from `ui-redesign`) → `0afc23a..7aa41b7`
+- Scope:
+  - Frontend redesign + UI consistency pass + CI green-up.
+- Changes:
+  - `frontend/src/pages/Login.tsx`
+    - `@` ikonu → `person_outline`, placeholder sadeleştirildi
+    - Footer (copyright/legal) kaldırıldı
+  - `frontend/src/components/Layout.tsx`, `frontend/src/pages/Dashboard.tsx`, `frontend/src/components/project/RequirementsTab.tsx`
+    - Navbar yeniden, talepler tab kart layout yenilendi
+    - Requirements card edit/delete flow (action menu, edit dialog, type toggle)
+  - `frontend/src/api/client.ts`
+    - `updateRequirement(id, rawText, type)` eklendi
+  - `backend/src/main/java/com/scopesmith/controller/RequirementController.java`
+    - `PUT /api/v1/requirements/{id}` endpoint
+  - `backend/src/main/java/com/scopesmith/controller/ProjectController.java`
+    - Git clone scan sonrası `localPath = null` set edilerek temp path persistence bug'ı kapatıldı
+  - `frontend/src/hooks/useToast.tsx`
+    - Solid colored toast → card-style with colored left border
+  - `frontend/src/components/project/TasksTab.tsx`
+    - `hasLocalPath` prop, "Yerel path gerekli" badge, agent button disable durumu
+    - Unused imports cleanup
+  - `frontend/e2e/smoke.spec.ts`
+    - UI redesign sonrası locator'lar resilient hâle getirildi
+    - Empty-state buton metni handling (`Proje Oluştur` vs `Yeni Proje Başlat`)
+    - Heading vs text-by-role disambiguation (strict mode violation)
+  - `backend/src/main/java/com/scopesmith/service/TaskBreakdownService.java`
+    - `project` ve `hasLocalPath` props destructure edilmemiş bug'ı düzeltildi
+- Verification:
+  - `backend`: compile + tests ✅
+  - `frontend`: `tsc -b`, `eslint`, `vite build`, `playwright e2e:smoke` ✅
+- Open items:
+  - "Bütün ekranlar sola yapışık ve ekranı kaplamıyor" (geniş ekran layout sorunu) **çözülmedi** — ayrı bir oturuma bırakıldı.
+- Next actions:
+  1. Wide-screen layout fix (max-width + center, veya responsive grid).
+
+---
+
+## 2026-04-28 — Claude Code (6 UX bug fixes)
+- Branch + commit: `master` @ `9800c0a` (`fix: 6 UX bugs found during demo prep`) + `1a7f346` (test alignment)
+- Scope:
+  - Manuel test sırasında tespit edilen 6 ufak ama belirgin UX sorunu giderildi.
+- Changes:
+  - **Bug 1 — "Diğer" textbox açılmıyor:**
+    - `frontend/src/components/project/DetailTab.tsx:200`
+    - `opt === "Diger"` (G ile) → `optNorm === "diger" || "other"` (Türkçe ğ + lowercase normalize)
+    - Sebep: AI prompt `"Diğer"` (Türkçe ğ) üretiyor, frontend hiçbir zaman match etmiyordu.
+  - **Bug 2 — Task breakdown çok fazla task üretiyor:**
+    - `backend/src/main/resources/prompts/task-breakdown.txt` + DB prompt v2
+    - Boyut bazlı eşleştirme eklendi (Tiny: 1-2 task ≤8 SP, Small: 2-3 ≤13, Medium: 3-5 ≤21, Large: 5-7 ≤34)
+    - Hard cap: 8 task. "Pessimistic on count" direktifi.
+    - DB cache backend restart ile temizlenir.
+  - **Bug 3 — SP divergence soruları yön-farkındasız:**
+    - `frontend/src/components/project/TasksTab.tsx:898`
+    - `task.spFinal > task.spSuggestion` (yukarı) vs `<` (aşağı) için ayrı reason set'leri ve ayrı soru metni.
+  - **Bug 4 — Refine sonrası eski SP'ler preserve ediliyor:**
+    - `backend/src/main/java/com/scopesmith/service/TaskBreakdownService.java:233`
+    - Title-match'li task'ta `oldMatch.getSpFinal()` artık preserve edilmiyor.
+    - Sebep: refine = scope değişti = yeni estimate beklenir.
+    - `backend/src/test/java/com/scopesmith/service/TaskBreakdownServiceTest.java`
+      - `assertEquals(5, ...)` → `assertNull(...)` (yeni davranış)
+  - **Bug 5 — ROI hesabı görünür değildi:**
+    - `frontend/src/components/project/UsageTab.tsx`
+    - ROI kartının altına şeffaf formül breakdown eklendi:
+      - `analyses × hours × rate = value / cost = multiplier`
+    - `frontend/src/api/client.ts` — `roi.hoursPerAnalysis` field type'a eklendi.
+  - **Bug 6 — Yararsız bar chart:**
+    - `frontend/src/components/project/UsageTab.tsx`
+    - "Operasyon Bazlı Dağılım" tablosunun altındaki redundant bar chart kaldırıldı.
+    - `getShortLabel()` ve `maxCount` artık kullanılmıyor, temizlendi.
+  - **Default rate update (related):**
+    - `backend/src/main/java/com/scopesmith/controller/UsageController.java`
+    - `hourlyRate` default `25.0 → 10.0` (TR junior baseline). Bkz. ADR-012.
+- Verification:
+  - `backend`: compile + `TaskBreakdownServiceTest` ✅
+  - `frontend`: `tsc`, `eslint`, `vite build` ✅
+  - CI: green ✅
+- Open items:
+  - Bug 1, 2, 3, 4 davranışsal test henüz yapılmadı (gerçek AI çağrısı tetiklemek gerekirdi). Statik kontroller geçti.
+- Next actions:
+  1. Wide-screen layout problemi (Apr 13'ten kalan açık iş).
